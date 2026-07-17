@@ -6,7 +6,7 @@ tags:
   - case-study
   - workcard
 status: active
-version: 2
+version: 4
 owner: navigation
 updated: 2026-07-17
 ---
@@ -17,9 +17,9 @@ updated: 2026-07-17
 
 ## Сейчас
 
-**Этап 1 завершён:** [[product-brief]], [[mvp-scope|MVP Scope v1]] и [[success-criteria]] приняты.
+**Этапы 1 и 2 завершены:** продуктовая граница и доменная спецификация приняты.
 
-**Следующий этап:** доменная спецификация, начиная с [[glossary]] и [[as-is-to-be]]. После базового проектирования проект развивается небольшими работающими vertical slices.
+**Следующий этап:** требования и acceptance criteria, начиная с [[use-cases]], [[user-stories]] и [[negative-scenarios]]. После базового проектирования проект развивается небольшими работающими vertical slices.
 
 ## Управление проектом
 
