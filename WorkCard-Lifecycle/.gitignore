@@ -1,0 +1,6 @@
+# Obsidian local UI state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
+# Obsidian local trash
+.trash/
