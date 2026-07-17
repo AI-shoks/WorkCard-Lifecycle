@@ -1,82 +1,93 @@
 ---
 artifact_id: domain.work-card-state-machine
 status: accepted
-version: 1
+version: 3
 owner: domain
 updated: 2026-07-17
 ---
 
 # WorkCard State Machine
 
-Канонический автомат состояний `WorkCard` для линейного workflow MVP v1. Любой переход вне этой схемы запрещён независимо от состояния UI.
+Канонический автомат `WorkCard` и связанный first-article gate `WorkCardSet`. Мастер фиксирует выполнение; назначенный исполнитель не отправляет lifecycle-команды. `WorkCardId` не является номером детали, а `CLOSED` не является финальной приёмкой всей партии.
 
-## Диаграмма
+## Диаграмма карточки
 
 ```mermaid
 stateDiagram-v2
     [*] --> RELEASED: ReleaseWorkCards
     RELEASED --> ASSIGNED: AssignWorkCards
-    ASSIGNED --> IN_PROGRESS: StartWorkCard
-    IN_PROGRESS --> COMPLETED: CompleteWorkCard
-    COMPLETED --> MASTER_CONFIRMED: ConfirmWorkCardByMaster
-    MASTER_CONFIRMED --> CLOSED: ConfirmWorkCardQuality
+    ASSIGNED --> IN_PROGRESS: StartWorkCard / MASTER
+    IN_PROGRESS --> COMPLETED: CompleteWorkCard / MASTER
+    COMPLETED --> CLOSED: AcceptFirstArticle / QUALITY_CONTROLLER
+    COMPLETED --> CLOSED: ConfirmWorkCardQuality / QUALITY_CONTROLLER
     CLOSED --> [*]
 
-    note right of CLOSED
-      Quality confirmation is recorded
-      and the card closes atomically.
-      Mock payroll export does not
-      change WorkCard status.
+    note right of COMPLETED
+      First-article card uses AcceptFirstArticle.
+      Serial card uses synthetic per-card
+      ConfirmWorkCardQuality.
+      Neither transition records FinalBatchAcceptance.
     end note
 ```
 
-## Состояния
+## Gate комплекта
+
+```mermaid
+stateDiagram-v2
+    [*] --> FIRST_ARTICLE_PENDING: ReleaseWorkCards
+    FIRST_ARTICLE_PENDING --> SERIAL_ALLOWED: AcceptFirstArticle
+    SERIAL_ALLOWED --> [*]
+```
+
+При `FIRST_ARTICLE_PENDING` комплект может зарегистрировать и провести только одну first-article карточку. Остальные serial-карточки не назначаются и не запускаются до `SERIAL_ALLOWED`.
+
+## Состояния карточки
 
 | Состояние | Значение | Обязательные данные |
 |---|---|---|
-| `RELEASED` | Карточка выпущена, но ещё не назначена. | `assigneeId = null` |
-| `ASSIGNED` | Карточка назначена исполнителю и ожидает начала. | `assigneeId` |
-| `IN_PROGRESS` | Назначенный исполнитель выполняет работу. | `assigneeId`, время начала |
-| `COMPLETED` | Исполнитель заявил о завершении; требуется проверка мастера. | исполнитель, время завершения |
-| `MASTER_CONFIRMED` | Мастер подтвердил выполнение; требуется положительное подтверждение БТК. | субъект и время подтверждения мастера |
-| `CLOSED` | БТК подтвердил качество, жизненный цикл завершён. | субъект и время подтверждения БТК/закрытия |
+| `RELEASED` | Внутренняя карточка выпущена в operation-scoped комплекте, но не назначена. | UUID, set/batch, `batchQuantitySnapshot`, operation/norm snapshots |
+| `ASSIGNED` | Мастер назначил карточку исполнителю и зафиксировал purpose. | `assigneeId`, `FIRST_ARTICLE | SERIAL` |
+| `IN_PROGRESS` | Мастер зафиксировал начало назначенной работы. | assignee, субъект/время старта |
+| `COMPLETED` | Мастер зафиксировал завершение; требуется положительное действие БТК. | assignee, субъект/время завершения |
+| `CLOSED` | First-article gate пройден либо отдельная serial WorkCard цифрово закрыта синтетическим per-card подтверждением. | тип цифрового действия, субъект/время закрытия; финальная приёмка партии не выводится |
+
+Состояния `MASTER_CONFIRMED` нет: отдельное подтверждение мастера дублировало бы факт, который уже фиксирует мастер командой `CompleteWorkCard`.
 
 ## Переходы
 
-| Из | Команда | Роль и ограничение | В | Событие | Правила |
+| Из | Команда | Роль и ограничение | В | События | Правила |
 |---|---|---|---|---|---|
-| создание | `ReleaseWorkCards` | Планировщик выпускает партию | `RELEASED` | `WorkCardReleased` | `BR-012`–`BR-016` |
-| `RELEASED` | `AssignWorkCards` | Мастер; карточка не назначена | `ASSIGNED` | `WorkCardAssigned` | `BR-020`–`BR-024` |
-| `ASSIGNED` | `StartWorkCard` | Только назначенный исполнитель | `IN_PROGRESS` | `WorkCardStarted` | `BR-030` |
-| `IN_PROGRESS` | `CompleteWorkCard` | Только назначенный исполнитель | `COMPLETED` | `WorkCardCompleted` | `BR-031` |
-| `COMPLETED` | `ConfirmWorkCardByMaster` | Мастер | `MASTER_CONFIRMED` | `WorkCardMasterConfirmed` | `BR-032` |
-| `MASTER_CONFIRMED` | `ConfirmWorkCardQuality` | Контролёр БТК | `CLOSED` | `WorkCardQualityConfirmed` | `BR-033`–`BR-035` |
+| создание | `ReleaseWorkCards` | `PLANNER`, атомарный выпуск всех комплектов | `RELEASED` | `WorkCardReleased` | `BR-012`–`BR-016` |
+| `RELEASED` | `AssignWorkCards` | `MASTER`; first article или открытый serial gate | `ASSIGNED` | `WorkCardAssigned` | `BR-020`–`BR-024` |
+| `ASSIGNED` | `StartWorkCard` | `MASTER`; gate соответствует purpose | `IN_PROGRESS` | `WorkCardStarted` | `BR-030` |
+| `IN_PROGRESS` | `CompleteWorkCard` | `MASTER` | `COMPLETED` | `WorkCardCompleted` | `BR-031` |
+| `COMPLETED` | `AcceptFirstArticle` | БТК; зарегистрированная first-article карточка и pending gate | `CLOSED` | `WorkCardQualityConfirmed`, `FirstArticleAccepted` | `BR-032` |
+| `COMPLETED` | `ConfirmWorkCardQuality` | БТК; serial-карточка и `SERIAL_ALLOWED`; per-card `TO_BE_DECISION` | `CLOSED` | `WorkCardQualityConfirmed` | `BR-033`–`BR-036` |
 
-## Универсальные проверки перехода
+## Граница финальной приёмки
 
-Перед любым переходом backend обязан:
+`FinalBatchAcceptance` — отдельный подтверждённый AS-IS-факт после завершения всей партии, сопровождаемый подписями БТК на физических карточках. Он не является состоянием этой state machine. Закрытие одной или всех WorkCard не создаёт финальную приёмку неявно.
 
-1. проверить существование карточки;
-2. проверить роль и, для действий исполнителя, совпадение `actorId` с `assigneeId`;
-3. сравнить `expectedVersion` с текущей версией;
-4. проверить точное исходное состояние;
-5. применить изменение, увеличить версию на единицу и сохранить audit event в одной транзакции.
+## Универсальные проверки
 
-Нарушение любой проверки оставляет карточку без изменений согласно `BR-001`–`BR-003` и `BR-050`–`BR-061`.
+1. backend устанавливает доверенную роль;
+2. загружает карточку и, когда требуется, комплект;
+3. проверяет точные роли, purpose, gate и исходное состояние;
+4. сверяет версии всех изменяемых агрегатов;
+5. применяет изменение, увеличивает версии и сохраняет полный набор audit events одной транзакцией.
+
+Отказ не создаёт состояние или событие успеха по `BR-001`–`BR-003`, `BR-050`–`BR-062`.
 
 ## Запрещённые переходы MVP
 
-- назначение из любого состояния, кроме `RELEASED`;
-- начало или завершение работы не назначенным исполнителем;
+- lifecycle-команда от `WORKER`, `PLANNER` или `ADMIN_AUDITOR`;
+- serial assignment/start до first-article acceptance;
+- более одной first-article карточки комплекта;
 - завершение без начала;
-- подтверждение мастером до `COMPLETED` или повторное подтверждение;
-- подтверждение БТК до `MASTER_CONFIRMED` или повторное подтверждение;
-- любое изменение жизненного цикла после `CLOSED`;
-- возврат в предыдущее состояние;
-- `REWORK_REQUIRED`, отклонение БТК, переназначение и повторный выпуск.
+- положительное действие БТК до `COMPLETED` или не для соответствующего purpose/gate;
+- любое изменение после `CLOSED`;
+- возврат, отклонение, `REWORK_REQUIRED`, переназначение и повторный выпуск.
 
-## Mock payroll и состояние карточки
+## Mock payroll
 
-`ExportWorkCardToPayroll` разрешён только для `CLOSED`, но не является переходом state machine. Факт первого экспорта хранится в отдельной `PayrollRecord`; повторный экспорт идемпотентен согласно `BR-040`–`BR-044`.
-
-Ветка `REWORK_REQUIRED` будет проектироваться только при переходе к итерации 2 и потребует явного изменения [[mvp-scope]], [[business-rules]], этого автомата и связанных требований.
+`ExportWorkCardToPayroll` разрешён только для `CLOSED`, но не является переходом. Факт первого export хранится в `PayrollRecord`; повтор идемпотентен.

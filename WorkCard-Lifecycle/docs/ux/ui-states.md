@@ -1,181 +1,177 @@
 ---
 artifact_id: ux.ui-states
 status: accepted
-version: 1
+version: 3
 owner: ux
 updated: 2026-07-17
 ---
 
 # UI States
 
-Каталог loading, empty, success, error и concurrency-состояний для экранов [[screen-map]]. UI не угадывает бизнес-результат: подтверждённое backend-состояние всегда важнее локального представления.
+Loading, empty, success, error, gate и concurrency states для [[screen-map]]. Backend state всегда важнее локального представления.
 
 ## Общая модель запроса
 
 ```mermaid
 stateDiagram-v2
     [*] --> InitialLoading
-    InitialLoading --> Ready: данные получены
-    InitialLoading --> LoadError: безопасная ошибка
-    LoadError --> InitialLoading: повторить
-    Ready --> Submitting: команда подтверждена
-    Submitting --> Refreshing: backend подтвердил успех
-    Refreshing --> Ready: актуальное состояние перечитано
-    Submitting --> ValidationError: неверный ввод
-    Submitting --> BusinessError: роль или предусловие
-    Submitting --> VersionConflict: версия устарела
-    VersionConflict --> Refreshing: перечитать
-    BusinessError --> Refreshing: обновить данные
+    InitialLoading --> Ready: data loaded
+    InitialLoading --> LoadError: safe error
+    LoadError --> InitialLoading: retry read
+    Ready --> Submitting: explicit command
+    Submitting --> Refreshing: backend success
+    Refreshing --> Ready: all targets refreshed
+    Submitting --> ValidationError
+    Submitting --> BusinessOrGateError
+    Submitting --> VersionConflict
+    VersionConflict --> Refreshing: explicit reload
 ```
 
-Успех команды не считается полностью отображённым до перечитывания затронутого объекта или набора. Если команда подтверждена, но refresh не удался, UI сообщает: «Действие могло выполниться; обновите данные», не предлагает слепой повтор.
+Если backend подтвердил command, но refresh не удался, UI сообщает неопределённость результата и требует read before retry.
 
 ## Типы состояний
 
-| Состояние | Представление | Допустимое действие |
+| State | Представление | Действие |
 |---|---|---|
-| initial loading | skeleton структуры экрана, заголовок маршрута сохраняется | дождаться / отменить навигацией |
-| background refresh | тонкий progress, существующие данные помечены как обновляемые | чтение разрешено, команды временно блокируются |
-| submitting | текст действия + spinner, повторный submit заблокирован | отмена только до отправки |
-| empty | объяснение, почему данных нет, и релевантный следующий шаг | роль-зависимый CTA или сброс фильтров |
-| success | краткое сообщение и подтверждённые новые данные | продолжить workflow |
-| validation error | сводка и ошибки возле полей | исправить и отправить заново |
-| authorization/access | безопасное сообщение без защищённых деталей | вернуться к партиям / сменить demo-роль |
-| not found | безопасное «объект недоступен или не существует» | вернуться к родительскому списку |
-| business/state conflict | причина на уровне доступного контекста | обновить данные |
-| version conflict | отдельный blocking alert, старая версия не перезаписывается | перечитать объект |
-| network/server error | request ID при наличии, без ложного бизнес-результата | повторить чтение; команду — только осознанно |
-| integrity warning | ожидаемое `N` не совпало с наблюдаемым результатом | обновить; не продолжать массовое действие |
+| initial loading | skeleton итоговой структуры, shell/role видимы | wait/navigation |
+| background refresh | existing data + progress; commands blocked | read |
+| submitting | command label + spinner; duplicate disabled | wait |
+| empty | причина и role-relevant next step | CTA/reset filter |
+| validation | summary + field errors | correct/resubmit |
+| authorization/access | safe message without protected data | back/switch role |
+| state/gate conflict | доступная причина и current state | refresh |
+| version conflict | blocking alert; no overwrite | reload all targets |
+| network/server | request ID, no false result | retry read first |
+| integrity warning | passport plan/counts/snapshots disagree | stop commands, refresh |
 
 ## Loading
 
-- skeleton повторяет финальную структуру, чтобы layout не прыгал;
-- глобальная смена маршрута не стирает breadcrumb и активную роль;
-- `S-04` при background refresh сохраняет таблицу, но блокирует checkbox и массовую панель;
-- `S-05` сохраняет видимый статус, помечает его как обновляемый и блокирует команду;
-- `S-06` и `S-07` не используют кэш другого demo-контекста после смены роли;
-- loading дольше согласованного порога показывает текст «Загрузка занимает больше времени», а не объявляет ошибку.
+- `S-03` skeleton reserves operation-plan/set table;
+- `S-04` background refresh preserves cards/distribution but blocks selection;
+- `S-05` shows current status/gate as updating and blocks command;
+- protected cache is cleared on role switch;
+- slow loading is announced without claiming error.
 
 ## Empty states
 
-| Контекст | Сообщение | CTA |
+| Context | Message | CTA |
 |---|---|---|
-| `S-01`, партий нет, `PLANNER` | «Производственных партий пока нет» | «Создать партию» |
-| `S-01`, партий нет, другая роль | «Партии появятся после создания планировщиком» | нет бизнес-действия |
-| `S-01`, фильтр ничего не нашёл | «По выбранным условиям партий нет» | «Сбросить фильтры» |
-| `S-03`, партия не выпущена | «Комплект ещё не создан» | выпуск только для допустимого `PLANNER` |
-| `S-04`, карточек нет при ожидаемом `N > 0` | предупреждение о неполном/недоступном выпуске | «Обновить», назначение заблокировано |
-| `S-04`, фильтр ничего не нашёл | «Нет карточек с такими параметрами» | «Сбросить фильтры» |
-| `S-06`, история пуста | «Успешных событий для карточки не найдено» | «Обновить» |
-| `S-07`, payroll отсутствует | безопасный not-found; на `S-05` — первый export, если разрешён | вернуться к карточке |
-
-Empty state не создаёт доменные данные автоматически и не предлагает действие, запрещённое активной роли.
+| `S-01`, no batches, `PLANNER` | «Партий пока нет» | create |
+| `S-01`, no batches, other role | «Партии появятся после создания ПДБ» | none |
+| `S-02`, no prepared passports | «Нет доступного подготовленного паспорта» | no create; fixture/configuration required |
+| `S-03`, not released | «Комплекты ещё не выпущены» | release for `PLANNER` |
+| `S-04`, cards missing vs planned | integrity warning | refresh; assignment blocked |
+| `S-04`, filter empty | «Нет карточек с такими условиями» | reset filters |
+| `S-06`, no history | «Успешных событий не найдено» | refresh |
+| `S-07`, no payroll | safe not-found; first export lives on `S-05` | back |
 
 ## Success feedback
 
-| Команда | Сообщение после подтверждённого refresh | Изменение экрана |
+| Command | Message after confirmed refresh | Main change |
 |---|---|---|
-| `CreateProductionBatch` | «Партия B-… создана» | открыть `S-03`, версия `1` |
-| `ReleaseWorkCards` | «Выпущен комплект: N из N карточек» | показать комплект, убрать выпуск |
-| `AssignWorkCards` | «Все N карточек назначены исполнителю …» | обновить строки, очистить выбор |
-| `StartWorkCard` | «Работа начата» | `IN_PROGRESS`, новая версия |
-| `CompleteWorkCard` | «Работа завершена и ожидает мастера» | `COMPLETED` |
-| `ConfirmWorkCardByMaster` | «Выполнение подтверждено; ожидается БТК» | `MASTER_CONFIRMED` |
-| `ConfirmWorkCardQuality` | «Качество подтверждено; карточка закрыта» | `CLOSED`, нет lifecycle-действий |
-| первый mock export | «Mock payroll запись создана» | открыть `S-07` |
-| повтор mock export | «Показана существующая mock payroll запись» | открыть тот же `S-07`, не заявлять новое начисление |
+| `CreateProductionBatch` | «Партия B-112 создана по паспорту PP-DEMO» | `S-03`, version 1 |
+| `ReleaseWorkCards` | «Выпущены 3 комплекта, 250 карточек» | sets `112/112/26`; release removed |
+| first-article `AssignWorkCards` | «Карточка назначена для первой детали» | set stores technical first-article UUID |
+| serial `AssignWorkCards` | «Все N карточек назначены» | rows + distribution summary |
+| `StartWorkCard` | «Мастер зафиксировал начало» | `IN_PROGRESS` |
+| `CompleteWorkCard` | «Мастер зафиксировал завершение; ожидается БТК» | `COMPLETED` |
+| `AcceptFirstArticle` | «Первая деталь принята; серийная работа разрешена» | card `CLOSED`, set `SERIAL_ALLOWED` |
+| `ConfirmWorkCardQuality` | «Карточка цифрово закрыта; финальная приёмка партии не записана» | `CLOSED` only for selected WorkCard |
+| first export | «Mock payroll запись создана» | `S-07` |
+| repeat export | «Показана существующая запись» | same `S-07` |
 
-Toast дополняет, но не заменяет изменение основного содержимого; его исчезновение не лишает пользователя подтверждения результата.
+Toast дополняет, но не заменяет visible state.
 
-## Validation states
+## Validation
 
 ### Партия
 
-- `quantity`: обязательное положительное целое;
-- `routeCode`, `routeName`: обязательные непустые значения;
-- `normHours`: обязательное положительное число;
-- клиентская проверка формата срабатывает до submit, серверная ошибка отображается в тех же местах;
-- нераспознанные серверные поля попадают в общую сводку.
+- паспорт обязателен и выбирается только из prepared list;
+- quantity — positive integer;
+- route/norm editable fields отсутствуют;
+- invalid passport snapshot блокирует create/release.
 
-### Массовое назначение
+### Assignment
 
-- нулевой выбор: панель действия отсутствует или кнопка disabled с причиной «Выберите хотя бы одну карточку»;
-- повторяющиеся ID не могут появиться через UI, но серверный отказ показывается как ошибка всего набора;
-- исполнитель обязателен и выбирается только из подготовленных `WORKER`;
-- при невалидном исполнителе все строки остаются неизменными.
+- first article: exactly one available row, valid `WORKER`, pending gate, no registered first article;
+- serial: nonempty unique rows from one set, valid worker, `SERIAL_ALLOWED`;
+- duplicate IDs cannot arise from UI, but backend failure applies to entire set;
+- distribution summary is derived from confirmed assignments, not user-entered total.
 
 ## Errors and safe disclosure
 
-| Категория требований | Текстовый шаблон UI | Что не показывать |
+| Category | UI text pattern | Не показывать |
 |---|---|---|
-| authorization | «Действие недоступно для активной demo-роли» | внутренние правила, существование защищённой записи |
-| ownership | «Этой карточкой может управлять только назначенный исполнитель» — только когда карточка уже законно прочитана | идентичности из недоступного объекта |
-| not found / protected read | «Объект недоступен или не существует» | различие, позволяющее перечислять защищённые объекты |
-| state conflict | «Действие больше не доступно в текущем состоянии. Обновите данные» | кнопка обхода состояния |
-| transactional failure | «Операция не завершена; подтверждённого частичного результата нет» | утверждение, что отдельные строки изменились |
-| network uncertainty after command | «Не удалось подтвердить результат. Перечитайте данные перед повтором» | автоматический повтор изменяющей команды |
-
-Точные коды и безопасная детализация будут определены в [[api-contracts]]. UX задаёт категории поведения, не предрешая HTTP-контракт.
-
-Категории охватывают version/state/authorization и transactional outcomes из `NS-001`–`NS-040`: предметные причины показываются только в законно прочитанном контексте, а внутренние ошибки оболочки событий, корреляции и транзакции сворачиваются в безопасный общий отказ без ложного частичного успеха.
+| authorization | «Действие недоступно активной demo-роли» | internal rules/protected existence |
+| worker write attempt | «Ведение карточки выполняет мастер» | control that implies worker can force it |
+| gate conflict | «Сначала требуется положительная приёмка первой детали» | bypass/force serial |
+| state conflict | «Действие недоступно в текущем состоянии» | force transition |
+| transaction failure | «Операция не завершена; частичный результат не подтверждён» | per-row optimistic success |
+| integrity | «Структура выпуска не совпадает с паспортом; продолжение заблокировано» | automatic repair |
+| network uncertainty | «Перечитайте данные перед повтором» | automatic command retry |
 
 ## Version conflict
 
 ```text
-┌ Данные изменились ──────────────────────────────────────────────────┐
-│ Загруженная версия: 3. Текущие данные необходимо перечитать.        │
-│ Команда не была применена и не будет повторена автоматически.       │
-│                                  [Остаться] [Перечитать данные]      │
-└──────────────────────────────────────────────────────────────────────┘
+┌ Данные изменились ────────────────────────────────────────────────┐
+│ Загруженные версии устарели. Команда не применена и не повторится.│
+│ Перечитайте карточку и связанный комплект.                        │
+│                              [Остаться] [Перечитать данные]       │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-- после «Перечитать» UI показывает актуальные статус и версию;
-- если действие ещё допустимо, пользователь подтверждает новую команду отдельно;
-- если действие стало недоступным, кнопка исчезает и появляется причина;
-- для `S-04` перечитывается весь выбранный набор, а выбор очищается;
-- введённая форма партии не относится к optimistic concurrency, так как создаёт новый объект;
-- кнопки «перезаписать», «игнорировать версию» и автоматический retry отсутствуют.
+- assignment reloads set + all selected cards and clears selection;
+- first-article acceptance reloads card + set;
+- release reloads batch + existing sets;
+- new explicit confirmation is required after refresh;
+- force overwrite/auto merge absent.
 
 ## Атомарные операции
 
-### Выпуск
+### Release
 
-- до ответа `0 из N` не превращается постепенно в `1…N`;
-- успех допустим только при наблюдаемом одном комплекте и `N из N`;
-- несоответствие отображается как integrity warning, а не частичный успех.
+- UI не показывает постепенное `1…250` создание;
+- success только при confirmed three sets `112/112/26`, total `250`;
+- mismatch is integrity warning.
 
-### Массовое назначение
+### Assignment
 
-- строки не получают optimistic status;
-- при общем отказе все выбранные строки остаются в исходном UI до refresh;
-- результат формулируется только для всего набора;
-- отсутствие одной строки после refresh считается причиной повторно проверить весь набор.
+- no optimistic row statuses;
+- one failed row leaves whole current command unchanged;
+- confirmed distribution uses counts `60 + 52`, not number ranges.
 
-## Offline и повтор запросов
+### First-article acceptance
 
-- полноценный offline mode не входит в MVP;
-- при потере сети чтение может показывать последние данные с явной меткой «могут быть устаревшими», команды блокируются;
-- изменяющая команда не ставится в фоновую очередь;
-- после timeout пользователь сначала перечитывает данные;
-- исключение по предметной идемпотентности mock export не даёт UI права создавать скрытый цикл повторов.
+- card `CLOSED` без set `SERIAL_ALLOWED` и обратное считаются integrity failure;
+- UI не открывает serial controls до refresh обоих aggregates.
 
-## Смена demo-контекста
+### Acceptance provenance
 
-- кэш permission-sensitive данных очищается;
-- выбранные карточки и открытые command-диалоги закрываются;
-- незавершённая форма требует подтверждения потери данных;
-- текущий route сохраняется лишь если новый контекст имеет право его читать;
-- недоступные `S-06`/`S-07` заменяются access state, а не содержимым предыдущего пользователя.
+- `FirstPieceAcceptance` показывает отдельную подтверждённую первую приёмку перед серией;
+- `ConfirmWorkCardQuality` всегда помечен как synthetic per-card close;
+- UI не показывает `FinalBatchAcceptance`, batch accepted или подпись БТК как результат закрытия одной/всех WorkCard;
+- подтверждённая финальная приёмка всей партии и физические подписи описываются как AS-IS-контекст вне прямого digital workflow MVP.
+
+## Offline/retry
+
+Offline commands не входят в MVP. Stale cached reads имеют label; commands blocked. Mutations не ставятся в background queue. Mock export backend-idempotency не разрешает hidden client retries.
+
+## Role switch
+
+Permission-sensitive cache, selections и dialogs очищаются; unfinished form требует confirmation. Protected routes become access state. Предметные данные не меняются.
 
 ## Проверяемые UX-цели
 
-| ID | Цель будущего browser test |
+| ID | Future browser test |
 |---|---|
-| `UX-T-001` | команда блокирует повторный submit и показывает результат после refresh |
-| `UX-T-002` | конфликт версии не перезаписывается и требует ручного перечитывания |
-| `UX-T-003` | массовый отказ не меняет ни одну строку |
-| `UX-T-004` | смена demo-роли очищает выбор и защищённые данные |
-| `UX-T-005` | повтор export открывает ту же запись без сообщения о новом начислении |
-| `UX-T-006` | loading, empty и error states доступны с клавиатуры и объявляются assistive technology |
+| `UX-T-001` | duplicate submit blocked; result shown after refresh |
+| `UX-T-002` | conflict requires explicit reload of all targets |
+| `UX-T-003` | failed mass assignment changes no row |
+| `UX-T-004` | role switch clears protected/command state |
+| `UX-T-005` | repeat export opens same record |
+| `UX-T-006` | loading/empty/error accessible |
+| `UX-T-007` | fixture shows 3 sets/250 and no sequence labels |
+| `UX-T-008` | first-article gate blocks serial controls until acceptance |
+| `UX-T-009` | `WORKER` sees read-only assignment, `MASTER` sees lifecycle controls |
 
-Ролевые причины видимости и блокировки приведены в [[permission-ux]].
+Ролевые правила — [[permission-ux]].

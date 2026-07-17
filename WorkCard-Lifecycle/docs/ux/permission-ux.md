@@ -1,182 +1,169 @@
 ---
 artifact_id: ux.permission-ux
 status: accepted
-version: 1
+version: 3
 owner: ux
 updated: 2026-07-17
 ---
 
 # Permission UX
 
-Правила представления полномочий из [[roles-permissions]] в браузерном UI. Скрытие, disabled-состояние и route guard снижают число ошибочных действий, но не являются контролем безопасности: backend повторно проверяет доверенную роль, владельца, состояние, версию и входные данные.
-
-Основные негативные связи: отказ по роли `NS-002`, запрет переназначения `NS-009`, владение `NS-010`, граница БТК `NS-018`, защита аудита/payroll `NS-019`, tampering `NS-024` и безопасная смена контекста `NS-031` из [[negative-scenarios]].
+Представление [[roles-permissions]] в UI. Backend проверяет доверенную роль, purpose, gate, state, versions и inputs независимо от controls.
 
 ## Модель решения
 
 ```mermaid
 flowchart TD
-    context["Доверенная demo-личность и активная роль"] --> route{"Есть право чтения маршрута?"}
-    route -- Нет --> access["Безопасное access state без защищённых данных"]
-    route -- Да --> command{"Роль поддерживает команду?"}
-    command -- Нет --> hide["Не показывать command control"]
-    command -- Да --> preconditions{"Известные предусловия выполнены?"}
-    preconditions -- Нет --> disabled["Disabled с доступной причиной"]
-    preconditions -- Да --> enabled["Разрешить подтверждение команды"]
-    enabled --> backend["Backend принимает окончательное решение"]
+    context["Trusted demo identity + role"] --> route{"Can read route?"}
+    route -->|No| access["Safe access state"]
+    route -->|Yes| command{"Role owns command?"}
+    command -->|No| hide["Hide command control"]
+    command -->|Yes| pre{"Visible preconditions + gate valid?"}
+    pre -->|No| disabled["Disabled + accessible reason"]
+    pre -->|Yes| enabled["Explicit confirmation"]
+    enabled --> backend["Backend final decision"]
 ```
 
-Отсутствие кнопки не доказывает отсутствие API-команды, а наличие кнопки не гарантирует успех.
+## Hide, disable, reject
 
-## Когда скрывать, блокировать и отклонять
-
-| Ситуация | UI-представление | Причина |
+| Situation | UI | Reason |
 |---|---|---|
-| команда никогда не принадлежит активной роли | скрыть | не создавать ложное ожидание полномочия |
-| роль поддерживает команду, но объект ещё не в нужном состоянии | disabled или текст следующего шага | обучить линейному workflow без отправки заведомого запроса |
-| `WORKER` читает чужую карточку | скрыть start/complete, показать «Доступно назначенному исполнителю» | широкое чтение не означает владение |
-| команда отправлена, а backend отказал | показать окончательный безопасный отказ и refresh | UI мог устареть или быть подменён |
-| защищённый маршрут истории/payroll | не показывать ссылку; прямой URL — access state | данные доступны только `ADMIN_AUDITOR` |
-| состояние/версия изменились после загрузки | убрать устаревший результат после refresh | не обходить concurrency/state machine |
-| функция вне MVP | не показывать ни enabled, ни disabled control | это не «скоро доступное» действие текущего workflow |
+| command never belongs to role | hidden | no false authority |
+| role owns command, state/gate not ready | disabled or next-step text | explain process |
+| `WORKER` views assignment | start/complete hidden; «Ведение фиксирует мастер» | assignee is not digital recorder |
+| serial action before first article | disabled with gate reason | no gate bypass |
+| protected audit/payroll route | link hidden; direct URL safe access | confidentiality |
+| function out of scope | no control, even disabled | not part of workflow |
+| backend denies shown control | safe error + refresh | stale/tampered UI |
 
-Отклонение БТК, возврат, доработка, переназначение, снятие назначения, отдельное закрытие и повторный выпуск не отображаются даже disabled-элементами.
+Отрицательная приёмка, rework, reassignment, sequence labels, repeated release и real payroll отсутствуют.
 
-## Матрица маршрутов
+## Route matrix
 
-| Маршрут | Planner | Master | Worker | Quality Controller | Admin / Auditor |
+| Route | Planner | Master | Worker | Quality | Admin |
 |---|:---:|:---:|:---:|:---:|:---:|
-| `S-01` список партий | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `S-02` новая партия | ✓ | — | — | — | — |
-| `S-03` партия | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `S-04` комплект/карточки | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `S-05` карточка | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `S-06` история | — | — | — | — | ✓ |
+| `S-01` batches | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `S-02` new batch | ✓ | — | — | — | — |
+| `S-03` batch | ✓ | ✓ | summary | ✓ | ✓ |
+| `S-04` set/cards | ✓ | ✓ | own/read-only | ✓ | ✓ |
+| `S-05` card | ✓ | ✓ | own/read-only | ✓ | ✓ |
+| `S-06` audit | — | — | — | — | ✓ |
 | `S-07` payroll | — | — | — | — | ✓ |
 
-Для `S-02` клиентский route guard перенаправляет к `S-01` с сообщением о роли. Для `S-06` и `S-07` прямой запрос не должен сначала загрузить данные, а затем скрыть их.
+Protected route data is never loaded before being hidden.
 
-## Матрица действий
+## Action matrix
 
-| UI-действие | Planner | Master | Worker | Quality Controller | Admin / Auditor | Дополнительное условие |
+| UI action | Planner | Master | Worker | Quality | Admin | Condition |
 |---|:---:|:---:|:---:|:---:|:---:|---|
-| создать партию | enabled | hidden | hidden | hidden | hidden | валидная форма |
-| выпустить карточки | enabled/disabled | hidden | hidden | hidden | hidden | партия не выпускалась, версия актуальна |
-| выбрать строки для назначения | hidden | enabled/disabled | hidden | hidden | hidden | только неназначенные `RELEASED` |
-| назначить выбранные карточки | hidden | enabled/disabled | hidden | hidden | hidden | непустой набор, один валидный `WORKER` |
-| начать работу | hidden | hidden | enabled/disabled | hidden | hidden | `ASSIGNED` и `actorId = assigneeId` |
-| завершить работу | hidden | hidden | enabled/disabled | hidden | hidden | `IN_PROGRESS` и `actorId = assigneeId` |
-| подтвердить выполнение | hidden | enabled/disabled | hidden | hidden | hidden | `COMPLETED` |
-| подтвердить качество и закрыть | hidden | hidden | hidden | enabled/disabled | hidden | `MASTER_CONFIRMED` |
-| открыть историю | hidden | hidden | hidden | hidden | enabled | карточка доступна |
-| первый mock export | hidden | hidden | hidden | hidden | enabled/disabled | `CLOSED`, есть исполнитель, записи ещё нет |
-| открыть payroll запись | hidden | hidden | hidden | hidden | enabled | запись существует |
+| select prepared passport/create batch | enabled | hidden | hidden | hidden | hidden | valid passport + quantity |
+| release all sets | enabled/disabled | hidden | hidden | hidden | hidden | unreleased batch + version |
+| select first-article card | hidden | enabled/disabled | hidden | hidden | hidden | pending gate, no first card |
+| serial mass selection/assignment | hidden | enabled/disabled | hidden | hidden | hidden | `SERIAL_ALLOWED` |
+| record start | hidden | enabled/disabled | hidden | hidden | hidden | `ASSIGNED`, purpose/gate valid |
+| record complete | hidden | enabled/disabled | hidden | hidden | hidden | `IN_PROGRESS` |
+| accept first article | hidden | hidden | hidden | enabled/disabled | hidden | first card `COMPLETED`, pending gate |
+| synthetic per-card serial quality/close | hidden | hidden | hidden | enabled/disabled | hidden | serial `COMPLETED`, open gate; does not record final batch acceptance |
+| accept final batch / sign physical cards | hidden | hidden | hidden | hidden | hidden | `N/A`: confirmed AS-IS, direct digital command outside MVP |
+| open audit | hidden | hidden | hidden | hidden | enabled | card accessible |
+| first mock export | hidden | hidden | hidden | hidden | enabled/disabled | `CLOSED`, assignee, no record |
+| open payroll record | hidden | hidden | hidden | hidden | enabled | record exists |
 
-`enabled/disabled` означает: роль в принципе владеет командой, но видимое состояние объекта определяет текущую доступность. Backend всё равно проверяет все предусловия.
-
-## Ролевые варианты `S-05`
+## Role variants `S-05`
 
 ### `PLANNER`
 
-- читает карточку и происхождение;
-- не видит действий назначения, выполнения, контроля, audit и payroll;
-- видит текст текущего состояния и следующую ответственную роль.
+- reads batch/set/card origin;
+- no assignment, lifecycle, quality, audit or payroll controls;
+- never sees editable operation/norm fields.
 
 ### `MASTER`
 
-- для `COMPLETED` видит «Подтвердить выполнение»;
-- в остальных состояниях видит следующий шаг без command control;
-- назначение выполняет только массово на `S-04`; отдельного назначения и переназначения на `S-05` нет.
+- `ASSIGNED`: «Зафиксировать начало»;
+- `IN_PROGRESS`: «Зафиксировать завершение»;
+- `COMPLETED`: next step says БТК, no separate master confirmation;
+- assignment only on `S-04`; no reassignment;
+- sees assignee and “recorded by master” separately.
 
 ### `WORKER`
 
-- для своей `ASSIGNED` видит «Начать работу»;
-- для своей `IN_PROGRESS` видит «Завершить работу»;
-- для чужой карточки не видит команд, даже если статус подходит;
-- не может выбирать другого исполнителя или подменять `assigneeId`.
+- reads only own assignment details and status;
+- no start/complete controls in any state;
+- sees explanation «Статус рабочей карточки фиксирует мастер»;
+- cannot edit assignee or purpose.
 
 ### `QUALITY_CONTROLLER`
 
-- для `MASTER_CONFIRMED` видит единственное действие «Подтвердить качество и закрыть»;
-- не видит «Отклонить», «Вернуть», «На доработку» или отдельное «Закрыть»;
-- для `CLOSED` видит терминальное состояние без повторного подтверждения.
+- first-article `COMPLETED`: «Принять первую деталь и открыть серию»;
+- serial `COMPLETED` + open gate: «Подтвердить качество и закрыть карточку» plus provenance note «не финальная приёмка партии»;
+- no reject/return/rework/separate close;
+- no `AcceptFinalBatch` or digital signature control;
+- `CLOSED`: terminal read-only.
 
 ### `ADMIN_AUDITOR`
 
-- не видит действий жизненного цикла;
-- видит ссылки на историю и payroll;
-- для подходящей `CLOSED` без записи видит первый mock export;
-- при существующей записи видит «Открыть mock payroll запись»;
-- не может редактировать/удалять audit events или `PayrollRecord`.
+- no production lifecycle actions;
+- audit/payroll links;
+- first export only for eligible `CLOSED`, else existing record link;
+- no edit/delete of audit/payroll.
 
 ## Disabled reasons
 
-Причина должна быть доступна без hover: поясняющий текст, `aria-describedby` или сообщение рядом с control.
-
-| Control | Disabled reason |
+| Control | Accessible reason |
 |---|---|
-| выпуск партии | «Партия уже выпущена» или «Обновите данные перед выпуском» |
-| checkbox карточки | «Назначать можно только неназначенную карточку RELEASED» |
-| массовое назначение | «Выберите хотя бы одну доступную карточку» / «Выберите исполнителя» |
-| start/complete своей карточки | «Сначала карточка должна быть назначена / начата» |
-| подтверждение мастера | «Ожидается завершение исполнителем» |
-| подтверждение БТК | «Сначала требуется подтверждение мастера» |
-| mock export | «Доступен только для закрытой карточки с исполнителем» |
+| release | «Партия уже выпущена» / «Обновите данные» |
+| first-article selection | «Выберите ровно одну доступную карточку» / «Первая деталь уже выбрана» |
+| serial assignment | «Сначала требуется положительная приёмка первой детали» |
+| assignment submit | «Выберите карточки и исполнителя» |
+| master start | «Карточка должна быть назначена; serial gate должен быть открыт» |
+| master complete | «Сначала мастер должен зафиксировать начало» |
+| first-article acceptance | «Требуется завершённая first-article карточка» |
+| synthetic per-card quality | «Требуется завершённая serial-карточка и открытый gate; действие не фиксирует финальную приёмку партии» |
+| mock export | «Доступно для закрытой карточки с исполнителем» |
 
-Если причина основана на устаревших данных, после backend-отказа приоритет получает сообщение «Данные изменились; перечитайте объект».
+## Role switcher
 
-## Demo role switcher
+Prepared identity/role only; no arbitrary role input. Shell/dialogs show active identity. Switch reloads route/permissions, clears selection and protected cache, and never changes domain data.
 
-- список содержит только подготовленные сочетания identity + role;
-- произвольный ввод роли отсутствует;
-- активные имя и роль всегда видимы в оболочке и в диалогах подтверждения;
-- после смены контекста route data и permissions загружаются заново;
-- selected rows, формы команд и прошлые ошибки очищаются;
-- если текущий маршрут защищён, отображается access state с переходом к партиям;
-- UI не передаёт роль в произвольном бизнес-поле как источник доверия.
+## Backend permission failure
 
-## Ошибка backend permission check
+1. no optimistic success;
+2. stop pending;
+3. safe message;
+4. explicit refresh of all affected aggregates;
+5. recompute controls;
+6. no local success event/auto retry.
 
-Если backend отклонил действие, которое UI показывал как доступное:
+## Tampering/stale UI
 
-1. не показывать success и не менять статус локально;
-2. закрыть pending-индикатор;
-3. показать безопасное сообщение о недоступности;
-4. перечитать объект или предложить явное перечитывание;
-5. пересчитать controls по новому контексту;
-6. не создавать локальное событие успеха и не повторять команду автоматически.
-
-Отказ другой роли от истории/payroll не должен раскрывать, существует ли защищённая запись. Точная унификация `403/404` остаётся задачей [[api-contracts]].
-
-## Tampering и stale UI
-
-- ручное добавление скрытой кнопки в DOM не повышает полномочия;
-- изменение `actorId`, `role`, `assigneeId` или `expectedVersion` в запросе не должно приводить к успеху;
-- deep link не обходит route и backend guard;
-- кэш данных `ADMIN_AUDITOR` не переиспользуется после смены роли;
-- клиент не хранит permission decision дольше текущего доверенного контекста;
-- backend-отказ считается корректным поведением даже при UX-дефекте.
+- DOM manipulation does not grant API permission;
+- role/actor/assignee/purpose/version changes are revalidated;
+- deep link cannot bypass guard;
+- previous admin cache not reused;
+- UUID display never becomes user-facing detail number.
 
 ## Accessibility
 
-- скрытый control отсутствует в accessibility tree;
-- disabled control имеет программно связанную причину;
-- при смене роли объявляется новый контекст и обновление доступных действий;
-- фокус после access state переходит на заголовок сообщения, а не на скрытый элемент;
-- permission различия не передаются только цветом;
-- подтверждение команды называет активную роль и объект действия.
+- hidden controls absent from accessibility tree;
+- disabled reason linked via `aria-describedby` or adjacent text;
+- role/gate changes announced;
+- permission differences not color-only;
+- confirmation names active role, operation scope and count, not detail-number range.
 
-## Будущие проверки
+## Future checks
 
-| ID | Проверка |
+| ID | Check |
 |---|---|
-| `UX-PERM-001` | каждая роль видит только свои command controls |
-| `UX-PERM-002` | чужой `WORKER` не видит start/complete, API отклоняет ручной запрос |
-| `UX-PERM-003` | `S-06` и `S-07` не раскрывают данные другим ролям |
-| `UX-PERM-004` | смена demo-роли удаляет защищённые данные и пересчитывает actions |
-| `UX-PERM-005` | БТК видит только положительное подтверждение и атомарное закрытие |
-| `UX-PERM-006` | мастер не видит переназначение или выполнение за исполнителя |
-| `UX-PERM-007` | admin не обходит state machine и не редактирует audit/payroll |
-| `UX-PERM-008` | backend-отказ отменяет optimistic UX и приводит к refresh |
+| `UX-PERM-001` | each role sees only owned controls |
+| `UX-PERM-002` | `WORKER` cannot see/call start or complete |
+| `UX-PERM-003` | audit/payroll protected |
+| `UX-PERM-004` | role switch clears protected state |
+| `UX-PERM-005` | БТК sees only correct positive action |
+| `UX-PERM-006` | master owns assignment/start/complete and no reassignment |
+| `UX-PERM-007` | admin cannot bypass lifecycle/edit records |
+| `UX-PERM-008` | backend denial triggers refresh |
+| `UX-PERM-009` | serial controls blocked until first article accepted |
+| `UX-PERM-010` | no per-card action is labeled as final batch acceptance or physical signature |
+| `UX-PERM-010` | no UI label implies card/detail sequence |
 
-Эти UX-цели дополняют `T-API-PERMISSION-*` из [[requirements-traceability]] и не заменяют серверные тесты.
+Эти проверки дополняют API targets из [[requirements-traceability]].

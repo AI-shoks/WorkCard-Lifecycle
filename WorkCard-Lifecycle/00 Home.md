@@ -6,20 +6,20 @@ tags:
   - case-study
   - workcard
 status: active
-version: 4
+version: 5
 owner: navigation
 updated: 2026-07-17
 ---
 
 # Production Work Card Workflow
 
-> Выпуск → назначение → выполнение → мастер → БТК → закрытие → mock payroll.
+> Паспорт → партия → несколько комплектов → первая деталь → серия → БТК → mock payroll.
 
 ## Сейчас
 
-**Этапы 1 и 2 завершены:** продуктовая граница и доменная спецификация приняты.
+**Этапы 1–3 семантически скорректированы:** модель соответствует подтверждённому AS-IS и явным TO-BE решениям.
 
-**Следующий этап:** требования и acceptance criteria, начиная с [[use-cases]], [[user-stories]] и [[negative-scenarios]]. После базового проектирования проект развивается небольшими работающими vertical slices.
+**Этап 4 скорректирован:** UX-документы исправлены, а отдельный [12-шаговый кликабельный прототип](docs/ux/prototype.html) проходит core sequence. Этап 5 не начат и остаётся следующей контрольной точкой после review.
 
 ## Управление проектом
 
@@ -31,6 +31,7 @@ updated: 2026-07-17
 - [[decision-log|Журнал решений]]
 - [[risk-register|Реестр рисков]]
 - [[case-study-positioning|Позиционирование case study]]
+- [[decision-provenance|Происхождение AS-IS, TO-BE решений и допущений]]
 
 ## Основные артефакты
 
@@ -59,6 +60,11 @@ updated: 2026-07-17
 
 ### Delivery
 
+- [[use-cases]]
+- [[user-stories]]
+- [[negative-scenarios]]
 - [[acceptance-criteria]]
+- [[screen-map]]
+- [[user-flows]]
 - [[test-strategy]]
 - [[demo-script]]

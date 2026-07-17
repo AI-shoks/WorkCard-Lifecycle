@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WorkCard Lifecycle — clickable prototype</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #607080;
+      --line: #d8e0e6;
+      --panel: #ffffff;
+      --canvas: #f3f6f8;
+      --navy: #173b57;
+      --navy-2: #22587e;
+      --orange: #e36f2d;
+      --orange-soft: #fff1e8;
+      --green: #267a5a;
+      --green-soft: #e9f7f0;
+      --yellow: #9a6900;
+      --yellow-soft: #fff6d9;
+      --red: #a13d3d;
+      --radius: 14px;
+      --shadow: 0 12px 32px rgba(23, 59, 87, .09);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); }
+    button, select, input { font: inherit; }
+    button, select { min-height: 42px; }
+    button:focus-visible, select:focus-visible, input:focus-visible {
+      outline: 3px solid rgba(227, 111, 45, .32);
+      outline-offset: 2px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      min-height: 76px;
+      padding: 14px clamp(18px, 4vw, 52px);
+      color: #fff;
+      background: linear-gradient(120deg, #112f47, #1d567b);
+      border-bottom: 4px solid var(--orange);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+    .mark {
+      display: grid; place-items: center; width: 42px; height: 42px;
+      border: 2px solid rgba(255,255,255,.8); border-radius: 12px;
+      font-weight: 800; letter-spacing: -.04em;
+    }
+    .brand strong { display: block; font-size: 17px; }
+    .brand span { display: block; opacity: .75; font-size: 12px; margin-top: 2px; }
+    .role-control { display: flex; align-items: center; gap: 10px; }
+    .role-control label { font-size: 12px; opacity: .76; }
+    .role-control select {
+      color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.32);
+      border-radius: 10px; padding: 0 34px 0 12px;
+    }
+    .role-control option { color: var(--ink); background: white; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      gap: 24px;
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 24px clamp(16px, 3vw, 38px) 40px;
+    }
+    .steps, .workspace {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .steps { padding: 18px 12px; align-self: start; position: sticky; top: 18px; }
+    .steps h2 { margin: 2px 10px 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; }
+    .step-list { display: grid; gap: 5px; }
+    .step-button {
+      width: 100%; display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 9px;
+      min-height: 48px; padding: 7px 10px; border: 0; border-radius: 10px; background: transparent;
+      color: var(--muted); text-align: left; cursor: pointer;
+    }
+    .step-button:hover { background: #f5f8fa; color: var(--ink); }
+    .step-button[aria-current="step"] { color: var(--navy); background: #eaf2f7; font-weight: 700; }
+    .step-button.done .step-index { background: var(--green); color: white; border-color: var(--green); }
+    .step-index {
+      display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line);
+      border-radius: 50%; font-size: 11px; font-weight: 800;
+    }
+    .step-copy { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+
+    .workspace { min-width: 0; overflow: hidden; }
+    .workspace-head { padding: clamp(20px, 4vw, 38px); border-bottom: 1px solid var(--line); }
+    .crumbs { color: var(--muted); font-size: 13px; margin-bottom: 15px; }
+    .eyebrow { color: var(--orange); font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    h1 { margin: 8px 0 8px; color: var(--navy); font-size: clamp(25px, 3vw, 38px); line-height: 1.12; }
+    .lead { max-width: 880px; margin: 0; color: var(--muted); line-height: 1.55; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin-top: 24px; }
+    .metric { padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: #fbfcfd; }
+    .metric span { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    .metric strong { display: block; margin-top: 5px; color: var(--navy); font-size: 19px; }
+
+    .screen { padding: clamp(20px, 4vw, 38px); min-height: 420px; }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card { border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px; background: #f7f9fa; border-bottom: 1px solid var(--line); }
+    .card-head h3 { margin: 0; color: var(--navy); font-size: 15px; }
+    .card-body { padding: 17px; }
+    .field { display: grid; gap: 6px; margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label, .label { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .field input, .field select {
+      width: 100%; min-height: 44px; padding: 10px 12px; color: var(--ink); background: white;
+      border: 1px solid #bfcbd4; border-radius: 9px;
+    }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .fact { padding: 12px; background: #f7f9fa; border-radius: 9px; }
+    .fact span { display: block; color: var(--muted); font-size: 11px; }
+    .fact strong { display: block; margin-top: 4px; font-size: 14px; overflow-wrap: anywhere; }
+    .callout { margin-top: 16px; padding: 14px 16px; border-left: 4px solid var(--navy-2); background: #eef5f9; border-radius: 9px; line-height: 1.5; }
+    .callout.warn { border-color: var(--yellow); background: var(--yellow-soft); }
+    .callout.ok { border-color: var(--green); background: var(--green-soft); }
+    .callout.guard { border-color: var(--orange); background: var(--orange-soft); }
+
+    .badge { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+    .badge.pending { color: var(--yellow); background: var(--yellow-soft); }
+    .badge.ok { color: var(--green); background: var(--green-soft); }
+    .badge.neutral { color: var(--navy); background: #eaf2f7; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; }
+    table { width: 100%; border-collapse: collapse; min-width: 650px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
+    th { color: var(--muted); background: #f7f9fa; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    tr:last-child td { border-bottom: 0; }
+    code { color: #29495e; background: #edf3f6; padding: 2px 6px; border-radius: 5px; font-size: .92em; }
+    .distribution { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .distribution div { flex: 1 1 150px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; }
+    .distribution span { color: var(--muted); font-size: 11px; }
+    .distribution strong { display: block; margin-top: 4px; color: var(--navy); font-size: 20px; }
+
+    .timeline { display: grid; grid-template-columns: repeat(5, minmax(90px, 1fr)); gap: 8px; margin-top: 16px; }
+    .timeline div { padding: 11px 8px; border: 1px solid var(--line); border-radius: 9px; text-align: center; color: var(--muted); font-size: 11px; }
+    .timeline .done { color: var(--green); border-color: #abd7c5; background: var(--green-soft); }
+    .timeline .current { color: var(--navy); border-color: #9fc1d6; background: #edf5fa; font-weight: 800; }
+
+    .workspace-actions {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 18px clamp(20px, 4vw, 38px); border-top: 1px solid var(--line); background: #fbfcfd;
+    }
+    .action-group { display: flex; flex-wrap: wrap; gap: 9px; }
+    .button { border: 1px solid #b8c5ce; border-radius: 9px; padding: 0 15px; background: white; color: var(--navy); font-weight: 750; cursor: pointer; }
+    .button:hover:not(:disabled) { border-color: var(--navy-2); background: #f0f5f8; }
+    .button.primary { color: white; border-color: var(--orange); background: var(--orange); }
+    .button.primary:hover:not(:disabled) { background: #c85b20; }
+    .button:disabled { cursor: not-allowed; opacity: .5; }
+    .permission-note { color: var(--red); font-size: 12px; text-align: right; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 960px) {
+      .app { grid-template-columns: 1fr; }
+      .steps { position: static; }
+      .step-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .step-button { grid-template-columns: 28px; justify-content: center; }
+      .step-copy { display: none; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 680px) {
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .role-control { width: 100%; justify-content: space-between; }
+      .role-control select { max-width: 64%; }
+      .grid.two, .facts { grid-template-columns: 1fr; }
+      .step-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .timeline { grid-template-columns: 1fr; }
+      .workspace-actions { align-items: stretch; flex-direction: column; }
+      .action-group { justify-content: space-between; }
+      .permission-note { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">WC</div>
+      <div><strong>WorkCard Lifecycle</strong><span>low-fidelity clickable prototype · synthetic data</span></div>
+    </div>
+    <div class="role-control">
+      <label for="role">Demo-контекст</label>
+      <select id="role" aria-describedby="roleHelp">
+        <option value="PLANNER">Ирина · PLANNER / ПДБ</option>
+        <option value="MASTER">Михаил · MASTER</option>
+        <option value="WORKER">Алексей · WORKER</option>
+        <option value="QUALITY_CONTROLLER">Ольга · QUALITY_CONTROLLER</option>
+        <option value="ADMIN_AUDITOR">Анна · ADMIN_AUDITOR</option>
+      </select>
+      <span id="roleHelp" class="sr-only">Смена роли демонстрирует permission-aware состояние и не меняет предметные данные.</span>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside class="steps" aria-label="Шаги демонстрационного сценария">
+      <h2>Core sequence</h2>
+      <nav id="stepList" class="step-list"></nav>
+    </aside>
+
+    <main class="workspace">
+      <section class="workspace-head">
+        <div id="crumbs" class="crumbs"></div>
+        <div id="eyebrow" class="eyebrow"></div>
+        <h1 id="title"></h1>
+        <p id="lead" class="lead"></p>
+        <div id="metrics" class="metrics"></div>
+      </section>
+
+      <section id="screen" class="screen" aria-live="polite"></section>
+
+      <footer class="workspace-actions">
+        <div class="action-group">
+          <button id="previous" class="button" type="button">Назад</button>
+          <button id="reset" class="button" type="button">Сначала</button>
+        </div>
+        <div>
+          <div id="permissionNote" class="permission-note" role="status"></div>
+          <button id="primary" class="button primary" type="button"></button>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <div id="announcement" class="sr-only" aria-live="assertive"></div>
+
+  <script>
+    const roles = {
+      PLANNER: "PLANNER / ПДБ",
+      MASTER: "MASTER",
+      WORKER: "WORKER",
+      QUALITY_CONTROLLER: "QUALITY_CONTROLLER",
+      ADMIN_AUDITOR: "ADMIN_AUDITOR"
+    };
+
+    const setRows = `
+      <div class="table-wrap"><table>
+        <thead><tr><th>Operation scope</th><th>Норма</th><th>Planned cards</th><th>Gate</th></tr></thead>
+        <tbody>
+          <tr><td>Операции 010–030</td><td>0.80 ч</td><td>112</td><td><span class="badge pending">FIRST_ARTICLE_PENDING</span></td></tr>
+          <tr><td>Операции 040–060</td><td>1.25 ч</td><td>112</td><td><span class="badge pending">FIRST_ARTICLE_PENDING</span></td></tr>
+          <tr><td>Операция 070</td><td>0.45 ч</td><td>26</td><td><span class="badge pending">FIRST_ARTICLE_PENDING</span></td></tr>
+        </tbody>
+      </table></div>`;
+
+    const steps = [
+      {
+        short: "Создать партию", role: "PLANNER", eyebrow: "UC-001 · ПДБ", title: "Новая партия по подготовленному паспорту",
+        crumbs: "Партии / Новая партия", lead: "Планировщик выбирает read-only паспорт технолога/БТБ и вводит только количество партии.",
+        action: "Создать партию 112", metrics: [["Паспорт", "PP-DEMO rev A"], ["Quantity", "112"], ["Operation scopes", "3"], ["Редактирование норм", "Недоступно"]],
+        html: `<div class="grid two">
+          <article class="card"><div class="card-head"><h3>Параметры партии</h3><span class="badge neutral">Синтетические данные</span></div><div class="card-body">
+            <div class="field"><label for="passport">Подготовленный паспорт</label><select id="passport"><option>PP-DEMO · rev A · Синтетическое изделие</option></select></div>
+            <div class="field"><label for="quantity">Количество партии</label><input id="quantity" value="112" inputmode="numeric"></div>
+            <p class="hint">ПДБ не вводит маршрут и нормативы: они приходят из подготовленного паспорта.</p>
+          </div></article>
+          <article class="card"><div class="card-head"><h3>Read-only operation plan</h3></div><div class="card-body">
+            <div class="facts"><div class="fact"><span>Операции 010–030</span><strong>0.80 ч · 112 cards</strong></div><div class="fact"><span>Операции 040–060</span><strong>1.25 ч · 112 cards</strong></div><div class="fact"><span>Операция 070</span><strong>0.45 ч · 26 cards</strong></div><div class="fact"><span>Всего</span><strong>250 cards</strong></div></div>
+          </div></article>
+        </div><div class="callout guard"><strong>Граница:</strong> карточка получит внутренний UUID, но не номер физической детали.</div>`
+      },
+      {
+        short: "Выпустить комплекты", role: "PLANNER", eyebrow: "UC-002 · атомарный выпуск", title: "Партия B-112 готова к выпуску",
+        crumbs: "Партии / B-112", lead: "Одна команда создаёт все комплекты паспорта и все 250 карточек — либо не создаёт ничего.",
+        action: "Выпустить 3 комплекта", metrics: [["Batch quantity", "112"], ["Комплекты", "3"], ["Cards total", "250"], ["Version", "1"]],
+        html: `${setRows}<div class="callout warn"><strong>Необратимо в MVP:</strong> повторный выпуск отсутствует. Каждая карточка получит <code>batchQuantitySnapshot = 112</code> без sequence.</div>`
+      },
+      {
+        short: "Назначить first article", role: "MASTER", eyebrow: "UC-003 · first article", title: "Выбрать карточку для первой детали",
+        crumbs: "Партии / B-112 / Операции 010–030", lead: "До приёмки первой детали мастер может назначить ровно одну внутреннюю карточку этого комплекта.",
+        action: "Назначить first-article карточку", metrics: [["Gate", "FIRST_ARTICLE_PENDING"], ["Planned cards", "112"], ["Assigned", "0"], ["Норма", "0.80 ч"]],
+        html: `<div class="table-wrap"><table><thead><tr><th>Выбор</th><th>Internal UUID</th><th>Status</th><th>Assignee</th><th>Purpose</th></tr></thead><tbody>
+          <tr><td><input type="radio" checked aria-label="Выбрать карточку с внутренним ID 9f4e"></td><td><code>9f4e2b7a…</code></td><td>RELEASED</td><td>—</td><td>—</td></tr>
+          <tr><td><input type="radio" aria-label="Выбрать карточку с внутренним ID a12c"></td><td><code>a12c880d…</code></td><td>RELEASED</td><td>—</td><td>—</td></tr>
+          <tr><td><input type="radio" aria-label="Выбрать карточку с внутренним ID c807"></td><td><code>c8071d64…</code></td><td>RELEASED</td><td>—</td><td>—</td></tr>
+        </tbody></table></div>
+        <div class="grid two" style="margin-top:16px"><div class="fact"><span>Исполнитель</span><strong>Алексей · WORKER</strong></div><div class="fact"><span>Purpose</span><strong>FIRST_ARTICLE</strong></div></div>
+        <div class="callout guard">UUID различает цифровые записи, но не становится номером «первой» физической детали.</div>`
+      },
+      {
+        short: "Зафиксировать начало", role: "MASTER", eyebrow: "UC-004 · мастер", title: "First-article карточка назначена",
+        crumbs: "B-112 / Операции 010–030 / Рабочая карточка", lead: "Мастер фиксирует начало работы назначенного исполнителя. Исполнитель не отправляет lifecycle-команду.",
+        action: "Зафиксировать начало", metrics: [["Status", "ASSIGNED"], ["Purpose", "FIRST_ARTICLE"], ["Assignee", "Алексей"], ["Version", "2"]],
+        html: cardDetails("ASSIGNED", "FIRST_ARTICLE", "Ожидается фиксация начала мастером", 1)
+      },
+      {
+        short: "Зафиксировать завершение", role: "MASTER", eyebrow: "UC-004 · мастер", title: "Работа по первой детали идёт",
+        crumbs: "B-112 / Операции 010–030 / Рабочая карточка", lead: "После фактического выполнения мастер фиксирует завершение, сохраняя assignee как исполнителя.",
+        action: "Зафиксировать завершение", metrics: [["Status", "IN_PROGRESS"], ["Purpose", "FIRST_ARTICLE"], ["Assignee", "Алексей"], ["Version", "3"]],
+        html: cardDetails("IN_PROGRESS", "FIRST_ARTICLE", "Начало зафиксировал Михаил · MASTER", 2)
+      },
+      {
+        short: "Принять первую деталь", role: "QUALITY_CONTROLLER", eyebrow: "UC-005 · БТК", title: "Положительная приёмка первой детали",
+        crumbs: "B-112 / Операции 010–030 / Рабочая карточка", lead: "Одно действие БТК закрывает first-article карточку и открывает serial gate комплекта.",
+        action: "Принять и открыть серию", metrics: [["Card status", "COMPLETED"], ["Gate", "FIRST_ARTICLE_PENDING"], ["Card version", "4"], ["Set version", "2"]],
+        html: `${cardDetails("COMPLETED", "FIRST_ARTICLE", "Завершение зафиксировал Михаил · MASTER", 3)}<div class="callout warn"><strong>Атомарно:</strong> WorkCard → CLOSED и WorkCardSet → SERIAL_ALLOWED. Отклонение и доработка отсутствуют.</div>`
+      },
+      {
+        short: "Распределить серию", role: "MASTER", eyebrow: "UC-003 · serial assignment", title: "Серийная работа разрешена",
+        crumbs: "B-112 / Операции 010–030", lead: "First-article карточка входит в долю первого исполнителя; последующие атомарные назначения дают итог 60 + 52 = 112.",
+        action: "Подтвердить распределение", metrics: [["Gate", "SERIAL_ALLOWED"], ["Planned", "112"], ["Assigned", "112"], ["Remaining", "0"]],
+        html: `<div class="distribution"><div><span>Алексей · включает first article</span><strong>60</strong></div><div><span>Сергей</span><strong>52</strong></div><div><span>Всего в комплекте</span><strong>112</strong></div></div>
+        <div class="callout ok"><strong>60 + 52 = 112.</strong> Распределение выражено количеством. Диапазонов номеров деталей нет.</div>
+        <div class="table-wrap" style="margin-top:16px"><table><thead><tr><th>Internal UUID</th><th>Status</th><th>Assignee</th><th>Purpose</th></tr></thead><tbody>
+          <tr><td><code>9f4e2b7a…</code></td><td>CLOSED</td><td>Алексей</td><td>FIRST_ARTICLE</td></tr>
+          <tr><td><code>a12c880d…</code></td><td>ASSIGNED</td><td>Алексей</td><td>SERIAL</td></tr>
+          <tr><td><code>c8071d64…</code></td><td>ASSIGNED</td><td>Сергей</td><td>SERIAL</td></tr>
+        </tbody></table></div>`
+      },
+      {
+        short: "Начать serial work", role: "MASTER", eyebrow: "UC-004 · serial", title: "Серийная карточка назначена",
+        crumbs: "B-112 / Операции 010–030 / Рабочая карточка", lead: "Gate открыт; мастер фиксирует начало одной serial-карточки для демонстрации.",
+        action: "Зафиксировать начало", metrics: [["Status", "ASSIGNED"], ["Purpose", "SERIAL"], ["Assignee", "Сергей"], ["Gate", "SERIAL_ALLOWED"]],
+        html: cardDetails("ASSIGNED", "SERIAL", "Серийная работа разрешена", 1, "c8071d64…", "Сергей")
+      },
+      {
+        short: "Завершить serial work", role: "MASTER", eyebrow: "UC-004 · serial", title: "Серийная работа в процессе",
+        crumbs: "B-112 / Операции 010–030 / Рабочая карточка", lead: "Мастер фиксирует завершение. Отдельного master confirmation после этого нет.",
+        action: "Зафиксировать завершение", metrics: [["Status", "IN_PROGRESS"], ["Purpose", "SERIAL"], ["Assignee", "Сергей"], ["Version", "3"]],
+        html: cardDetails("IN_PROGRESS", "SERIAL", "Начало зафиксировал Михаил · MASTER", 2, "c8071d64…", "Сергей")
+      },
+      {
+        short: "Закрыть WorkCard", role: "QUALITY_CONTROLLER", eyebrow: "UC-006 · synthetic TO-BE", title: "Per-card quality confirmation",
+        crumbs: "B-112 / Операции 010–030 / Рабочая карточка", lead: "БТК цифрово закрывает одну завершённую serial WorkCard; это не финальная приёмка всей партии.",
+        action: "Подтвердить и закрыть карточку", metrics: [["Status", "COMPLETED"], ["Scope", "WORK_CARD"], ["Gate", "SERIAL_ALLOWED"], ["Version", "4"]],
+        html: `${cardDetails("COMPLETED", "SERIAL", "Завершение зафиксировал Михаил · MASTER", 3, "c8071d64…", "Сергей")}<div class="callout guard"><strong>Граница:</strong> FinalBatchAcceptance всей партии и подписи БТК на физических карточках подтверждены AS-IS, но этим per-card действием не записываются.</div>`
+      },
+      {
+        short: "Создать mock record", role: "ADMIN_AUDITOR", eyebrow: "UC-009 · mock payroll", title: "Карточка закрыта и готова к export",
+        crumbs: "B-112 / Рабочая карточка / Mock payroll", lead: "Admin создаёт единственную неизменяемую запись operation-scoped нормы — без денег и фактического времени.",
+        action: "Создать mock payroll запись", metrics: [["Card status", "CLOSED"], ["Beneficiary", "Сергей"], ["Norm snapshot", "0.80 ч"], ["Record", "Ещё нет"]],
+        html: `<div class="grid two"><article class="card"><div class="card-head"><h3>Закрытая карточка</h3><span class="badge ok">CLOSED</span></div><div class="card-body"><div class="facts"><div class="fact"><span>Internal UUID</span><strong>c8071d64…</strong></div><div class="fact"><span>Beneficiary</span><strong>Сергей</strong></div><div class="fact"><span>Operation scope</span><strong>Операции 010–030</strong></div><div class="fact"><span>Norm snapshot</span><strong>0.80 ч</strong></div></div></div></article>
+          <article class="card"><div class="card-head"><h3>Граница mock payroll</h3></div><div class="card-body"><p>Будет создана одна запись <code>workCardId + beneficiaryId + normHours</code>.</p><p class="hint">Не рассчитываются зарплата, налоги, коэффициенты, фактическое время или выплата.</p></div></article></div>`
+      },
+      {
+        short: "Проверить аудит", role: "ADMIN_AUDITOR", eyebrow: "UC-008 / UC-014", title: "Core sequence завершён",
+        crumbs: "Audit / correlation COR-DEMO-112", lead: "Финальный экран показывает неизменяемую mock-запись и события, связанные общими command/correlation IDs.",
+        action: "Начать демонстрацию заново", metrics: [["Payroll records", "1"], ["Batch", "B-112"], ["Sets / cards", "3 / 250"], ["Distribution", "60 + 52"]],
+        html: `<div class="grid two"><article class="card"><div class="card-head"><h3>Mock payroll record</h3><span class="badge ok">Создана один раз</span></div><div class="card-body"><div class="facts"><div class="fact"><span>WorkCard UUID</span><strong>c8071d64…</strong></div><div class="fact"><span>Beneficiary</span><strong>Сергей</strong></div><div class="fact"><span>Norm snapshot</span><strong>0.80 ч</strong></div><div class="fact"><span>Money</span><strong>Не рассчитываются</strong></div></div></div></article>
+          <article class="card"><div class="card-head"><h3>Audit events</h3><span class="badge neutral">correlationId</span></div><div class="card-body"><p><code>ProductionBatchCreated</code> · PLANNER</p><p><code>WorkCardStarted</code> / <code>WorkCardCompleted</code> · MASTER</p><p><code>FirstArticleAccepted</code> / <code>WorkCardQualityConfirmed</code> · QUALITY_CONTROLLER</p><p><code>WorkCardExportedToPayroll</code> · ADMIN_AUDITOR</p></div></article></div>
+        <div class="callout ok"><strong>Проверено:</strong> 112 → 3 комплекта → 250 карточек; UUID без номера детали; first article до серии; мастер ведёт lifecycle; 60 + 52 = 112; одна mock-запись.</div>
+        <div class="callout guard"><strong>Provenance:</strong> FirstPieceAcceptance и FinalBatchAcceptance — разные подтверждённые AS-IS-факты. WorkCardQualityConfirmed — synthetic per-card TO-BE и не заменяет финальную приёмку партии или подписи БТК.</div>`
+      }
+    ];
+
+    function cardDetails(status, purpose, note, activeIndex, uuid = "9f4e2b7a…", assignee = "Алексей") {
+      const labels = ["RELEASED", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "CLOSED"];
+      return `<article class="card"><div class="card-head"><h3>Рабочая карточка</h3><span class="badge neutral">${status}</span></div><div class="card-body">
+        <div class="facts"><div class="fact"><span>Internal UUID</span><strong>${uuid}</strong></div><div class="fact"><span>Assignee</span><strong>${assignee}</strong></div><div class="fact"><span>Purpose</span><strong>${purpose}</strong></div><div class="fact"><span>Batch quantity snapshot</span><strong>112 · не позиция карточки</strong></div><div class="fact"><span>Operation norm snapshot</span><strong>0.80 ч</strong></div><div class="fact"><span>Gate</span><strong>${purpose === "FIRST_ARTICLE" ? "FIRST_ARTICLE_PENDING" : "SERIAL_ALLOWED"}</strong></div></div>
+        <div class="timeline">${labels.map((label, index) => `<div class="${index < activeIndex ? "done" : index === activeIndex ? "current" : ""}">${label}</div>`).join("")}</div>
+        <div class="callout">${note}</div>
+      </div></article>`;
+    }
+
+    let current = 0;
+    let selectedRole = steps[0].role;
+
+    const els = {
+      role: document.getElementById("role"), stepList: document.getElementById("stepList"), crumbs: document.getElementById("crumbs"),
+      eyebrow: document.getElementById("eyebrow"), title: document.getElementById("title"), lead: document.getElementById("lead"),
+      metrics: document.getElementById("metrics"), screen: document.getElementById("screen"), previous: document.getElementById("previous"),
+      reset: document.getElementById("reset"), primary: document.getElementById("primary"), permissionNote: document.getElementById("permissionNote"),
+      announcement: document.getElementById("announcement")
+    };
+
+    function renderSteps() {
+      els.stepList.innerHTML = steps.map((step, index) => `<button type="button" class="step-button ${index < current ? "done" : ""}" data-step="${index}" ${index === current ? 'aria-current="step"' : ""} title="${step.short}"><span class="step-index">${index + 1}</span><span class="step-copy">${step.short}</span></button>`).join("");
+      els.stepList.querySelectorAll("button").forEach(button => button.addEventListener("click", () => go(Number(button.dataset.step), true)));
+    }
+
+    function render() {
+      const step = steps[current];
+      renderSteps();
+      els.role.value = selectedRole;
+      els.crumbs.textContent = step.crumbs;
+      els.eyebrow.textContent = step.eyebrow;
+      els.title.textContent = step.title;
+      els.lead.textContent = step.lead;
+      els.metrics.innerHTML = step.metrics.map(([label, value]) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join("");
+      els.screen.innerHTML = step.html;
+      els.previous.disabled = current === 0;
+      els.primary.textContent = step.action;
+      const allowed = selectedRole === step.role;
+      els.primary.disabled = !allowed;
+      els.permissionNote.textContent = allowed ? "" : `Действие принадлежит роли ${roles[step.role]}. Текущий контекст: ${roles[selectedRole]}.`;
+      document.title = `${current + 1}/${steps.length} · ${step.title}`;
+    }
+
+    function go(index, syncRole = true) {
+      current = Math.max(0, Math.min(steps.length - 1, index));
+      if (syncRole) selectedRole = steps[current].role;
+      render();
+      els.announcement.textContent = `Открыт шаг ${current + 1}: ${steps[current].title}. Активная роль ${roles[selectedRole]}.`;
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+
+    els.role.addEventListener("change", event => { selectedRole = event.target.value; render(); els.announcement.textContent = `Активная роль изменена на ${roles[selectedRole]}. Предметные данные не изменены.`; });
+    els.previous.addEventListener("click", () => go(current - 1, true));
+    els.reset.addEventListener("click", () => go(0, true));
+    els.primary.addEventListener("click", () => current === steps.length - 1 ? go(0, true) : go(current + 1, true));
+
+    render();
+  </script>
+</body>
+</html>

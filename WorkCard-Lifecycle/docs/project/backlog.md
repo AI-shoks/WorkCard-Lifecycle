@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 9
+version: 10
 owner: project
 updated: 2026-07-17
 ---
@@ -43,7 +43,26 @@ updated: 2026-07-17
 - [x] Зафиксировать [[ui-states|loading, empty и error states]].
 - [x] Описать [[permission-ux|UX разрешённых и запрещённых действий]].
 
-## Далее — этап 5
+## Выполнено — доменная коррекция этапов 1–4
+
+- [x] Добавить [[decision-provenance|реестр происхождения решений]].
+- [x] Исправить `ProductionBatch 1 → many WorkCardSet` и operation-scoped нормы.
+- [x] Удалить `SequenceNumber`, пользовательские `#01`, `n из N` и ложную идентификацию деталей.
+- [x] Добавить `batchQuantitySnapshot`, fixture `112 → 112 + 112 + 26 = 250` и `60 + 52 = 112`.
+- [x] Включить positive-only first-article gate без отрицательного цикла.
+- [x] Сопоставить `PLANNER` с ПДБ, а технолога/БТБ — с read-only seed-данными.
+- [x] Передать assignment/start/complete мастеру; оставить `WORKER` read-only assignee/beneficiary.
+- [x] Обновить 14 use cases, 20 stories, 40 negative scenarios и 30 acceptance criteria.
+- [x] Обновить пять UX-артефактов, README и navigation pages.
+
+## Выполнено — честное закрытие этапа 4
+
+- [x] Создать интерактивный [кликабельный прототип](../ux/prototype.html) core demo sequence.
+- [x] Проверить 12 шагов, desktop/mobile layouts, role denial и отсутствие sequence labels в headless Chrome.
+- [x] Повторить strict structural audit и semantic pass.
+- [x] Вернуть этапу 4 статус «выполнено»; PR #1 оставить draft до отдельного review.
+
+## Далее — этап 5 (не начато)
 
 - [ ] Принять [[technology-stack|технологический стек]].
 - [ ] Описать [[system-context|системный контекст и границы frontend/backend]].
@@ -52,6 +71,8 @@ updated: 2026-07-17
 - [ ] Зафиксировать [[transactions-concurrency|транзакции и конкурентность]].
 - [ ] Спроектировать [[audit-log-design|хранение аудита]] и [[mock-integrations|mock-интеграции]].
 - [ ] Принять [[security-baseline]] и необходимые ADR.
+
+Эти задачи начинать только по отдельному указанию после review доменной коррекции. В архитектуре сохранить отдельный server query по `correlationId` как предпочтительный вариант полного аудита массовой операции; UX endpoint не предрешает.
 
 ## Icebox — после MVP
 

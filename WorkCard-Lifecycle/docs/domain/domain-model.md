@@ -1,53 +1,79 @@
 ---
 artifact_id: domain.model
 status: accepted
-version: 1
+version: 3
 owner: domain
 updated: 2026-07-17
 ---
 
 # Domain Model
 
-Концептуальная модель предметной области MVP v1. Она определяет ответственность объектов и границы согласованности, но не задаёт таблицы, ORM-модели или HTTP-контракты: они будут описаны в [[er-model]] и [[api-contracts]].
+Концептуальная модель MVP v1. Она исправляет кардинальности и ответственность согласно [[decision-provenance]], но не задаёт таблицы, ORM или HTTP-контракты: они появятся в [[er-model]] и [[api-contracts]].
 
 ## Принципы модели
 
-- `WorkCard` — отдельная единица жизненного цикла и отдельный агрегат, чтобы карточки одной партии могли изменяться независимо.
-- `WorkCardSet` группирует выпущенные карточки, но не владеет их последующим состоянием.
-- межагрегатные операции выпуска и массового назначения координируются прикладным сервисом в одной транзакции;
-- норматив копируется в карточку при выпуске как неизменяемый снимок для будущего mock export; это не является версионным справочником норм;
-- демонстрационные пользователи и роли являются ссылочными данными, а не частью производственных агрегатов;
-- audit log хранит факты и не используется для выполнения команд или восстановления текущего состояния в MVP.
+- `ProductionBatch` ссылается на снимок подготовленного паспорта и не хранит один норматив партии;
+- одна партия после выпуска имеет **несколько** `WorkCardSet` по операциям или группам операций;
+- `WorkCardSet` владеет operation scope, нормой, плановым числом карточек и first-article gate;
+- `WorkCard` имеет внутренний UUID, но не `SequenceNumber`, номер детали или серийную идентичность;
+- `batchQuantitySnapshot` задаёт контекст партии и не является позицией `n из N`;
+- мастер фиксирует lifecycle карточки; исполнитель остаётся assignee и бенефициаром;
+- `FirstPieceAcceptance`, `FinalBatchAcceptance` и цифровое закрытие отдельной `WorkCard` имеют разный scope и происхождение;
+- `FinalBatchAcceptance` всей партии и подписи БТК подтверждены AS-IS, но не вводятся как агрегат, состояние или команда MVP;
+- межагрегатные команды выпуска, назначения и first-article acceptance координируются прикладным сервисом в одной транзакции;
+- audit log хранит факты, но не восстанавливает текущее состояние через event sourcing.
 
 ## Концептуальные связи
 
 ```mermaid
 classDiagram
-    ProductionBatch "1" --> "0..1" WorkCardSet : releases
-    WorkCardSet "1" --> "1..N" WorkCard : groups
+    ProductionPassport "1" --> "1..*" OperationPlan : defines
+    ProductionBatch "0..*" --> "1" ProductionPassportSnapshot : selects
+    ProductionBatch "1" --> "1..*" WorkCardSet : releases
+    WorkCardSet "1" --> "1..*" WorkCard : groups
     WorkCard "0..*" --> "0..1" DemoUser : assigned to
     WorkCard "1" --> "0..*" AuditEvent : described by
+    WorkCardSet "1" --> "0..*" AuditEvent : described by
     WorkCard "1" --> "0..1" PayrollRecord : exported as
 
+    class ProductionPassport {
+      PassportId id
+      String code
+      String revision
+      OperationPlan[] operations
+    }
+    class OperationPlan {
+      OperationScope scope
+      NormHours normHours
+      PlannedCardCount plannedCardCount
+    }
     class ProductionBatch {
       BatchId id
       BatchQuantity quantity
-      RouteSnapshot route
-      NormHours normHours
+      ProductionPassportSnapshot passport
       ReleaseStatus releaseStatus
+      Version version
     }
     class WorkCardSet {
       WorkCardSetId id
       BatchId batchId
-      BatchQuantity plannedQuantity
+      OperationScopeSnapshot operationScope
+      NormHours normHoursSnapshot
+      PlannedCardCount plannedCardCount
+      FirstArticleGateStatus gateStatus
+      WorkCardId firstArticleWorkCardId
+      Version version
     }
     class WorkCard {
       WorkCardId id
       WorkCardSetId setId
-      SequenceNumber sequence
+      BatchId batchId
+      BatchQuantity batchQuantitySnapshot
+      OperationScopeSnapshot operationScope
+      NormHours normHoursSnapshot
+      WorkCardPurpose purpose
       WorkCardStatus status
       UserId assigneeId
-      NormHours normHoursSnapshot
       Version version
     }
     class PayrollRecord {
@@ -63,38 +89,62 @@ classDiagram
       DateTime occurredAt
       Version aggregateVersion
     }
-    class DemoUser {
-      UserId id
-      Role role
-    }
 ```
 
-Связи на диаграмме концептуальны. Состав внешних ключей, индексов и ограничений будет принят отдельно на этапе технической архитектуры.
+`ProductionPassport` и `OperationPlan` — подготовленные read-only reference data. Состав внешних ключей, индексов и ограничений будет принят на этапе архитектуры.
+
+## Канонический fixture
+
+| Объект | Значение |
+|---|---|
+| `ProductionBatch.quantity` | `112` |
+| комплекты | три operation scopes |
+| `plannedCardCount` | `112`, `112`, `26` |
+| сумма карточек | `250` |
+| `WorkCard.batchQuantitySnapshot` | `112` у каждой карточки |
+| распределение первого комплекта | один исполнитель `60`, второй `52`; сумма `112` |
+
+Точные коды operations и значения норм синтетические. Fixture проверяет кардинальности, а не идентификацию деталей.
+
+## Гранулярность приёмки
+
+| Понятие | Происхождение | Scope | Представление MVP |
+|---|---|---|---|
+| `FirstPieceAcceptance` | `CONFIRMED_AS_IS` (`ASIS-005`) | первая деталь перед серией конкретного operation-scoped комплекта | `AcceptFirstArticle` закрывает first-article WorkCard и открывает gate комплекта |
+| `FinalBatchAcceptance` | `CONFIRMED_AS_IS` (`ASIS-010`, `ASIS-011`) | вся завершённая партия; физическое свидетельство — подписи БТК на карточках | прямой агрегат, state и command отсутствуют |
+| `WorkCardQualityConfirmation` | `TO_BE_DECISION` (`TOBE-006`, `D-009`, `D-020`) | одна завершённая serial WorkCard | `ConfirmWorkCardQuality` переводит только эту карточку в `CLOSED` |
+
+`CLOSED` отдельной карточки не является записью `FinalBatchAcceptance`, а набор закрытых карточек не создаёт это состояние неявно.
+
+## Reference data
+
+### `ProductionPassport`
+
+Подготовлен технологом в исходной ответственности и представлен seed-данными MVP.
+
+**Состояние:** ID, код, ревизия, наименование изделия и непустой упорядоченный набор `OperationPlan`.
+
+### `OperationPlan`
+
+**Состояние:** operation scope одной операции/группы, положительный `NormHours` и положительный `PlannedCardCount`. В MVP каждый создаваемый комплект обязательно начинает с first-article gate.
+
+Норма и план карточек не редактируются интерактивным `PLANNER`.
 
 ## Агрегаты
 
 ### `ProductionBatch`
 
-Корень агрегата производственной партии.
+**Состояние:** `BatchId`, положительный `BatchQuantity`, неизменяемый `ProductionPassportSnapshot`, признак выпуска, список созданных `WorkCardSetId` после выпуска и версия.
 
-**Состояние:**
-
-- `BatchId`;
-- положительное `BatchQuantity`;
-- `RouteSnapshot` с идентификатором и названием синтетического маршрута;
-- положительные `NormHours`;
-- признак выпуска и ссылка на созданный `WorkCardSet` после выпуска;
-- версия для optimistic concurrency.
-
-**Ответственность:** валидировать параметры партии, запретить повторный выпуск и зафиксировать, какой комплект был выпущен. После выпуска количество, маршрут и норматив партии неизменяемы в MVP.
+**Ответственность:** валидировать количество, запретить повторный выпуск и зафиксировать состав выпущенных комплектов. Партия не содержит `normHours` и не предполагает один комплект.
 
 ### `WorkCardSet`
 
-Неизменяемый после выпуска корень агрегата комплекта.
+Изменяемый корень агрегата operation-scoped комплекта.
 
-**Состояние:** `WorkCardSetId`, `BatchId`, плановое количество и дата выпуска.
+**Состояние:** `WorkCardSetId`, `BatchId`, `OperationScopeSnapshot`, `NormHoursSnapshot`, `PlannedCardCount`, `FIRST_ARTICLE_PENDING | SERIAL_ALLOWED`, необязательный `firstArticleWorkCardId`, версия и дата выпуска.
 
-**Ответственность:** обозначить единственный комплект партии и сохранить ожидаемое количество карточек. Комплект не меняет состояния отдельных `WorkCard` и не содержит их как вложенные сущности агрегата.
+**Ответственность:** сохранить контекст и норму комплекта, зарегистрировать ровно одну first-article карточку и не разрешить серийную работу до положительной приёмки. Комплект не владеет последующим состоянием всех карточек как вложенных сущностей.
 
 ### `WorkCard`
 
@@ -102,64 +152,73 @@ classDiagram
 
 **Состояние:**
 
-- `WorkCardId`, `WorkCardSetId`, `BatchId` и порядковый номер экземпляра;
-- неизменяемые снимки маршрута и нормо-часов;
+- внутренние UUID `WorkCardId`, `WorkCardSetId`, `BatchId`;
+- неизменяемые `BatchQuantitySnapshot`, `OperationScopeSnapshot`, `NormHoursSnapshot`;
+- `purpose = FIRST_ARTICLE | SERIAL`, определяемый при первом назначении;
 - необязательный `assigneeId`;
-- одно из состояний `RELEASED`, `ASSIGNED`, `IN_PROGRESS`, `COMPLETED`, `MASTER_CONFIRMED`, `CLOSED`;
-- версия для optimistic concurrency;
-- сведения о времени и субъекте последних значимых переходов, если они нужны для проверки инварианта.
+- `RELEASED`, `ASSIGNED`, `IN_PROGRESS`, `COMPLETED` или `CLOSED`;
+- версия, времена и субъекты значимых переходов.
 
-**Ответственность:** владеть назначением, проверять допустимые переходы, принадлежность действия исполнителю и терминальность закрытого состояния. Положительное подтверждение БТК переводит карточку из `MASTER_CONFIRMED` непосредственно в `CLOSED`.
+**Отсутствующие данные:** `sequenceNumber`, номер/серийный номер детали, позиция `n из N` и ссылка на физическую деталь.
+
+**Ответственность:** владеть назначением и состоянием, проверять допустимый переход мастера и терминальность `CLOSED`. `AcceptFirstArticle` переводит first-article карточку `COMPLETED → CLOSED` и меняет gate комплекта; синтетическое per-card `ConfirmWorkCardQuality` закрывает только serial WorkCard. Ни один переход карточки не фиксирует финальную приёмку партии.
 
 ### `PayrollRecord`
 
-Корень агрегата демонстрационного начисления, создаваемый при первом успешном mock payroll export.
+**Состояние:** `PayrollRecordId`, уникальный `WorkCardId`, исполнитель-бенефициар, снимок нормы карточки и время экспорта.
 
-**Состояние:** `PayrollRecordId`, уникальный `WorkCardId`, исполнитель-бенефициар, снимок нормо-часов и время экспорта.
+**Ответственность:** обеспечить не более одной неизменяемой записи на карточку. Повтор export возвращает существующий результат.
 
-**Ответственность:** обеспечить не более одной записи на карточку. Повтор той же команды возвращает существующий результат и не создаёт новый доменный факт.
-
-## Прочие доменные объекты
+## Value objects и reference entities
 
 | Объект | Тип | Назначение |
 |---|---|---|
-| `BatchQuantity` | Value Object | Положительное целое число экземпляров. |
-| `NormHours` | Value Object | Положительное десятичное значение с единым правилом точности. Конкретная точность будет закреплена в [[er-model]]. |
-| `RouteSnapshot` | Value Object | Неизменяемые код и название синтетического маршрута на момент выпуска. |
-| `SequenceNumber` | Value Object | Номер карточки внутри комплекта от `1` до `N`. |
-| `ExpectedVersion` | Value Object | Версия, которую клиент ожидает изменить. |
+| `BatchQuantity` | Value Object | Положительное количество партии. |
+| `PlannedCardCount` | Value Object | Положительное число карточек конкретного комплекта. |
+| `NormHours` | Value Object | Положительная operation-scoped норма. |
+| `ProductionPassportSnapshot` | Value Object | Неизменяемые паспорт и планы комплектов на момент создания партии. |
+| `OperationScopeSnapshot` | Value Object | Коды/названия одной операции или группы операций. |
+| `FirstArticleGateStatus` | Enum | `FIRST_ARTICLE_PENDING`, `SERIAL_ALLOWED`. |
+| `WorkCardPurpose` | Enum | `FIRST_ARTICLE`, `SERIAL`; не является номером детали. |
+| `ExpectedVersion` | Value Object | Ожидаемая клиентом версия агрегата. |
 | `Role` | Enum | `PLANNER`, `MASTER`, `WORKER`, `QUALITY_CONTROLLER`, `ADMIN_AUDITOR`. |
-| `WorkCardStatus` | Enum | Состояния линейного MVP workflow. Канонические переходы задаёт [[work-card-state-machine]]. |
-| `AuditEvent` | Append-only record | Факт успешного значимого действия; хранится согласованно с изменением агрегата. |
-| `DemoUser` | Reference entity | Синтетическая личность и роль для демонстрации permissions. |
+| `WorkCardStatus` | Enum | Канонические состояния из [[work-card-state-machine]]. |
+| `AuditEvent` | Append-only record | Факт каждой успешной изменяющей команды. |
+| `DemoUser` | Reference entity | Синтетическая личность/роль; `WORKER` также assignee и beneficiary. |
 
 ## Владение инвариантами
 
 | Инвариант | Владелец | Дополнительная защита |
 |---|---|---|
-| Положительные количество и норматив | `ProductionBatch` и value objects | Валидация API, ограничения БД |
-| Один выпуск и один комплект на партию | `ProductionBatch` | Уникальность `WorkCardSet.batchId`, транзакция выпуска |
-| Ровно `N` уникальных карточек | Сервис выпуска + фабрика карточек | Одна транзакция, уникальность `(setId, sequence)` |
-| Атомарное массовое назначение | Сервис массового назначения + каждая `WorkCard` | Одна транзакция |
-| Допустимый переход и исполнитель действия | `WorkCard` | Backend permissions |
-| Отсутствие потерянных обновлений | Каждый изменяемый агрегат | Optimistic locking по версии |
-| Одна запись начисления на карточку | `PayrollRecord` / сервис экспорта | Уникальность `workCardId` |
-| Согласованность состояния и истории | Транзакция команды | Audit event в той же транзакции |
+| Положительное количество и существующий паспорт | `ProductionBatch` | API validation, constraints |
+| Один выпуск и все комплекты плана | `ProductionBatch` + release service | транзакция, release marker |
+| Operation scope, норма и planned count комплекта | `WorkCardSet` | snapshots, constraints |
+| Уникальные UUID карточек без sequence | card factory | PK/UUID uniqueness |
+| Полнота fixture `112 + 112 + 26 = 250` | release service | integration test |
+| Ровно одна first-article карточка и gate | `WorkCardSet` | транзакция assignment/acceptance |
+| Атомарное массовое назначение | assignment service + `WorkCard` | одна транзакция |
+| Переходы выполняет мастер, контроль — БТК | `WorkCard` + backend permissions | role checks |
+| Одна payroll-запись | `PayrollRecord` | unique `workCardId` |
+| Состояние и история согласованы | transaction boundary | audit event в той же транзакции |
 
 ## Транзакционные границы MVP
 
-1. **Выпуск:** отметить партию выпущенной, создать `WorkCardSet`, создать ровно `N` карточек и audit events — одна транзакция.
-2. **Массовое назначение:** проверить все выбранные карточки, применить все назначения и записать события — одна транзакция.
-3. **Переход карточки:** изменить одну `WorkCard`, увеличить версию и записать событие — одна транзакция.
-4. **Mock export:** проверить закрытую карточку и создать первую `PayrollRecord` вместе с событием экспорта — одна транзакция.
+1. **Создание партии:** партия и `ProductionBatchCreated`.
+2. **Выпуск:** отметить партию выпущенной, создать все комплекты/карточки и события.
+3. **First-article assignment:** зарегистрировать карточку в комплекте, назначить её и записать события.
+4. **Serial mass assignment:** проверить gate и все карточки, применить назначения и события.
+5. **Переход карточки:** мастер меняет одну карточку и пишет событие.
+6. **First-article acceptance:** закрыть карточку, открыть gate комплекта и записать события обоих агрегатов.
+7. **Digital per-card quality confirmation:** закрыть одну serial WorkCard и записать событие, не создавая `FinalBatchAcceptance`.
+8. **Mock export:** создать первую `PayrollRecord` и событие либо вернуть существующую запись без нового факта.
 
-Подробная стратегия конкурентного доступа будет зафиксирована в [[transactions-concurrency]].
+Стратегия блокировок и API появится в [[transactions-concurrency]] и [[api-contracts]].
 
 ## Вне модели MVP v1
 
-- отклонение БТК, `REWORK_REQUIRED` и повторные циклы;
-- редактирование или версионный каталог норм;
-- повторный выпуск комплекта;
-- фактический учёт времени и денежные расчёты;
-- реальные учётные записи предприятия, подразделения, станки, материалы и склад;
-- реальные интеграционные модели MES, ERP и payroll.
+- сущность физической детали и серийная прослеживаемость;
+- `SequenceNumber` и пользовательская нумерация карточек;
+- отрицательная приёмка, доработка и повторный first-article gate;
+- прямая цифровая `FinalBatchAcceptance`, подпись БТК и вывод финальной приёмки из статусов карточек;
+- редактирование/версионный каталог паспортов и норм;
+- повторный выпуск, переназначение, фактическое время и денежные расчёты.
