@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 8
+version: 9
 owner: project
 updated: 2026-07-17
 ---
@@ -35,13 +35,23 @@ updated: 2026-07-17
 - [x] Описать [[acceptance-criteria|Given / When / Then]].
 - [x] Связать scope, требования и будущие тесты в [[requirements-traceability]].
 
-## Сейчас — этап 4
+## Выполнено — этап 4
 
-- [ ] Подготовить [[screen-map|карту экранов и информационную архитектуру]].
-- [ ] Описать [[user-flows|пользовательские потоки и массовые операции]].
-- [ ] Разработать [[wireframes]].
-- [ ] Зафиксировать [[ui-states|loading, empty и error states]].
-- [ ] Описать [[permission-ux|UX разрешённых и запрещённых действий]].
+- [x] Подготовить [[screen-map|карту экранов и информационную архитектуру]].
+- [x] Описать [[user-flows|пользовательские потоки и массовые операции]].
+- [x] Разработать [[wireframes]].
+- [x] Зафиксировать [[ui-states|loading, empty и error states]].
+- [x] Описать [[permission-ux|UX разрешённых и запрещённых действий]].
+
+## Далее — этап 5
+
+- [ ] Принять [[technology-stack|технологический стек]].
+- [ ] Описать [[system-context|системный контекст и границы frontend/backend]].
+- [ ] Подготовить [[er-model]] и [[api-contracts]].
+- [ ] В [[api-contracts]] выбрать способ полного аудита массовой операции: отдельный query событий по `correlationId` (предпочтительно для событий разных агрегатов) либо доказуемо полное клиентское сопоставление историй карточек.
+- [ ] Зафиксировать [[transactions-concurrency|транзакции и конкурентность]].
+- [ ] Спроектировать [[audit-log-design|хранение аудита]] и [[mock-integrations|mock-интеграции]].
+- [ ] Принять [[security-baseline]] и необходимые ADR.
 
 ## Icebox — после MVP
 
