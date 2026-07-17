@@ -1,7 +1,7 @@
 ---
 artifact_id: domain.model
 status: accepted
-version: 3
+version: 4
 owner: domain
 updated: 2026-07-17
 ---
@@ -19,7 +19,7 @@ updated: 2026-07-17
 - `batchQuantitySnapshot` задаёт контекст партии и не является позицией `n из N`;
 - мастер фиксирует lifecycle карточки; исполнитель остаётся assignee и бенефициаром;
 - `FirstPieceAcceptance`, `FinalBatchAcceptance` и цифровое закрытие отдельной `WorkCard` имеют разный scope и происхождение;
-- `FinalBatchAcceptance` всей партии и подписи БТК подтверждены AS-IS, но не вводятся как агрегат, состояние или команда MVP;
+- `FinalBatchAcceptance` вводится как отдельная неизменяемая запись уровня партии; она не является состоянием `WorkCard` и не заменяет физические подписи БТК;
 - межагрегатные команды выпуска, назначения и first-article acceptance координируются прикладным сервисом в одной транзакции;
 - audit log хранит факты, но не восстанавливает текущее состояние через event sourcing.
 
@@ -30,10 +30,12 @@ classDiagram
     ProductionPassport "1" --> "1..*" OperationPlan : defines
     ProductionBatch "0..*" --> "1" ProductionPassportSnapshot : selects
     ProductionBatch "1" --> "1..*" WorkCardSet : releases
+    ProductionBatch "1" --> "0..1" FinalBatchAcceptance : accepted by
     WorkCardSet "1" --> "1..*" WorkCard : groups
     WorkCard "0..*" --> "0..1" DemoUser : assigned to
     WorkCard "1" --> "0..*" AuditEvent : described by
     WorkCardSet "1" --> "0..*" AuditEvent : described by
+    ProductionBatch "1" --> "0..*" AuditEvent : described by
     WorkCard "1" --> "0..1" PayrollRecord : exported as
 
     class ProductionPassport {
@@ -51,8 +53,17 @@ classDiagram
       BatchId id
       BatchQuantity quantity
       ProductionPassportSnapshot passport
-      ReleaseStatus releaseStatus
+      BatchLifecycleStatus lifecycleStatus
+      FinalBatchAcceptanceId finalAcceptanceId
       Version version
+    }
+    class FinalBatchAcceptance {
+      FinalBatchAcceptanceId id
+      BatchId batchId
+      UserId controllerId
+      DateTime acceptedAt
+      CommandId commandId
+      Version resultingBatchVersion
     }
     class WorkCardSet {
       WorkCardSetId id
@@ -111,10 +122,10 @@ classDiagram
 | Понятие | Происхождение | Scope | Представление MVP |
 |---|---|---|---|
 | `FirstPieceAcceptance` | `CONFIRMED_AS_IS` (`ASIS-005`) | первая деталь перед серией конкретного operation-scoped комплекта | `AcceptFirstArticle` закрывает first-article WorkCard и открывает gate комплекта |
-| `FinalBatchAcceptance` | `CONFIRMED_AS_IS` (`ASIS-010`, `ASIS-011`) | вся завершённая партия; физическое свидетельство — подписи БТК на карточках | прямой агрегат, state и command отсутствуют |
+| `FinalBatchAcceptance` | `CONFIRMED_AS_IS` + `TO_BE_DECISION` (`ASIS-010`, `ASIS-011`, `TOBE-008`, `D-021`) | вся завершённая партия; физическое свидетельство — подписи БТК на карточках | `RecordFinalBatchAcceptance` создаёт одну неизменяемую запись, не являющуюся цифровой подписью |
 | `WorkCardQualityConfirmation` | `TO_BE_DECISION` (`TOBE-006`, `D-009`, `D-020`) | одна завершённая serial WorkCard | `ConfirmWorkCardQuality` переводит только эту карточку в `CLOSED` |
 
-`CLOSED` отдельной карточки не является записью `FinalBatchAcceptance`, а набор закрытых карточек не создаёт это состояние неявно.
+`CLOSED` отдельной карточки не является записью `FinalBatchAcceptance`, а набор закрытых карточек не создаёт её неявно. Закрытие всех обязательных карточек — только предусловие отдельной команды уровня партии.
 
 ## Reference data
 
@@ -134,9 +145,17 @@ classDiagram
 
 ### `ProductionBatch`
 
-**Состояние:** `BatchId`, положительный `BatchQuantity`, неизменяемый `ProductionPassportSnapshot`, признак выпуска, список созданных `WorkCardSetId` после выпуска и версия.
+**Состояние:** `BatchId`, положительный `BatchQuantity`, неизменяемый `ProductionPassportSnapshot`, `CREATED | RELEASED | FINAL_ACCEPTED`, список созданных `WorkCardSetId`, необязательный `finalBatchAcceptanceId` и версия.
 
-**Ответственность:** валидировать количество, запретить повторный выпуск и зафиксировать состав выпущенных комплектов. Партия не содержит `normHours` и не предполагает один комплект.
+**Ответственность:** валидировать количество, запретить повторный выпуск, зафиксировать состав выпущенных комплектов и не допустить более одной финальной приёмки. Партия не содержит `normHours` и не предполагает один комплект.
+
+### `FinalBatchAcceptance`
+
+Неизменяемая запись, создаваемая только `RecordFinalBatchAcceptance`.
+
+**Состояние:** уникальный `FinalBatchAcceptanceId`, уникальный `BatchId`, `controllerId`, `acceptedAt`, исходный `commandId` и результирующая версия партии.
+
+**Ответственность:** доказать отдельный цифровой факт финальной приёмки завершённой партии. Запись не хранит изображение/сертификат подписи, не выводится из карточек и не редактируется после создания.
 
 ### `WorkCardSet`
 
@@ -179,6 +198,7 @@ classDiagram
 | `ProductionPassportSnapshot` | Value Object | Неизменяемые паспорт и планы комплектов на момент создания партии. |
 | `OperationScopeSnapshot` | Value Object | Коды/названия одной операции или группы операций. |
 | `FirstArticleGateStatus` | Enum | `FIRST_ARTICLE_PENDING`, `SERIAL_ALLOWED`. |
+| `BatchLifecycleStatus` | Enum | `CREATED`, `RELEASED`, `FINAL_ACCEPTED`. |
 | `WorkCardPurpose` | Enum | `FIRST_ARTICLE`, `SERIAL`; не является номером детали. |
 | `ExpectedVersion` | Value Object | Ожидаемая клиентом версия агрегата. |
 | `Role` | Enum | `PLANNER`, `MASTER`, `WORKER`, `QUALITY_CONTROLLER`, `ADMIN_AUDITOR`. |
@@ -198,6 +218,7 @@ classDiagram
 | Ровно одна first-article карточка и gate | `WorkCardSet` | транзакция assignment/acceptance |
 | Атомарное массовое назначение | assignment service + `WorkCard` | одна транзакция |
 | Переходы выполняет мастер, контроль — БТК | `WorkCard` + backend permissions | role checks |
+| Одна финальная приёмка только завершённой партии | `ProductionBatch` + final acceptance service | unique `batchId`, consistent completion read, transaction |
 | Одна payroll-запись | `PayrollRecord` | unique `workCardId` |
 | Состояние и история согласованы | transaction boundary | audit event в той же транзакции |
 
@@ -210,7 +231,8 @@ classDiagram
 5. **Переход карточки:** мастер меняет одну карточку и пишет событие.
 6. **First-article acceptance:** закрыть карточку, открыть gate комплекта и записать события обоих агрегатов.
 7. **Digital per-card quality confirmation:** закрыть одну serial WorkCard и записать событие, не создавая `FinalBatchAcceptance`.
-8. **Mock export:** создать первую `PayrollRecord` и событие либо вернуть существующую запись без нового факта.
+8. **Final batch acceptance:** проверить актуальную версию партии и согласованную полноту всех комплектов/карточек, создать `FinalBatchAcceptance`, перевести партию в `FINAL_ACCEPTED` и записать `FinalBatchAccepted` одной транзакцией.
+9. **Mock export:** создать первую `PayrollRecord` и событие либо вернуть существующую запись без нового факта.
 
 Стратегия блокировок и API появится в [[transactions-concurrency]] и [[api-contracts]].
 
@@ -219,6 +241,7 @@ classDiagram
 - сущность физической детали и серийная прослеживаемость;
 - `SequenceNumber` и пользовательская нумерация карточек;
 - отрицательная приёмка, доработка и повторный first-article gate;
-- прямая цифровая `FinalBatchAcceptance`, подпись БТК и вывод финальной приёмки из статусов карточек;
+- цифровая копия/сертификат физической подписи БТК и вывод финальной приёмки из статусов карточек;
+- отрицательная финальная приёмка, причины брака и rework;
 - редактирование/версионный каталог паспортов и норм;
 - повторный выпуск, переназначение, фактическое время и денежные расчёты.

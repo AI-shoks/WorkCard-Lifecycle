@@ -1,14 +1,14 @@
 ---
 artifact_id: requirements.acceptance-criteria
 status: accepted
-version: 4
+version: 5
 owner: requirements
 updated: 2026-07-17
 ---
 
 # Acceptance Criteria
 
-30 объективных критериев MVP v1. Если не указано обратное, отказ выполняет единый постконтракт [[negative-scenarios]].
+37 объективных критериев MVP v1. Если не указано обратное, отказ выполняет единый постконтракт [[negative-scenarios]].
 
 ## Партия и выпуск
 
@@ -101,6 +101,60 @@ updated: 2026-07-17
 **And Given** запрошены отрицательная приёмка, отклонение, возврат, отдельное закрытие или `REWORK_REQUIRED`
 **Then** действие отсутствует/отклонено.
 
+## Финальная приёмка партии
+
+### AC-FBA-001. Положительная финальная приёмка завершённой партии
+
+**Given** выпущенная партия актуальной версии имеет все обязательные `WorkCardSet` в `SERIAL_ALLOWED`, полный `plannedCardCount`, только `CLOSED` WorkCard и ещё не имеет `FinalBatchAcceptance`
+**And** доверенный актор — `QUALITY_CONTROLLER`
+**When** выполняется `RecordFinalBatchAcceptance`
+**Then** одна транзакция создаёт ровно одну неизменяемую `FinalBatchAcceptance`, связывает её с партией, переводит партию в `FINAL_ACCEPTED` и увеличивает её версию на один
+**And** создаётся `FinalBatchAccepted` с общими `commandId`/`correlationId` и результирующей версией партии
+**And** запись не содержит и не заменяет физическую подпись БТК.
+
+### AC-FBA-002. Запрет преждевременной приёмки
+
+**Given** хотя бы один обязательный комплект не `SERIAL_ALLOWED`, число карточек не равно `plannedCardCount` или хотя бы одна необходимая WorkCard не `CLOSED`
+**When** `QUALITY_CONTROLLER` вызывает `RecordFinalBatchAcceptance`
+**Then** запись, связь, статус/версия партии и событие не создаются
+**And** UI объясняет невыполненные предусловия, не предлагая обход.
+
+### AC-FBA-003. Повторная команда и единственность записи
+
+**Given** финальная приёмка партии уже успешно записана
+**When** повторяется тот же `commandId`
+**Then** возвращается та же `FinalBatchAcceptance` без новой записи, версии или события.
+
+**And When** новая команда с другим `commandId` пытается принять ту же партию
+**Then** она отклоняется как терминальный конфликт, а уникальность `batchId` сохраняет одну запись.
+
+### AC-FBA-004. Version conflict
+
+**Given** `expectedVersion` партии устарела
+**When** выполняется `RecordFinalBatchAcceptance`
+**Then** команда отклоняется без записи, версии и события
+**And** клиент перечитывает партию, completion summary и существующую acceptance перед новой явной попыткой.
+
+### AC-FBA-005. Транзакционная согласованность
+
+**Given** успешная финальная приёмка должна сохранить `FinalBatchAcceptance`, ссылку/статус/версию партии и `FinalBatchAccepted`
+**When** любой компонент не сохраняется
+**Then** откатывается вся операция; ни read model, ни audit не показывают частичный успех.
+
+### AC-FBA-006. Только `QUALITY_CONTROLLER`
+
+**Given** доверенная роль отличается от `QUALITY_CONTROLLER`, даже если клиент подменил actor/role или показал control вручную
+**When** вызывается `RecordFinalBatchAcceptance`
+**Then** backend отклоняет команду без предметного изменения и события успеха.
+
+### AC-FBA-007. Read-back финальной приёмки
+
+**Given** существует `FinalBatchAcceptance`
+**When** разрешённая demo-роль читает партию или `GetFinalBatchAcceptance`
+**Then** возвращаются `acceptanceId`, `batchId`, `controllerId`, `acceptedAt`, исходный `commandId` и результирующая версия партии
+**And** карточки остаются отдельными записями, а поле физической подписи отсутствует
+**And** чтение не создаёт новую запись, версию или событие.
+
 ## Авторизация и чтение
 
 ### AC-AUT-001. Backend как граница
@@ -167,7 +221,7 @@ updated: 2026-07-17
 
 ### AC-TXN-001. Атомарность
 
-**Given** любая изменяющая команда, включая создание партии, выпуск, assignment и first-article acceptance
+**Given** любая изменяющая команда, включая создание партии, выпуск, assignment, first-article acceptance и final-batch acceptance
 **When** любая предметная запись или событие не сохраняется
 **Then** откатывается вся операция; частичный набор и состояние без события не наблюдаются.
 

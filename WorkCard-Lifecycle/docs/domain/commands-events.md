@@ -1,7 +1,7 @@
 ---
 artifact_id: domain.commands-events
 status: accepted
-version: 3
+version: 4
 owner: domain
 updated: 2026-07-17
 ---
@@ -99,11 +99,21 @@ updated: 2026-07-17
 | Результат | Синтетическое per-card подтверждение и `COMPLETED → CLOSED` только выбранной WorkCard |
 | Событие | `WorkCardQualityConfirmed` с `confirmationScope: WORK_CARD`, `acceptanceType: SERIAL`, `resultingStatus: CLOSED` |
 
-Команд отклонения, возврата, отдельного закрытия и повторной приёмки нет.
+Команд отклонения, возврата, отдельного закрытия и повторного per-card подтверждения нет.
 
-### Граница `FinalBatchAcceptance`
+### `RecordFinalBatchAcceptance`
 
-Подтверждённая AS-IS финальная приёмка выполняется БТК после завершения всей партии и сопровождается подписями на физических карточках. В MVP нет `AcceptFinalBatch`, агрегата/состояния `FinalBatchAcceptance` или события цифровой подписи. `ConfirmWorkCardQuality` — выбранное `TO_BE_DECISION` уровня одной WorkCard; оно не записывает и не доказывает финальную приёмку партии.
+| Поле | Спецификация |
+|---|---|
+| Инициатор | `QUALITY_CONTROLLER` |
+| Вход | `batchId`, `expectedVersion`; `commandId` из общей оболочки |
+| Предусловия | Партия `RELEASED`; все обязательные комплекты имеют `SERIAL_ALLOWED`, полный `plannedCardCount` и только `CLOSED` WorkCard; `FinalBatchAcceptance` отсутствует; `BR-036`–`BR-039` |
+| Результат | Создана одна неизменяемая `FinalBatchAcceptance`, связанная с партией; партия становится `FINAL_ACCEPTED`, её версия увеличивается на один |
+| Событие | `FinalBatchAccepted` с `acceptanceId`, `batchId`, `controllerId`, `acceptedAt`, `resultingBatchVersion` |
+| Атомарность | Партия, запись и audit event сохраняются одной транзакцией; ошибка любого сохранения откатывает всё |
+| Повтор | Тот же `commandId` возвращает существующую запись без новой версии/события; новый command для принятой партии отклоняется |
+
+Закрытые карточки являются предусловием, но не доказательством финальной приёмки. Цифровая запись не хранит и не заменяет подписи БТК на физических карточках.
 
 ## Mock payroll
 
@@ -126,6 +136,7 @@ updated: 2026-07-17
 | `GetProductionBatch` / `ListProductionBatches` | demo-роли | Нет |
 | `GetWorkCardSet` / `ListWorkCardSets` | demo-роли | Нет |
 | `GetWorkCard` / `ListWorkCards` | demo-роли | Нет |
+| `GetFinalBatchAcceptance` | demo-роли, видящие партию | Нет |
 | `GetWorkCardHistory` | `ADMIN_AUDITOR` | Нет |
 | `GetPayrollRecord` | `ADMIN_AUDITOR` | Нет |
 
@@ -143,6 +154,7 @@ updated: 2026-07-17
 | `WorkCardCompleted` | `WorkCard` | `workCardId`, `assigneeId`, `recordedByMasterId`, `status` |
 | `WorkCardQualityConfirmed` | `WorkCard` | `workCardId`, `controllerId`, `confirmationScope: WORK_CARD`, `acceptanceType`, `resultingStatus: CLOSED` |
 | `FirstArticleAccepted` | `WorkCardSet` | `setId`, `workCardId`, `resultingGateStatus: SERIAL_ALLOWED` |
+| `FinalBatchAccepted` | `ProductionBatch` | `acceptanceId`, `batchId`, `controllerId`, `acceptedAt`, `resultingBatchStatus: FINAL_ACCEPTED` |
 | `WorkCardExportedToPayroll` | `PayrollRecord` | `payrollRecordId`, `workCardId`, `beneficiaryId`, `normHours` |
 
 `sequenceNumber`, номер детали и один норматив партии отсутствуют в событиях.

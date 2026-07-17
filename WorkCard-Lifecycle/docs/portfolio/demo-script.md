@@ -12,4 +12,4 @@ updated: 2026-07-17
 
 ## Черновой маршрут
 
-Создание партии → генерация карточек → массовое назначение → выполнение → подтверждение мастером → подтверждение БТК → закрытие → mock payroll export → audit log → демонстрация защиты от повторного экспорта.
+Создание партии → выпуск нескольких комплектов → first-article assignment и приёмка → serial assignment `60 + 52` → master start/complete → synthetic per-card close → подготовленное `250/250 CLOSED` состояние → отдельная `RecordFinalBatchAcceptance` с actor/time/ID → mock payroll export → audit log → демонстрация защиты от повторов.

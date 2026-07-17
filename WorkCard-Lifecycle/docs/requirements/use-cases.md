@@ -1,7 +1,7 @@
 ---
 artifact_id: requirements.use-cases
 status: accepted
-version: 4
+version: 5
 owner: requirements
 updated: 2026-07-17
 ---
@@ -15,7 +15,7 @@ updated: 2026-07-17
 - подготовленные паспорта, operation scopes и нормы являются read-only seed-данными технолога/БТБ;
 - `PLANNER` представляет интерактивные обязанности ПДБ;
 - `MASTER` назначает карточки и фиксирует начало/завершение; `WORKER` не отправляет lifecycle-команды;
-- `AcceptFirstArticle`, подтверждённая AS-IS `FinalBatchAcceptance` и синтетическое per-card закрытие WorkCard имеют разный смысл;
+- `AcceptFirstArticle`, отдельная `RecordFinalBatchAcceptance` и синтетическое per-card закрытие WorkCard имеют разный смысл;
 - изменяющая команда содержит версии всех существующих изменяемых агрегатов;
 - успех сохраняет полный предметный результат и audit events атомарно, отказ не имеет побочных эффектов;
 - HTTP-маршруты и коды появятся в [[api-contracts]].
@@ -38,6 +38,7 @@ updated: 2026-07-17
 | UC-012 | Восстановиться после version conflict | Изменяющая роль | refresh + новая команда |
 | UC-013 | Просмотреть mock payroll-запись | `ADMIN_AUDITOR` | `GetPayrollRecord` |
 | UC-014 | Сопоставить события массовой операции | `ADMIN_AUDITOR` | audit по `correlationId` |
+| UC-015 | Зафиксировать финальную приёмку завершённой партии | `QUALITY_CONTROLLER` | `RecordFinalBatchAcceptance` |
 
 ## UC-001. Создать производственную партию
 
@@ -148,7 +149,7 @@ updated: 2026-07-17
 
 **Основной поток:** БТК выполняет `ConfirmWorkCardQuality`; система переводит только выбранную карточку в `CLOSED` и сохраняет `WorkCardQualityConfirmed` с `confirmationScope: WORK_CARD`, `acceptanceType: SERIAL`.
 
-**Граница:** `CLOSED` не означает `FinalBatchAcceptance`. Подтверждённая AS-IS финальная приёмка всей завершённой партии и подписи БТК на физических карточках не представлены отдельной digital-командой MVP.
+**Граница:** `CLOSED` не означает `FinalBatchAcceptance`. Отдельная digital-команда уровня партии описана в `UC-015`, а подписи БТК на физических карточках не оцифровываются.
 
 **Отказы:** `NS-016`–`NS-018`.
 
@@ -217,6 +218,28 @@ updated: 2026-07-17
 
 Аудитор открывает audit-контекст по `correlationId` и сопоставляет полный набор событий выпуска, назначения или first-article acceptance с предметным результатом. UX не фиксирует endpoint; архитектура должна обеспечить доказуемо полный набор.
 
+## UC-015. Зафиксировать финальную приёмку завершённой партии
+
+**Цель:** отдельным positive-only действием подтвердить всю завершённую `ProductionBatch`, не выводя приёмку автоматически из карточек и не имитируя физическую подпись.
+
+**Актор:** `QUALITY_CONTROLLER`.
+
+**Предусловия:** партия выпущена; каждый обязательный `WorkCardSet` имеет `SERIAL_ALLOWED`, полный `plannedCardCount` и только `CLOSED` WorkCard; `FinalBatchAcceptance` отсутствует; `expectedVersion` партии актуальна.
+
+**Основной поток:**
+
+1. БТК открывает `S-03` и видит раздельные признаки: first-article gates пройдены, все необходимые serial-карточки закрыты, финальная приёмка ещё не записана.
+2. БТК подтверждает `RecordFinalBatchAcceptance` с `batchId`, `expectedVersion` и `commandId`.
+3. Backend проверяет доверенную роль, версию и completion predicate по транзакционно согласованному состоянию.
+4. Одна транзакция создаёт неизменяемую `FinalBatchAcceptance`, связывает её с партией, переводит партию в `FINAL_ACCEPTED`, увеличивает версию и сохраняет `FinalBatchAccepted`.
+5. Read-back показывает `acceptanceId`, актора, время и результирующую версию партии.
+
+**Повтор:** replay того же `commandId` возвращает существующую запись без второй версии/события; новый command после успеха отклоняется как терминальный конфликт.
+
+**Отказы:** `NS-002`, `NS-004`, `NS-023`, `NS-041`–`NS-045`.
+
+**Правила:** `BR-001`–`BR-003`, `BR-036`–`BR-039`, `BR-050`–`BR-062`.
+
 ## Сквозной порядок
 
-Core demo sequence: `UC-001 → UC-002 → UC-003(first article) → UC-004 → UC-005 → UC-003(serial) → UC-004 → UC-006 → UC-009`. `UC-006` демонстрирует только синтетическое per-card закрытие. `UC-007` проверяет, что оно не выдано за подтверждённую финальную приёмку партии; `UC-008`, `UC-010`–`UC-014` обеспечивают остальные supporting-сценарии.
+Core demo sequence: `UC-001 → UC-002 → UC-003(first article) → UC-004 → UC-005 → UC-003(serial) → UC-004 → UC-006 → UC-015 → UC-009`. После демонстрации одной serial WorkCard прототип использует подготовленное all-closed состояние остальных карточек, чтобы показать aggregate-level приёмку без ручного прогона `250` записей. `UC-006` остаётся только синтетическим per-card закрытием; `UC-015` отдельно создаёт `FinalBatchAcceptance`. `UC-007`, `UC-008`, `UC-010`–`UC-014` обеспечивают read/provenance и supporting-сценарии.

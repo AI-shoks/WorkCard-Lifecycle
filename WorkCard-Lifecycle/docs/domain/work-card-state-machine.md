@@ -1,14 +1,14 @@
 ---
 artifact_id: domain.work-card-state-machine
 status: accepted
-version: 3
+version: 4
 owner: domain
 updated: 2026-07-17
 ---
 
 # WorkCard State Machine
 
-Канонический автомат `WorkCard` и связанный first-article gate `WorkCardSet`. Мастер фиксирует выполнение; назначенный исполнитель не отправляет lifecycle-команды. `WorkCardId` не является номером детали, а `CLOSED` не является финальной приёмкой всей партии.
+Канонический автомат `WorkCard`, связанный first-article gate `WorkCardSet` и отдельный lifecycle партии. Мастер фиксирует выполнение; назначенный исполнитель не отправляет lifecycle-команды. `WorkCardId` не является номером детали, а `CLOSED` не является записью финальной приёмки всей партии.
 
 ## Диаграмма карточки
 
@@ -26,7 +26,8 @@ stateDiagram-v2
       First-article card uses AcceptFirstArticle.
       Serial card uses synthetic per-card
       ConfirmWorkCardQuality.
-      Neither transition records FinalBatchAcceptance.
+      Neither transition records FinalBatchAcceptance;
+      only RecordFinalBatchAcceptance does.
     end note
 ```
 
@@ -64,15 +65,29 @@ stateDiagram-v2
 | `COMPLETED` | `AcceptFirstArticle` | БТК; зарегистрированная first-article карточка и pending gate | `CLOSED` | `WorkCardQualityConfirmed`, `FirstArticleAccepted` | `BR-032` |
 | `COMPLETED` | `ConfirmWorkCardQuality` | БТК; serial-карточка и `SERIAL_ALLOWED`; per-card `TO_BE_DECISION` | `CLOSED` | `WorkCardQualityConfirmed` | `BR-033`–`BR-036` |
 
-## Граница финальной приёмки
+## Lifecycle партии и финальной приёмки
 
-`FinalBatchAcceptance` — отдельный подтверждённый AS-IS-факт после завершения всей партии, сопровождаемый подписями БТК на физических карточках. Он не является состоянием этой state machine. Закрытие одной или всех WorkCard не создаёт финальную приёмку неявно.
+```mermaid
+stateDiagram-v2
+    [*] --> CREATED: CreateProductionBatch
+    CREATED --> RELEASED: ReleaseWorkCards
+    RELEASED --> FINAL_ACCEPTED: RecordFinalBatchAcceptance / QUALITY_CONTROLLER
+    FINAL_ACCEPTED --> [*]
+
+    note right of RELEASED
+      Every required set has SERIAL_ALLOWED;
+      every required WorkCard is CLOSED;
+      no FinalBatchAcceptance exists.
+    end note
+```
+
+`RecordFinalBatchAcceptance` создаёт отдельную неизменяемую запись и `FinalBatchAccepted`. Она не добавляет состояние в автомат WorkCard: закрытие одной или всех WorkCard лишь выполняет предусловие и не создаёт финальную приёмку неявно. Физические подписи БТК остаются отдельным AS-IS-свидетельством.
 
 ## Универсальные проверки
 
 1. backend устанавливает доверенную роль;
 2. загружает карточку и, когда требуется, комплект;
-3. проверяет точные роли, purpose, gate и исходное состояние;
+3. проверяет точные роли, purpose, gate и исходное состояние; для финальной приёмки — согласованную полноту всех обязательных set/card;
 4. сверяет версии всех изменяемых агрегатов;
 5. применяет изменение, увеличивает версии и сохраняет полный набор audit events одной транзакцией.
 
@@ -86,6 +101,8 @@ stateDiagram-v2
 - завершение без начала;
 - положительное действие БТК до `COMPLETED` или не для соответствующего purpose/gate;
 - любое изменение после `CLOSED`;
+- финальная приёмка до `SERIAL_ALLOWED` всех обязательных комплектов или до закрытия всех необходимых WorkCard;
+- вторая финальная приёмка партии новым `commandId`;
 - возврат, отклонение, `REWORK_REQUIRED`, переназначение и повторный выпуск.
 
 ## Mock payroll

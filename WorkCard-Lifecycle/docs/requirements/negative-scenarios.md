@@ -1,7 +1,7 @@
 ---
 artifact_id: requirements.negative-scenarios
 status: accepted
-version: 3
+version: 4
 owner: requirements
 updated: 2026-07-17
 ---
@@ -52,6 +52,11 @@ updated: 2026-07-17
 | NS-038 | `PayrollRecord.normHours` отличается от snapshot карточки/комплекта. | Запись и событие не создаются. | snapshot integrity | `BR-042`; `AC-PAY-005`, `AC-TXN-001` |
 | NS-039 | Beneficiary отличается от `assigneeId` карточки. | Запись и событие не создаются. | beneficiary integrity | `BR-040`, `BR-042`; `AC-PAY-005`, `AC-TXN-001` |
 | NS-040 | Клиент меняет или удаляет `PayrollRecord`. | Команда отсутствует/отклонена; запись неизменна. | immutability | `BR-042`; `AC-PAY-005` |
+| NS-041 | `RecordFinalBatchAcceptance` вызвана до `SERIAL_ALLOWED` хотя бы одного обязательного комплекта, при неполном `plannedCardCount` или пока хотя бы одна необходимая WorkCard не `CLOSED`. | Приёмка, версия партии и событие не создаются. | premature aggregate state | `BR-037`; `AC-FBA-002` |
+| NS-042 | После успешной финальной приёмки тот же `commandId` повторён или новый command пытается создать вторую запись. | Replay возвращает существующую запись без эффекта; новый command отклоняется, вторая запись/событие не создаются. | idempotency / terminal conflict | `BR-038`, `BR-039`; `AC-FBA-003` |
+| NS-043 | `RecordFinalBatchAcceptance` вызывает роль, отличная от `QUALITY_CONTROLLER`, либо клиент подменяет actor/role. | Backend отклоняет команду без раскрытия control authority и без эффекта. | authorization | `BR-001`, `BR-037`; `AC-FBA-006` |
+| NS-044 | `expectedVersion` партии устарела перед финальной приёмкой. | Вся команда отклоняется; completion state и версия перечитываются явно. | concurrency | `BR-002`, `BR-038`, `BR-061`, `BR-062`; `AC-FBA-004` |
+| NS-045 | Запись `FinalBatchAcceptance`, связь/статус/версия партии или `FinalBatchAccepted` не сохраняются совместно. | Вся транзакция откатывается; частичной приёмки нет. | transaction | `BR-003`, `BR-038`, `BR-050`, `BR-051`; `AC-FBA-005` |
 
 ## Порядок безопасной обработки
 

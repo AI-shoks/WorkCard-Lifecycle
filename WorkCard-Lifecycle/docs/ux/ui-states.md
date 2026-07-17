@@ -1,7 +1,7 @@
 ---
 artifact_id: ux.ui-states
 status: accepted
-version: 3
+version: 4
 owner: ux
 updated: 2026-07-17
 ---
@@ -77,6 +77,7 @@ stateDiagram-v2
 | `CompleteWorkCard` | «Мастер зафиксировал завершение; ожидается БТК» | `COMPLETED` |
 | `AcceptFirstArticle` | «Первая деталь принята; серийная работа разрешена» | card `CLOSED`, set `SERIAL_ALLOWED` |
 | `ConfirmWorkCardQuality` | «Карточка цифрово закрыта; финальная приёмка партии не записана» | `CLOSED` only for selected WorkCard |
+| `RecordFinalBatchAcceptance` | «Завершённая партия принята БТК» | `FINAL_ACCEPTED` + immutable acceptance actor/time/ID |
 | first export | «Mock payroll запись создана» | `S-07` |
 | repeat export | «Показана существующая запись» | same `S-07` |
 
@@ -107,6 +108,7 @@ Toast дополняет, но не заменяет visible state.
 | gate conflict | «Сначала требуется положительная приёмка первой детали» | bypass/force serial |
 | state conflict | «Действие недоступно в текущем состоянии» | force transition |
 | transaction failure | «Операция не завершена; частичный результат не подтверждён» | per-row optimistic success |
+| premature final acceptance | «Сначала завершите все обязательные комплекты и закройте все карточки» | auto-accept / bypass completion predicate |
 | integrity | «Структура выпуска не совпадает с паспортом; продолжение заблокировано» | automatic repair |
 | network uncertainty | «Перечитайте данные перед повтором» | automatic command retry |
 
@@ -123,6 +125,7 @@ Toast дополняет, но не заменяет visible state.
 - assignment reloads set + all selected cards and clears selection;
 - first-article acceptance reloads card + set;
 - release reloads batch + existing sets;
+- final-batch acceptance reloads batch + all completion counters + existing acceptance;
 - new explicit confirmation is required after refresh;
 - force overwrite/auto merge absent.
 
@@ -145,12 +148,20 @@ Toast дополняет, но не заменяет visible state.
 - card `CLOSED` без set `SERIAL_ALLOWED` и обратное считаются integrity failure;
 - UI не открывает serial controls до refresh обоих aggregates.
 
+### Final-batch acceptance
+
+- success наблюдается только когда `FinalBatchAcceptance`, `FINAL_ACCEPTED`, новая версия партии и `FinalBatchAccepted` согласованы;
+- до успеха UI отдельно показывает gates, `CLOSED / planned` и отсутствие acceptance;
+- тот же command ID не показывает второе success-событие, новый command после `FINAL_ACCEPTED` недоступен;
+- transaction/network uncertainty требует read-back batch + acceptance перед повтором.
+
 ### Acceptance provenance
 
 - `FirstPieceAcceptance` показывает отдельную подтверждённую первую приёмку перед серией;
 - `ConfirmWorkCardQuality` всегда помечен как synthetic per-card close;
-- UI не показывает `FinalBatchAcceptance`, batch accepted или подпись БТК как результат закрытия одной/всех WorkCard;
-- подтверждённая финальная приёмка всей партии и физические подписи описываются как AS-IS-контекст вне прямого digital workflow MVP.
+- UI не показывает `FinalBatchAcceptance` или batch accepted как автоматический результат закрытия одной/всех WorkCard;
+- отдельный success `RecordFinalBatchAcceptance` показывает цифровой actor/time/ID уровня партии;
+- физические подписи остаются AS-IS-контекстом и не отображаются как данные цифровой acceptance.
 
 ## Offline/retry
 
@@ -173,5 +184,8 @@ Permission-sensitive cache, selections и dialogs очищаются; unfinished
 | `UX-T-007` | fixture shows 3 sets/250 and no sequence labels |
 | `UX-T-008` | first-article gate blocks serial controls until acceptance |
 | `UX-T-009` | `WORKER` sees read-only assignment, `MASTER` sees lifecycle controls |
+| `UX-T-010` | final-batch action disabled until gates and all required cards complete |
+| `UX-T-011` | only `QUALITY_CONTROLLER` sees final-batch action; read-back shows actor/time/ID |
+| `UX-T-012` | per-card close does not auto-create acceptance; replay does not show duplicate result |
 
 Ролевые правила — [[permission-ux]].

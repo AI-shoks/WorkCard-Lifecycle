@@ -1,7 +1,7 @@
 ---
 artifact_id: ux.permission-ux
 status: accepted
-version: 3
+version: 4
 owner: ux
 updated: 2026-07-17
 ---
@@ -64,7 +64,8 @@ Protected route data is never loaded before being hidden.
 | record complete | hidden | enabled/disabled | hidden | hidden | hidden | `IN_PROGRESS` |
 | accept first article | hidden | hidden | hidden | enabled/disabled | hidden | first card `COMPLETED`, pending gate |
 | synthetic per-card serial quality/close | hidden | hidden | hidden | enabled/disabled | hidden | serial `COMPLETED`, open gate; does not record final batch acceptance |
-| accept final batch / sign physical cards | hidden | hidden | hidden | hidden | hidden | `N/A`: confirmed AS-IS, direct digital command outside MVP |
+| accept completed batch | hidden | hidden | hidden | enabled/disabled | hidden | all mandatory gates accepted, all required WorkCard `CLOSED`, no prior acceptance, current batch version |
+| sign physical cards | hidden | hidden | hidden | hidden | hidden | `N/A`: physical signature is not digitized |
 | open audit | hidden | hidden | hidden | hidden | enabled | card accessible |
 | first mock export | hidden | hidden | hidden | hidden | enabled/disabled | `CLOSED`, assignee, no record |
 | open payroll record | hidden | hidden | hidden | hidden | enabled | record exists |
@@ -96,8 +97,9 @@ Protected route data is never loaded before being hidden.
 
 - first-article `COMPLETED`: «Принять первую деталь и открыть серию»;
 - serial `COMPLETED` + open gate: «Подтвердить качество и закрыть карточку» plus provenance note «не финальная приёмка партии»;
+- на `S-03` для all-closed batch: «Принять завершённую партию»; после success — read-only actor/time/acceptance ID;
 - no reject/return/rework/separate close;
-- no `AcceptFinalBatch` or digital signature control;
+- no physical-signature control;
 - `CLOSED`: terminal read-only.
 
 ### `ADMIN_AUDITOR`
@@ -119,6 +121,7 @@ Protected route data is never loaded before being hidden.
 | master complete | «Сначала мастер должен зафиксировать начало» |
 | first-article acceptance | «Требуется завершённая first-article карточка» |
 | synthetic per-card quality | «Требуется завершённая serial-карточка и открытый gate; действие не фиксирует финальную приёмку партии» |
+| final-batch acceptance | «Требуются принятые первые детали всех обязательных комплектов, полный состав CLOSED-карточек и актуальная версия партии» |
 | mock export | «Доступно для закрытой карточки с исполнителем» |
 
 ## Role switcher
@@ -164,6 +167,8 @@ Prepared identity/role only; no arbitrary role input. Shell/dialogs show active 
 | `UX-PERM-008` | backend denial triggers refresh |
 | `UX-PERM-009` | serial controls blocked until first article accepted |
 | `UX-PERM-010` | no per-card action is labeled as final batch acceptance or physical signature |
-| `UX-PERM-010` | no UI label implies card/detail sequence |
+| `UX-PERM-011` | no UI label implies card/detail sequence |
+| `UX-PERM-012` | only `QUALITY_CONTROLLER` sees `RecordFinalBatchAcceptance` when every prerequisite is met |
+| `UX-PERM-013` | final-batch permission denial and stale version produce no acceptance or optimistic success |
 
 Эти проверки дополняют API targets из [[requirements-traceability]].

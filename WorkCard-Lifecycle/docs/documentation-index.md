@@ -1,7 +1,7 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 4
+version: 5
 owner: project
 updated: 2026-07-17
 ---
@@ -49,3 +49,4 @@ docs/
 - структурный audit проверяет metadata и ссылки, но не доказывает соответствие предметной области;
 - перед закрытием этапа обязательны structural audit и отдельный semantic pass по scope, кардинальностям, ролям, состояниям и UX;
 - интерактивный прототип является отдельным deliverable и не подменяется текстовыми wireframes.
+- текущее aggregate-level решение прослеживается как `ASIS-010 + ASIS-011 → D-021 → BR-036–BR-039 → UC-015 → US-021 → AC-FBA-* → Future Tests`; физические подписи остаются отдельным AS-IS-свидетельством.

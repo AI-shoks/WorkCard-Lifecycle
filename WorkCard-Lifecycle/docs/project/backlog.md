@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 10
+version: 11
 owner: project
 updated: 2026-07-17
 ---
@@ -52,15 +52,24 @@ updated: 2026-07-17
 - [x] Включить positive-only first-article gate без отрицательного цикла.
 - [x] Сопоставить `PLANNER` с ПДБ, а технолога/БТБ — с read-only seed-данными.
 - [x] Передать assignment/start/complete мастеру; оставить `WORKER` read-only assignee/beneficiary.
-- [x] Обновить 14 use cases, 20 stories, 40 negative scenarios и 30 acceptance criteria.
+- [x] Обновить 15 use cases, 21 story, 45 negative scenarios и 37 acceptance criteria.
 - [x] Обновить пять UX-артефактов, README и navigation pages.
 
 ## Выполнено — честное закрытие этапа 4
 
 - [x] Создать интерактивный [кликабельный прототип](../ux/prototype.html) core demo sequence.
-- [x] Проверить 12 шагов, desktop/mobile layouts, role denial и отсутствие sequence labels в headless Chrome.
+- [x] Проверить 14 шагов, desktop/mobile layouts, role denial, отдельную final-batch acceptance и отсутствие sequence labels в headless DOM.
 - [x] Повторить strict structural audit и semantic pass.
 - [x] Вернуть этапу 4 статус «выполнено»; PR #1 оставить draft до отдельного review.
+
+## Выполнено — отдельная digital FinalBatchAcceptance в MVP v1
+
+- [x] Принять `D-021` и добавить `TOBE-008`, сохранив `ASIS-010`/`ASIS-011` и границу физических подписей.
+- [x] Описать `RecordFinalBatchAcceptance`, неизменяемую запись и `FinalBatchAccepted` с optimistic concurrency и атомарностью.
+- [x] Добавить `UC-015`, `US-021`, `AC-FBA-001`–`007`, `NS-041`–`045` и future tests.
+- [x] Перестроить traceability от evidence до тестов, не используя read-only `UC-007` как основную команду.
+- [x] Добавить batch-level action, permission gating и actor/time/ID read-back в UX и прототип.
+- [x] Повторить structural audit (`48 / 0 / 0`), semantic/ID/metadata gates и headless positive/negative/permission/replay checks.
 
 ## Далее — этап 5 (не начато)
 

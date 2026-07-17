@@ -1,7 +1,7 @@
 ---
 artifact_id: ux.screen-map
 status: accepted
-version: 3
+version: 4
 owner: ux
 updated: 2026-07-17
 ---
@@ -18,7 +18,8 @@ updated: 2026-07-17
 - карточка показывает внутренний UUID только как secondary technical metadata, не как `#01` или номер детали;
 - мастер владеет assignment/start/complete controls, `WORKER` получает read-only view;
 - БТК видит positive-only first-piece action или синтетическое per-card serial quality action;
-- UX явно сообщает, что per-card `CLOSED` не является `FinalBatchAcceptance` всей партии и не заменяет физическую подпись БТК;
+- на экране партии БТК отдельно выполняет `RecordFinalBatchAcceptance` только после всех first-article gates и закрытия всех обязательных WorkCard;
+- UX явно сообщает, что per-card `CLOSED` не является `FinalBatchAcceptance`, а цифровая запись уровня партии не заменяет физическую подпись БТК;
 - audit/payroll доступны только `ADMIN_AUDITOR`;
 - отсутствуют отрицательный контроль, доработка, переназначение, повторный выпуск и real payroll.
 
@@ -32,7 +33,7 @@ updated: 2026-07-17
 |---|---|---|---|---|---|
 | `S-01` | Партии `/batches` | quantity, паспорт, release, sets/cards totals | demo-роли | создать партию — `PLANNER` | `UC-001`, `UC-007` |
 | `S-02` | Новая партия `/batches/new` | выбор read-only паспорта и quantity; preview operation plans | `PLANNER` | создать | `UC-001` |
-| `S-03` | Партия `/batches/:batchId` | паспорт-снимок, quantity, operation plan, несколько комплектов, total cards | demo-роли | выпустить один раз — `PLANNER` | `UC-002`, `UC-007`, `UC-011`, `UC-012` |
+| `S-03` | Партия `/batches/:batchId` | паспорт-снимок, quantity, operation plan, комплекты, completion summary и read-back `FinalBatchAcceptance` | demo-роли | выпустить один раз — `PLANNER`; принять завершённую партию — `QUALITY_CONTROLLER` | `UC-002`, `UC-007`, `UC-011`, `UC-012`, `UC-015` |
 | `S-04` | Комплект `/card-sets/:setId` | operation scope, норма, planned count, gate, assignment summary, карточки | demo-роли по матрице | first-article/serial assignment — `MASTER` | `UC-003`, `UC-007`, `UC-011`, `UC-012` |
 | `S-05` | WorkCard `/work-cards/:workCardId` | status, purpose, assignee, batch quantity snapshot, operation/norm snapshots, version, UUID metadata | demo-роли по матрице | master lifecycle или БТК action по точному state/gate | `UC-004`–`UC-007`, `UC-009`, `UC-012` |
 | `S-06` | Audit context | card/set/batch history и операция по correlation | `ADMIN_AUDITOR` | read/copy ID | `UC-008`, `UC-014` |
@@ -62,6 +63,8 @@ flowchart TD
 |---|---|---|
 | партия не выпущена | Не выпущена | ПДБ выпускает |
 | партия выпущена | Выпущена | Мастер открывает комплекты |
+| партия завершена, acceptance отсутствует | Готова к финальной приёмке | БТК выполняет отдельное действие |
+| `FINAL_ACCEPTED` | Финальная приёмка выполнена | Read-only actor/time/acceptance ID |
 | `FIRST_ARTICLE_PENDING` | Ожидается первая деталь | Мастер выбирает/ведёт first article, затем БТК |
 | `SERIAL_ALLOWED` | Серийная работа разрешена | Мастер распределяет серийные карточки |
 | `RELEASED` | Доступна к назначению | Мастер |
@@ -100,6 +103,7 @@ Technical enums доступны в details/tooltips, но не заменяют
 - release: пользователь остаётся `S-03`, видит несколько комплектов и total;
 - assignment: остаётся `S-04`, перечитываются комплект и карточки;
 - lifecycle/acceptance: остаётся `S-05`, затем refresh card + set;
+- final-batch acceptance: остаётся `S-03`, затем refresh batch + completion summary + acceptance read-back;
 - export: `S-05 → S-07`;
 - conflict сохраняет маршрут, не повторяет команду автоматически.
 
@@ -113,7 +117,7 @@ Technical enums доступны в details/tooltips, но не заменяют
 | `60 + 52 = 112` | `S-04` |
 | мастерское ведение | `S-04`, `S-05` |
 | separate first-piece acceptance и synthetic per-card quality | `S-04`, `S-05` |
-| provenance финальной приёмки партии без ложного digital state | `S-03`, `S-05`, `S-06` |
+| отдельная digital `FinalBatchAcceptance` без автоматического вывода или ложной подписи | `S-03`, `S-05`, `S-06` |
 | conflict recovery | `S-03`–`S-05` |
 | audit/payroll | `S-06`, `S-07` |
 
@@ -129,5 +133,6 @@ Technical enums доступны в details/tooltips, но не заменяют
 | `US-010`, `US-011`, `US-016` | `S-05`, `S-07` |
 | `US-012`, `US-015`, `US-019` | conflict flow |
 | `US-014` | global role switch |
+| `US-021` | `S-03`, completion summary, отдельный control и acceptance read-back |
 
-Детали: [[user-flows]], [[wireframes]], [[ui-states]], [[permission-ux]]. Интерактивный [12-шаговый прототип](prototype.html) отдельно реализует core sequence и не смешивается с текстовой спецификацией.
+Детали: [[user-flows]], [[wireframes]], [[ui-states]], [[permission-ux]]. Интерактивный [14-шаговый прототип](prototype.html) отдельно реализует core sequence и не смешивается с текстовой спецификацией.

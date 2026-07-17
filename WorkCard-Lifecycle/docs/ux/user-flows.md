@@ -1,7 +1,7 @@
 ---
 artifact_id: ux.user-flows
 status: accepted
-version: 3
+version: 4
 owner: ux
 updated: 2026-07-17
 ---
@@ -12,7 +12,7 @@ updated: 2026-07-17
 
 ## Core demo sequence
 
-`UC-001 → UC-002 → UC-003(first article) → UC-004 → UC-005 → UC-003(serial) → UC-004 → UC-006 → UC-009`.
+`UC-001 → UC-002 → UC-003(first article) → UC-004 → UC-005 → UC-003(serial) → UC-004 → UC-006 → UC-015 → UC-009`.
 
 ```mermaid
 flowchart LR
@@ -23,10 +23,11 @@ flowchart LR
     Q1 --> M3["MASTER: serial assignment 60 + 52"]
     M3 --> M4["MASTER: start + complete serial card"]
     M4 --> Q2["БТК: synthetic per-card close"]
-    Q2 --> A1["ADMIN: mock export"]
+    Q2 --> Q3["БТК: принять all-closed партию"]
+    Q3 --> A1["ADMIN: mock export"]
 ```
 
-`UC-007` дополнительно проверяет provenance: core sequence не записывает подтверждённую AS-IS финальную приёмку всей партии. `UC-008`, `UC-010`–`UC-014` дают остальные supporting-сценарии.
+`UC-007` дополнительно проверяет provenance: per-card close не записывает финальную приёмку, а `UC-015` создаёт её только отдельной командой. `UC-008`, `UC-010`–`UC-014` дают остальные supporting-сценарии.
 
 ## F-01. Создание партии
 
@@ -106,21 +107,31 @@ flowchart TD
 3. Success показывает `CLOSED` только для этой WorkCard; lifecycle controls исчезают.
 4. Постоянная provenance-подсказка сообщает: `FinalBatchAcceptance` всей завершённой партии и подписи БТК на физических карточках подтверждены AS-IS, но этим действием не записываются.
 
-## F-07. Mock payroll
+## F-07. Отдельная финальная приёмка партии
+
+**Связи:** `UC-015`, `US-021`, `AC-FBA-001`–`007`.
+
+1. БТК открывает `S-03`; UI раздельно показывает `first-article gates: 3/3`, `closed cards: 250/250`, `FinalBatchAcceptance: ещё нет`.
+2. До выполнения любого условия action disabled с точной причиной; другие роли его не видят.
+3. «Принять завершённую партию» вызывает `RecordFinalBatchAcceptance` с batch version и явным confirmation.
+4. Success refreshes batch и показывает `FINAL_ACCEPTED`, `acceptanceId`, актора и время; физическая подпись не показывается.
+5. Replay того же command ID показывает существующую запись без нового success; новый command недоступен.
+
+## F-08. Mock payroll
 
 1. `ADMIN_AUDITOR` открывает `CLOSED` карточку.
 2. Первый export создаёт запись operation-scoped нормы и открывает `S-07`.
 3. Повтор/существующая запись открывает ту же `S-07` без сообщения о новом начислении.
 4. Money, taxes, actual time, edit/delete отсутствуют.
 
-## F-08. Audit и correlation
+## F-09. Audit и correlation
 
 1. `ADMIN_AUDITOR` открывает историю карточки.
 2. События показываются по versions/time; technical envelope раскрывается по запросу.
 3. Correlation context показывает полный набор выпуска, assignment или first-article acceptance, включая batch/set/card aggregates.
 4. UX фиксирует потребность, но не endpoint.
 
-## F-09. Conflict recovery
+## F-10. Conflict recovery
 
 ```mermaid
 flowchart TD
@@ -135,17 +146,17 @@ flowchart TD
 
 Assignment очищает selection после refresh; first-article acceptance перечитывает и card, и set. «Force overwrite» отсутствует.
 
-## F-10. Role switch
+## F-11. Role switch
 
 Выбор подготовленной identity обновляет shell, route data и permissions. Command dialogs/selections очищаются. Если route защищён, показывается access state. Предметные данные не меняются.
 
 ## Общие правила команд
 
-- подтверждение требуется для release, assignment, first-piece acceptance, synthetic per-card quality и первого export;
+- подтверждение требуется для release, assignment, first-piece acceptance, synthetic per-card quality, final-batch acceptance и первого export;
 - submit блокируется до ответа;
 - success отображается только после backend response и refresh;
 - клиент не меняет status/gate оптимистически;
 - network uncertainty требует read before retry;
 - UUID доступен для copy/debug, но никогда не оформляется как номер детали.
 
-Состояния описывает [[ui-states]], permissions — [[permission-ux]]. [Кликабельный прототип](prototype.html) проходит эти flow за 12 шагов и демонстрирует role-aware controls.
+Состояния описывает [[ui-states]], permissions — [[permission-ux]]. [Кликабельный прототип](prototype.html) проходит эти flow за 14 шагов и демонстрирует role-aware controls.

@@ -1,7 +1,7 @@
 ---
 artifact_id: domain.roles-permissions
 status: accepted
-version: 3
+version: 4
 owner: domain
 updated: 2026-07-17
 ---
@@ -19,7 +19,7 @@ updated: 2026-07-17
 | БТБ | Read-only нормы `OperationPlan` | Интерактивного редактирования нет. |
 | Мастер | `MASTER` | Назначает карточки и фиксирует начало/завершение. |
 | Исполнитель | `WORKER` + assignee reference | Читает назначенную работу; подтверждённый AS-IS самоконтроль не имеет отдельной digital lifecycle-команды. |
-| БТК | `QUALITY_CONTROLLER` | Digital first-piece acceptance и синтетическое per-card quality confirmation. Подтверждённые финальная приёмка всей партии и физические подписи не представлены отдельной командой. |
+| БТК | `QUALITY_CONTROLLER` | Digital first-piece acceptance, синтетическое per-card quality confirmation и отдельная `RecordFinalBatchAcceptance` всей завершённой партии. Физические подписи не оцифровываются. |
 | Аудит / mock integration | `ADMIN_AUDITOR` | Не меняет производственный lifecycle. |
 
 ## Модель demo-идентичности
@@ -36,7 +36,7 @@ updated: 2026-07-17
 | `PLANNER` | Выбрать паспорт, создать партию и один раз выпустить все комплекты. | Не редактирует паспорт/нормы, не назначает и не выполняет карточки. |
 | `MASTER` | Выбрать first-article карточку, назначать карточки, фиксировать начало и завершение. | Не подтверждает качество и не переназначает. |
 | `WORKER` | Просмотреть назначенную ему работу. | Не запускает и не завершает цифровую карточку. |
-| `QUALITY_CONTROLLER` | Положительно принять first article и выполнить synthetic per-card serial quality confirmation. | Не записывает `FinalBatchAcceptance`, не хранит физическую подпись, не отклоняет и не возвращает на доработку. |
+| `QUALITY_CONTROLLER` | Положительно принять first article, выполнить synthetic per-card serial quality confirmation и отдельно принять завершённую партию. | Не хранит физическую подпись, не выполняет преждевременную/отрицательную приёмку и не возвращает на доработку. |
 | `ADMIN_AUDITOR` | Просмотреть аудит и создать/прочитать mock payroll-запись. | Не обходит state machine. |
 
 ## Матрица команд
@@ -52,6 +52,7 @@ updated: 2026-07-17
 | `CompleteWorkCard` | — | ✓ | — | — | — |
 | `AcceptFirstArticle` | — | — | — | ✓ | — |
 | `ConfirmWorkCardQuality` | — | — | — | ✓ | — |
+| `RecordFinalBatchAcceptance` | — | — | — | ✓ | — |
 | `ExportWorkCardToPayroll` | — | — | — | — | ✓ |
 
 Разрешённая по роли команда всё равно отклоняется при неверных данных, purpose, gate, состоянии или версии.
@@ -86,7 +87,8 @@ updated: 2026-07-17
 - `ConfirmWorkCardQuality` требует serial-карточку `COMPLETED` и `SERIAL_ALLOWED`;
 - обе команды positive-only и закрывают карточку;
 - `AcceptFirstArticle` относится к первой детали, а `ConfirmWorkCardQuality` — только к одной цифровой WorkCard;
-- финальная приёмка всей партии и подписи БТК подтверждены AS-IS, но отдельной команды `AcceptFinalBatch` в MVP нет;
+- `RecordFinalBatchAcceptance` требует `SERIAL_ALLOWED` у всех обязательных комплектов, полный состав карточек, только `CLOSED` WorkCard, отсутствие прежней записи и актуальную версию партии;
+- её успех создаёт одну неизменяемую запись уровня партии и событие, но не цифровую копию физической подписи;
 - БТК не видит команд отклонения, возврата или отдельного закрытия.
 
 ## Порядок backend-проверок
@@ -105,7 +107,7 @@ updated: 2026-07-17
 - `PLANNER` выбирает паспорт из списка и не видит поля route/norm;
 - `MASTER` видит assignment и lifecycle-controls;
 - `WORKER` видит назначенную работу без start/complete;
-- `QUALITY_CONTROLLER` видит first-article или serial positive action в точном состоянии;
+- `QUALITY_CONTROLLER` видит first-article, serial per-card или final-batch positive action в точном состоянии;
 - другие роли не видят audit/payroll;
 - backend-отказ окончателен, даже если UI устарел.
 
@@ -116,7 +118,7 @@ updated: 2026-07-17
 - давать `PLANNER` редактирование операций и норм под видом создания партии;
 - позволять `WORKER` начинать/завершать карточку;
 - серийно назначать/запускать карточки до first-article acceptance;
-- позволять БТК отрицательный исход, отдельное закрытие или повторное подтверждение;
-- трактовать `ConfirmWorkCardQuality` или набор `CLOSED` карточек как запись `FinalBatchAcceptance` всей партии;
+- позволять БТК отрицательный исход, отдельное закрытие, преждевременную или вторую финальную приёмку;
+- трактовать `ConfirmWorkCardQuality` или набор `CLOSED` карточек как запись `FinalBatchAcceptance` без отдельной команды;
 - показывать технический UUID как номер детали;
 - добавлять переназначение, перевыпуск или реальную интеграцию без изменения scope.

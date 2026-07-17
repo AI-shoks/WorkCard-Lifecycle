@@ -1,7 +1,7 @@
 ---
 artifact_id: ux.wireframes
 status: accepted
-version: 3
+version: 4
 owner: ux
 updated: 2026-07-17
 ---
@@ -97,6 +97,29 @@ Operation names и нормы — синтетический fixture. `PLANNER` 
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Готовность и отдельная финальная приёмка
+
+```text
+┌ Партия B-112                 [Готова к финальной приёмке] ┐
+│ First-article gates                         3 / 3         │
+│ Обязательные WorkCard CLOSED              250 / 250       │
+│ FinalBatchAcceptance                      Ещё нет          │
+│ Batch version                             7                │
+│                         [Принять завершённую партию]       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Action принадлежит только `QUALITY_CONTROLLER` и появляется при полном completion predicate. Закрытие последней карточки само не меняет batch на accepted.
+
+```text
+┌ Партия B-112                         [FINAL_ACCEPTED] ┐
+│ FinalBatchAcceptance ID   FBA-8d31…                   │
+│ Принял                    Ольга · QUALITY_CONTROLLER  │
+│ Время                     17.07.2026 12:04 UTC        │
+│ Physical signature        Не хранится                 │
+└────────────────────────────────────────────────────────┘
+```
+
 ## W-04. Комплект и assignment `S-04`
 
 ### Pending first article
@@ -161,7 +184,7 @@ UUID fragments exist only to distinguish digital rows and are explicitly labeled
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-For `MASTER`, primary action is «Зафиксировать начало/завершение». For first-article `QUALITY_CONTROLLER`, action says «Принять первую деталь и открыть серию»; for serial — «Подтвердить качество и закрыть карточку». Persistent helper text distinguishes this synthetic per-card close from confirmed `FinalBatchAcceptance` всей партии и подписей БТК на физических карточках.
+For `MASTER`, primary action is «Зафиксировать начало/завершение». For first-article `QUALITY_CONTROLLER`, action says «Принять первую деталь и открыть серию»; for serial — «Подтвердить качество и закрыть карточку». Persistent helper text distinguishes this synthetic per-card close from the separate final-batch action on `S-03` and from signatures on physical cards.
 
 ## W-06. Audit `S-06`
 
@@ -174,6 +197,7 @@ For `MASTER`, primary action is «Зафиксировать начало/зав
 │ v3 │ WorkCardStarted              │ Михаил       │ MSTR  │ 10:51  │
 │ v4 │ WorkCardCompleted            │ Михаил       │ MSTR  │ 11:34  │
 │ ... [eventId, commandId, correlationId, typed data] ...             │
+│ v8 │ FinalBatchAccepted           │ Ольга / БТК   │ QUAL  │ 12:04  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -208,4 +232,4 @@ Operation context must include all batch/set/card events for the correlation. No
 - assignment result and gate change announced via `aria-live`;
 - DOM order matches visual order.
 
-Системные states — [[ui-states]], role variants — [[permission-ux]]. [Clickable prototype](prototype.html) реализует 12-шаговый core sequence и проверен в desktop/mobile viewport.
+Системные states — [[ui-states]], role variants — [[permission-ux]]. [Clickable prototype](prototype.html) реализует 14-шаговый core sequence и проверяется в desktop/mobile viewport.

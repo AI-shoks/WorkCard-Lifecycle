@@ -333,6 +333,23 @@
         html: `${cardDetails("COMPLETED", "SERIAL", "Завершение зафиксировал Михаил · MASTER", 3, "c8071d64…", "Сергей")}<div class="callout guard"><strong>Граница:</strong> FinalBatchAcceptance всей партии и подписи БТК на физических карточках подтверждены AS-IS, но этим per-card действием не записываются.</div>`
       },
       {
+        short: "Принять партию", role: "QUALITY_CONTROLLER", eyebrow: "UC-015 · aggregate-level", title: "Завершённая партия готова к финальной приёмке",
+        crumbs: "Партии / B-112 / Финальная приёмка", lead: "Отдельное действие появляется только после всех first-article gates и закрытия всех обязательных WorkCard.",
+        action: "Принять завершённую партию", ready: true,
+        blockedReason: "Сначала примите первые детали всех обязательных комплектов и закройте все необходимые WorkCard.",
+        metrics: [["First-piece gates", "3 / 3"], ["WorkCard CLOSED", "250 / 250"], ["Final acceptance", "Ещё нет"], ["Batch version", "7"]],
+        html: `<div class="grid two"><article class="card"><div class="card-head"><h3>Completion summary</h3><span class="badge ok">Предусловия выполнены</span></div><div class="card-body"><div class="facts"><div class="fact"><span>Первая деталь принята</span><strong>3 / 3 комплектов</strong></div><div class="fact"><span>Serial и first-article WorkCard</span><strong>250 / 250 CLOSED</strong></div><div class="fact"><span>FinalBatchAcceptance</span><strong>Ещё не выполнена</strong></div><div class="fact"><span>Expected version</span><strong>7</strong></div></div></div></article>
+          <article class="card"><div class="card-head"><h3>Отдельное действие БТК</h3></div><div class="card-body"><p><code>RecordFinalBatchAcceptance</code> создаст одну неизменяемую запись уровня партии и <code>FinalBatchAccepted</code>.</p><p class="hint">Прототип сворачивает повторяющееся закрытие остальных карточек в подготовленное all-closed состояние. Закрытие последней карточки само не принимает партию.</p></div></article></div>
+        <div class="callout guard"><strong>Граница:</strong> цифровая запись не хранит и не заменяет подписи БТК на физических карточках.</div>`
+      },
+      {
+        short: "Проверить приёмку", role: "QUALITY_CONTROLLER", eyebrow: "UC-015 · read-back", title: "Финальная приёмка партии выполнена",
+        crumbs: "Партии / B-112 / FinalBatchAcceptance FBA-8d31", lead: "После подтверждённого backend success экран показывает отдельную неизменяемую запись, актора, время и ID.",
+        action: "Перейти к mock payroll", metrics: [["Batch status", "FINAL_ACCEPTED"], ["Acceptance ID", "FBA-8d31…"], ["Actor", "Ольга · БТК"], ["Batch version", "8"]],
+        html: `<article class="card"><div class="card-head"><h3>FinalBatchAcceptance</h3><span class="badge ok">Записана один раз</span></div><div class="card-body"><div class="facts"><div class="fact"><span>Acceptance ID</span><strong>FBA-8d31…</strong></div><div class="fact"><span>ProductionBatch</span><strong>B-112</strong></div><div class="fact"><span>Принял</span><strong>Ольга · QUALITY_CONTROLLER</strong></div><div class="fact"><span>Время</span><strong>17.07.2026 12:04 UTC</strong></div><div class="fact"><span>Command ID</span><strong>CMD-FBA-112</strong></div><div class="fact"><span>Physical signature</span><strong>Не хранится</strong></div></div></div></article>
+        <div class="callout ok"><strong>Атомарно:</strong> acceptance record, статус/версия партии и <code>FinalBatchAccepted</code> согласованы. Replay того же command ID вернёт эту запись без дубля.</div>`
+      },
+      {
         short: "Создать mock record", role: "ADMIN_AUDITOR", eyebrow: "UC-009 · mock payroll", title: "Карточка закрыта и готова к export",
         crumbs: "B-112 / Рабочая карточка / Mock payroll", lead: "Admin создаёт единственную неизменяемую запись operation-scoped нормы — без денег и фактического времени.",
         action: "Создать mock payroll запись", metrics: [["Card status", "CLOSED"], ["Beneficiary", "Сергей"], ["Norm snapshot", "0.80 ч"], ["Record", "Ещё нет"]],
@@ -342,11 +359,11 @@
       {
         short: "Проверить аудит", role: "ADMIN_AUDITOR", eyebrow: "UC-008 / UC-014", title: "Core sequence завершён",
         crumbs: "Audit / correlation COR-DEMO-112", lead: "Финальный экран показывает неизменяемую mock-запись и события, связанные общими command/correlation IDs.",
-        action: "Начать демонстрацию заново", metrics: [["Payroll records", "1"], ["Batch", "B-112"], ["Sets / cards", "3 / 250"], ["Distribution", "60 + 52"]],
+        action: "Начать демонстрацию заново", metrics: [["Payroll records", "1"], ["Final acceptance", "FBA-8d31…"], ["Sets / cards", "3 / 250"], ["Distribution", "60 + 52"]],
         html: `<div class="grid two"><article class="card"><div class="card-head"><h3>Mock payroll record</h3><span class="badge ok">Создана один раз</span></div><div class="card-body"><div class="facts"><div class="fact"><span>WorkCard UUID</span><strong>c8071d64…</strong></div><div class="fact"><span>Beneficiary</span><strong>Сергей</strong></div><div class="fact"><span>Norm snapshot</span><strong>0.80 ч</strong></div><div class="fact"><span>Money</span><strong>Не рассчитываются</strong></div></div></div></article>
-          <article class="card"><div class="card-head"><h3>Audit events</h3><span class="badge neutral">correlationId</span></div><div class="card-body"><p><code>ProductionBatchCreated</code> · PLANNER</p><p><code>WorkCardStarted</code> / <code>WorkCardCompleted</code> · MASTER</p><p><code>FirstArticleAccepted</code> / <code>WorkCardQualityConfirmed</code> · QUALITY_CONTROLLER</p><p><code>WorkCardExportedToPayroll</code> · ADMIN_AUDITOR</p></div></article></div>
-        <div class="callout ok"><strong>Проверено:</strong> 112 → 3 комплекта → 250 карточек; UUID без номера детали; first article до серии; мастер ведёт lifecycle; 60 + 52 = 112; одна mock-запись.</div>
-        <div class="callout guard"><strong>Provenance:</strong> FirstPieceAcceptance и FinalBatchAcceptance — разные подтверждённые AS-IS-факты. WorkCardQualityConfirmed — synthetic per-card TO-BE и не заменяет финальную приёмку партии или подписи БТК.</div>`
+          <article class="card"><div class="card-head"><h3>Audit events</h3><span class="badge neutral">correlationId</span></div><div class="card-body"><p><code>ProductionBatchCreated</code> · PLANNER</p><p><code>WorkCardStarted</code> / <code>WorkCardCompleted</code> · MASTER</p><p><code>FirstArticleAccepted</code> / <code>WorkCardQualityConfirmed</code> · QUALITY_CONTROLLER</p><p><code>FinalBatchAccepted</code> · QUALITY_CONTROLLER</p><p><code>WorkCardExportedToPayroll</code> · ADMIN_AUDITOR</p></div></article></div>
+        <div class="callout ok"><strong>Проверено:</strong> 112 → 3 комплекта → 250 карточек; UUID без номера детали; first article до серии; мастер ведёт lifecycle; 60 + 52 = 112; отдельная final acceptance; одна mock-запись.</div>
+        <div class="callout guard"><strong>Provenance:</strong> FirstPieceAcceptance, WorkCardQualityConfirmation и FinalBatchAcceptance — разные факты. Последняя записана отдельной aggregate-level командой, но не является цифровой подписью на физических карточках.</div>`
       }
     ];
 
@@ -387,9 +404,10 @@
       els.screen.innerHTML = step.html;
       els.previous.disabled = current === 0;
       els.primary.textContent = step.action;
-      const allowed = selectedRole === step.role;
+      const prerequisitesMet = step.ready !== false;
+      const allowed = selectedRole === step.role && prerequisitesMet;
       els.primary.disabled = !allowed;
-      els.permissionNote.textContent = allowed ? "" : `Действие принадлежит роли ${roles[step.role]}. Текущий контекст: ${roles[selectedRole]}.`;
+      els.permissionNote.textContent = allowed ? "" : selectedRole !== step.role ? `Действие принадлежит роли ${roles[step.role]}. Текущий контекст: ${roles[selectedRole]}.` : step.blockedReason || "Действие недоступно до выполнения предусловий.";
       document.title = `${current + 1}/${steps.length} · ${step.title}`;
     }
 

@@ -1,7 +1,7 @@
 ---
 artifact_id: domain.glossary
 status: accepted
-version: 4
+version: 5
 owner: domain
 updated: 2026-07-17
 ---
@@ -41,7 +41,8 @@ updated: 2026-07-17
 | **FirstPieceAcceptance / приёмка первой детали** | Отдельный факт `CONFIRMED_AS_IS`: БТК принимает первую деталь до серийного запуска. В MVP представлен positive-only командой `AcceptFirstArticle`. |
 | **Master work recording** | Команды мастера, фиксирующие начало и завершение назначенной карточки. Они отражают ведение карточек мастером, а не self-service исполнителя. |
 | **Operator self-control / самоконтроль** | Факт `CONFIRMED_AS_IS`: во время серии исполнитель контролирует свою работу. Отдельная цифровая команда self-check в MVP отсутствует. |
-| **FinalBatchAcceptance / финальная приёмка партии** | Отдельный факт `CONFIRMED_AS_IS`: после завершения БТК принимает всю партию и подписывает физические карточки. Это не состояние отдельной `WorkCard`. |
+| **FinalBatchAcceptance / финальная приёмка партии** | Факт `CONFIRMED_AS_IS`: после завершения БТК принимает всю партию. В MVP это также одна неизменяемая цифровая запись `TO_BE_DECISION`, связанная с `ProductionBatch`; она не является состоянием отдельной `WorkCard` и не заменяет физические подписи. |
+| **RecordFinalBatchAcceptance** | Positive-only команда `QUALITY_CONTROLLER` уровня партии. После всех обязательных first-article gates и `CLOSED` WorkCard создаёт одну `FinalBatchAcceptance` и `FinalBatchAccepted` в общей транзакции. |
 | **WorkCardQualityConfirmation** | `TO_BE_DECISION`: positive-only `ConfirmWorkCardQuality` для одной завершённой serial-карточки; атомарно переводит её в `CLOSED`, но не записывает `FinalBatchAcceptance` и не заменяет физическую подпись БТК. |
 | **Close / цифровое закрытие карточки** | Терминальное состояние отдельной WorkCard после `AcceptFirstArticle` или синтетического per-card `ConfirmWorkCardQuality`. `CLOSED` не доказывает финальную приёмку всей партии. |
 | **Optimistic concurrency** | Проверка ожидаемой версии каждого изменяемого агрегата; конфликт не перезаписывается молча. |
@@ -65,7 +66,7 @@ updated: 2026-07-17
 | **БТБ** | Источник operation-scoped норм; не интерактивная роль MVP. |
 | **`MASTER`** | Выбрать first-article карточку, назначать карточки и фиксировать начало/завершение. |
 | **`WORKER`** | Read-only представление своей назначенной работы; assignee/beneficiary. Подтверждённый самоконтроль не имеет отдельной digital-команды MVP. |
-| **`QUALITY_CONTROLLER`** | Выполнить digital first-piece gate и синтетическое per-card подтверждение. Подтверждённая финальная приёмка всей партии не представлена отдельной командой. |
+| **`QUALITY_CONTROLLER`** | Выполнить digital first-piece gate, синтетическое per-card подтверждение и отдельную `RecordFinalBatchAcceptance` всей завершённой партии. |
 | **`ADMIN_AUDITOR`** | Читать аудит и создавать/читать mock payroll-запись. |
 
 ## Языковые правила
