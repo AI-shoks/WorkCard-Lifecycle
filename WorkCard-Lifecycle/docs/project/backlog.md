@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 7
+version: 8
 owner: project
 updated: 2026-07-17
 ---
@@ -27,13 +27,21 @@ updated: 2026-07-17
 - [x] Утвердить state machine.
 - [x] Утвердить матрицу ролей и прав.
 
-## Сейчас — этап 3
+## Выполнено — этап 3
 
-- [ ] Описать акторов, предусловия и потоки в [[use-cases]].
-- [ ] Подготовить проверяемые [[user-stories]].
-- [ ] Зафиксировать [[negative-scenarios]].
-- [ ] Описать [[acceptance-criteria|Given / When / Then]].
-- [ ] Связать scope, требования и будущие тесты в [[requirements-traceability]].
+- [x] Описать акторов, предусловия и потоки в [[use-cases]].
+- [x] Подготовить проверяемые [[user-stories]].
+- [x] Зафиксировать [[negative-scenarios]].
+- [x] Описать [[acceptance-criteria|Given / When / Then]].
+- [x] Связать scope, требования и будущие тесты в [[requirements-traceability]].
+
+## Сейчас — этап 4
+
+- [ ] Подготовить [[screen-map|карту экранов и информационную архитектуру]].
+- [ ] Описать [[user-flows|пользовательские потоки и массовые операции]].
+- [ ] Разработать [[wireframes]].
+- [ ] Зафиксировать [[ui-states|loading, empty и error states]].
+- [ ] Описать [[permission-ux|UX разрешённых и запрещённых действий]].
 
 ## Icebox — после MVP
 
