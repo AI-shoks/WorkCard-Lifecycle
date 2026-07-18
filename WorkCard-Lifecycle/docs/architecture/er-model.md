@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.er-model
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-07-18
 ---
@@ -226,6 +226,8 @@ Successful command reserve хранит глобально уникальный 
 - `RecordFinalBatchAcceptance` replay того же type/hash возвращает исходный result;
 - обычная non-replayable команда с уже завершённым ID не выполняется повторно;
 - payroll дополнительно идемпотентен по `payroll_records.work_card_id`.
+- если payroll row уже существует, новый разрешённый `command_id` всё равно создаёт отдельный receipt с новым `correlation_id` и ссылкой на ту же row; audit events для этого receipt отсутствуют, поэтому кардинальность `COMMAND_RECEIPTS ||--o{ AUDIT_EVENTS` намеренно допускает ноль;
+- reuse этого `command_id` с другим canonical path/body/type даёт conflict, а correlation query пустого event set возвращает `totalCount: 0`, `complete: true`.
 
 ### `audit_events`
 
@@ -257,6 +259,7 @@ Indexes:
 | first-article acceptance | `work_cards`, `work_card_sets`, receipt, два audit events |
 | final-batch acceptance | `production_batches`, `final_batch_acceptances`, receipt, audit |
 | first payroll export | `payroll_records`, receipt, audit; WorkCard state/version не меняются |
+| payroll no-op с новым `commandId` | новый receipt с новым correlation; существующая `payroll_records` не меняется, audit event отсутствует |
 
 Детали isolation и lock order определены в [[transactions-concurrency]].
 

@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-07-18
 ---
@@ -16,7 +16,7 @@ HTTP-контракт MVP v1 для команд и запросов из [[comm
 - формат: JSON UTF-8; errors — `application/problem+json`;
 - browser session — signed `HttpOnly` cookie, выданная backend по подготовленной demo identity;
 - все business-command mutations требуют `X-CSRF-Token` и `X-Command-Id: <uuid>`; bootstrap GET выдаёт token, а session switch/logout требуют CSRF, но не являются business commands и не получают `commandId`/event;
-- backend создаёт один `correlationId` на команду и использует его во всех событиях этой транзакции;
+- backend создаёт один `correlationId` на каждую новую successful command transaction, включая допустимый no-op повторного payroll export, и использует его во всех событиях этой транзакции, если события есть;
 - client передаёт ожидаемые версии в command body; resource response содержит `version` и `ETag: "v{version}"`;
 - UUID — технические идентификаторы. API не возвращает `sequenceNumber`, part number или позицию `n из N`;
 - успешный read не создаёт receipt/event и не меняет version;
@@ -80,6 +80,8 @@ Allowed-actions projection — подсказка UI, а не grant: backend з�
 
 Order — `occurredAt`, затем `eventId`. Один committed `correlationId` больше не пополняется, поэтому keyset pages образуют стабильный полный набор. `complete = true` означает, что `returnedCount` текущего накопленного обхода достиг `totalCount`; canonical release (`1 batch + 3 sets + 250 cards`) должен читаться одним ответом при audit limit `500`. Это принятое решение для `UC-014`/`AC-AUD-003`; клиентское сопоставление отдельных историй не считается источником полноты.
 
+Backend сначала проверяет роль `ADMIN_AUDITOR`, затем находит command receipt по `correlationId` и выбирает связанные events. Поэтому successful no-op повторного payroll export с новым `commandId` законно возвращает сохранённый в receipt `commandId`, `items: []`, `returnedCount: 0`, `totalCount: 0`, `complete: true` и `nextCursor: null`. Для роли без права audit одинаковый безопасный `403` формируется до поиска receipt/events, поэтому запрос не позволяет определить существование переданного `correlationId`.
+
 ## Command envelope
 
 Каждый endpoint ниже получает trusted actor из session и `commandId` из `X-Command-Id`. Успешный ответ содержит:
@@ -95,7 +97,7 @@ Order — `occurredAt`, затем `eventId`. Один committed `correlationId`
 }
 ```
 
-Новые ресурсы возвращают `201`; изменённые ресурсы — `200`; body отсутствует только там, где read-back не нужен. Commit должен завершиться до ответа.
+Новые ресурсы возвращают `201`; изменённые или уже существующие идемпотентные ресурсы — `200`; body отсутствует только там, где read-back не нужен. Commit должен завершиться до ответа. `correlationId` возвращается инициатору как opaque metadata успешной команды и сам по себе не даёт права на audit query.
 
 ## Commands партии
 
@@ -229,8 +231,11 @@ Order — `occurredAt`, затем `eventId`. Один committed `correlationId`
 - роль: `ADMIN_AUDITOR`;
 - карточка `CLOSED`, assignee существует, version актуальна;
 - первый успех `201`: один `PayrollRecord` и `WorkCardExportedToPayroll`; WorkCard state/version не меняются;
-- повтор для того же `workCardId`, включая новый command ID: `200`, та же запись, `replayed: true`, без второго event;
-- concurrent first exports сходятся к одной row за счёт unique business key.
+- точный повтор того же canonical request с тем же `commandId`: `200`, та же запись и исходные receipt/`correlationId`, `replayed: true`, без нового event;
+- если `PayrollRecord` уже существует, новая разрешённая команда с новым `commandId` возвращает `200` и ту же запись, но сохраняет новый command receipt с новым server-generated `correlationId`; `replayed: false`, domain event отсутствует;
+- для этого no-op transaction `changedAggregates = pendingEvents = ∅`, а audit query нового `correlationId` возвращает `totalCount: 0`, `complete: true`;
+- повторное использование этого нового `commandId` с другим canonical path/body/type возвращает `409 COMMAND_ID_REUSED`;
+- concurrent first exports сходятся к одной row/одному event за счёт unique business key; каждая успешно завершившаяся команда с отдельным `commandId` всё равно получает собственный receipt/correlation.
 
 ## Error contract
 
@@ -279,10 +284,11 @@ Receipt lookup не обходит текущую authorization: replay result �
 | Ситуация | Поведение клиента/API |
 |---|---|
 | network timeout с неизвестным исходом | клиент может повторить тот же request с тем же `X-Command-Id`; API сверяет receipt |
-| тот же ID + другой canonical body/type | `409 COMMAND_ID_REUSED` |
-| завершённая обычная команда с тем же ID | не выполняется повторно; возвращается безопасный `409 COMMAND_ALREADY_PROCESSED` |
+| тот же ID + другой canonical path/body/type | `409 COMMAND_ID_REUSED` |
+| завершённая команда без специальной replay-семантики с тем же ID | не выполняется повторно; возвращается безопасный `409 COMMAND_ALREADY_PROCESSED` |
 | final acceptance, тот же ID/body | исходный success result, `replayed: true` |
-| payroll, row уже существует | существующий result независимо от нового command ID, без нового event |
+| payroll, тот же ID/path/body | исходный success result и correlation, `replayed: true`, без нового receipt/event |
+| payroll, row уже существует, новый command ID | существующий result; новый receipt и новый correlation, `replayed: false`, без event; correlation query возвращает `totalCount: 0`, `complete: true` |
 | version conflict | никакого автоматического replay; refresh и новое осознанное подтверждение с новым command ID |
 
 ## OpenAPI gate

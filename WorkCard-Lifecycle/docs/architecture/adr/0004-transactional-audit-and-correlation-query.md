@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.adr.0004
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-07-18
 ---
@@ -25,7 +25,7 @@ updated: 2026-07-18
 
 ## Решение
 
-Принять вариант 1 по [[audit-log-design]] и [[api-contracts]]. Одна successful command получает server-generated `correlationId`; все events изменённых aggregates записываются с ним атомарно. `GET /api/v1/audit/operations/{correlationId}/events` возвращает stable paginated set с `totalCount`/`complete`.
+Принять вариант 1 по [[audit-log-design]] и [[api-contracts]]. Одна successful command получает server-generated `correlationId`; все events изменённых aggregates записываются с ним атомарно. Инициатор successful command может получить этот `correlationId` как opaque metadata ответа, но это не даёт права читать audit. `GET /api/v1/audit/operations/{correlationId}/events` возвращает stable paginated set с `totalCount`/`complete` только `ADMIN_AUDITOR`.
 
 Audit остаётся business success history, не event sourcing и не operational log. Runtime role не может update/delete rows.
 
@@ -42,4 +42,6 @@ Audit остаётся business success history, не event sourcing и не ope
 - correlation query покрывает каждый event transaction;
 - result stable across pagination;
 - failure/denial не создаёт success event;
-- роли кроме `ADMIN_AUDITOR` не узнают о существовании correlation ID.
+- `correlationId` может возвращаться инициатору successful command как opaque metadata;
+- только `ADMIN_AUDITOR` может запросить соответствующий event set;
+- authorization выполняется до поиска receipt/events, поэтому неавторизованный запрос не позволяет определить, существует ли указанный `correlationId`.

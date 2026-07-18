@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.audit-log
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-07-18
 ---
@@ -16,6 +16,7 @@ Append-only журнал успешных business commands MVP v1. Он обе�
 - атомарность current state и полного event set;
 - история WorkCard и связанных batch/set contexts;
 - полный server-side набор массовой операции по `correlationId`;
+- корректный пустой event set для successful no-op, не создающего новую aggregate version;
 - actor/role/command/version provenance для `ADMIN_AUDITOR`;
 - отсутствие success events у отказов.
 
@@ -74,9 +75,9 @@ Append-only журнал успешных business commands MVP v1. Он обе�
 
 ## Формирование и commit
 
-1. application service применяет domain command в unit of work;
+1. application service применяет domain command либо распознаёт явно разрешённый successful no-op в unit of work;
 2. каждый changed aggregate регистрирует pending event с resulting version;
-3. transaction assertion сравнивает set changed aggregates и pending events и проверяет одну пару `commandId`/`correlationId` для всего набора;
+3. transaction assertion сравнивает set changed aggregates и pending events и проверяет одну пару `commandId`/`correlationId` для всего набора; при повторном payroll export с новым разрешённым `commandId` оба set законно равны `∅`;
 4. сохраняются current rows, command receipt и `audit_events`;
 5. DB uniqueness и composite FK event `(commandId, correlationId)` → receipt проверяются до commit;
 6. API отвечает только после commit.
@@ -108,15 +109,16 @@ Streams не сливаются в ложную общую version sequence. Rol
 
 ## Correlation массовой операции
 
-Принят отдельный `GET /api/v1/audit/operations/{correlationId}/events`. Backend выполняет прямой indexed query, а не собирает результат из N card histories.
+Принят отдельный `GET /api/v1/audit/operations/{correlationId}/events`. После authorization backend находит command receipt по `correlationId`, затем выполняет прямой indexed query events, а не собирает результат из N card histories.
 
 - release: один batch event, по одному событию на каждый из трёх sets и `250` cards — `254` events одного correlation;
 - first-article assignment: set selection + card assignment;
 - serial assignment: одно card event на каждую выбранную WorkCard;
 - first-article acceptance: card quality + set gate events;
 - single-aggregate command: correlation всё равно присутствует и содержит один event.
+- повторный payroll export с новым разрешённым `commandId`: новый receipt/correlation существует, но event set пуст, потому что `PayrollRecord` не изменена.
 
-Ответ включает `totalCount`, stable cursor, `nextCursor` и `complete`. Отсутствие части набора не маскируется клиентским merge. После commit в correlation не добавляются события, поэтому pagination стабильна.
+Ответ включает `commandId` из receipt, `totalCount`, stable cursor, `nextCursor` и `complete`. Для no-op correlation законны `items: []`, `totalCount: 0`, `complete: true`; отсутствие части непустого набора не маскируется клиентским merge. После commit в correlation не добавляются события, поэтому pagination стабильна.
 
 ## Command и correlation semantics
 
@@ -124,13 +126,15 @@ Streams не сливаются в ложную общую version sequence. Rol
 - `correlationId` отвечает «какие aggregate facts составили его atomic result»;
 - одна command transaction имеет один correlation;
 - разные commands, даже вызванные одной UI-последовательностью, имеют разные correlations;
-- replay не создаёт новый correlation/event set;
+- точный replay того же `commandId` не создаёт новый receipt/correlation/event set;
+- новый разрешённый payroll command при существующей row не является replay receipt: он получает новый correlation, но его atomic result не содержит новых aggregate facts и поэтому имеет пустой event set;
 - causation chain между разными commands не вводится в MVP.
 
 ## Защита данных
 
 - audit endpoints закрыты для всех ролей кроме `ADMIN_AUDITOR`;
 - authorization выполняется до поиска correlation/aggregate;
+- инициатор successful command может получить `correlationId` как opaque metadata, но только `ADMIN_AUDITOR` может запросить соответствующий event set; неавторизованный запрос не раскрывает существование ID;
 - payload schemas используют allowlist, а не serialization целых objects;
 - cookies, CSRF, request headers, SQL и exception stack не записываются;
 - operational logs используют opaque trace ID и могут ссылаться на command/correlation ID без копии event data.
@@ -148,6 +152,7 @@ Streams не сливаются в ложную общую version sequence. Rol
 - event с `commandId` одного receipt и чужим `correlationId` отклоняется composite FK;
 - update/delete runtime role отклоняется;
 - correlation query release возвращает ровно `254` events и `complete = true`;
+- correlation query successful payroll no-op возвращает `totalCount = 0` и `complete = true`;
 - роли кроме `ADMIN_AUDITOR` получают безопасный `403` без проверки существования ID;
 - `ConfirmWorkCardQuality` не создаёт `FinalBatchAccepted`;
 - final acceptance replay не создаёт второе событие.

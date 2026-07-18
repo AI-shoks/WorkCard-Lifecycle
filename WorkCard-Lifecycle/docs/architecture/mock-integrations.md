@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.mock-integrations
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-07-18
 ---
@@ -65,15 +65,16 @@ Money, currency, tax, coefficient, actual time, payment status и external emplo
 
 | Сценарий | Результат |
 |---|---|
-| тот же `commandId`, тот же request | существующий record, без event |
-| новый `commandId`, тот же `workCardId` | существующий record, без event |
-| два concurrent first exports | unique key создаёт одну row/одно event; второй читает winner |
-| тот же `commandId`, другой workCard/body | `409 COMMAND_ID_REUSED` |
+| тот же `commandId`, тот же canonical request | существующий record и исходные receipt/`correlationId`, `replayed: true`, без нового event |
+| новый разрешённый `commandId`, тот же `workCardId` | существующий record; новый receipt и новый server-generated `correlationId`, `replayed: false`, без event |
+| два concurrent first exports | unique key создаёт одну row/одно event; второй читает winner и при отдельном `commandId` сохраняет собственный receipt/correlation с пустым event set |
+| тот же `commandId`, другой canonical path/body/type | `409 COMMAND_ID_REUSED` |
 | stale WorkCard version до первого export | `409 VERSION_CONFLICT`, row/event отсутствуют |
 | WorkCard не `CLOSED`/без assignee | `409`/`422`, row/event отсутствуют |
-| failure записи event/receipt | payroll insert откатывается |
+| failure записи event/receipt при первом export | payroll insert откатывается |
+| failure записи receipt для no-op | новый command result не фиксируется; существующая `PayrollRecord` не меняется |
 
-Повторный результат не означает новое начисление и не создаёт техническую «попытку успеха» в audit.
+Для successful no-op с новым `commandId` transaction сохраняет только receipt, ссылающийся на существующую `PayrollRecord`; `changedAggregates = pendingEvents = ∅`. Correlation query для нового `correlationId` законно возвращает `totalCount: 0`, `complete: true`. Повторный результат не означает новое начисление и не создаёт техническую «попытку успеха» в audit.
 
 ## Failure model
 
@@ -105,7 +106,8 @@ Integration tests должны иметь failure injection до insert, меж�
 ## Проверки
 
 - canonical closed WorkCard создаёт одну record с точными assignee/norm snapshots;
-- повтор и concurrent first export дают ту же row и одно event;
+- повтор и concurrent first export дают ту же row и одно event; каждый новый successful `commandId` получает receipt/correlation, а no-op correlation имеет ноль events;
+- reuse no-op `commandId` с другим path/body даёт `409 COMMAND_ID_REUSED`;
 - non-closed/missing assignee/wrong role/stale version не дают side effects;
 - real network access отсутствует;
 - seed passport snapshot не меняется после создания batch;

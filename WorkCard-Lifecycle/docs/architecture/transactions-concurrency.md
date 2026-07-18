@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.transactions-concurrency
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-07-18
 ---
@@ -15,6 +15,7 @@ updated: 2026-07-18
 - PostgreSQL — единственный transaction coordinator;
 - application service открывает transaction на одну business command;
 - current-state rows, immutable result, command receipt и все success events commit/rollback совместно;
+- successful no-op может зафиксировать receipt без current-state changes и без events только там, где контракт явно разрешает такой результат;
 - существующие изменяемые агрегаты проверяются по client `expectedVersion`;
 - каждая фактически изменённая aggregate row получает `version = version + 1` ровно один раз;
 - read-only context row может иметь expected version как gate precondition, но не увеличивается;
@@ -60,7 +61,7 @@ RETURNING *;
 | `AcceptFirstArticle` | lock set, затем card | set + card | оба `+1` |
 | `ConfirmWorkCardQuality` | lock/read set, conditional card update | set gate version + card | только card `+1` |
 | `RecordFinalBatchAcceptance` | `SERIALIZABLE`; lock batch, consistent aggregate completion query | batch | batch `+1`; acceptance version не изменяется |
-| first `ExportWorkCardToPayroll` | `READ COMMITTED`; lock/read card; `INSERT ... ON CONFLICT DO NOTHING` | WorkCard read version | WorkCard не меняется; PayrollRecord immutable |
+| `ExportWorkCardToPayroll` | `READ COMMITTED`; lock/read card; `INSERT ... ON CONFLICT DO NOTHING` | WorkCard read version | первый export создаёт immutable PayrollRecord; при существующей row state/version не меняются |
 
 ## Атомарный выпуск
 
@@ -122,10 +123,12 @@ RETURNING *;
 ```
 
 - если row создана, та же transaction создаёт receipt и `WorkCardExportedToPayroll`;
-- если unique conflict вернул ноль rows, service читает committed existing record и возвращает его без event;
+- если unique conflict вернул ноль rows, service читает committed existing record; для нового разрешённого `commandId` transaction сохраняет новый receipt с новым server-generated `correlationId` и возвращает record без event;
+- в no-op transaction допустимо и обязательно `changedAggregates = pendingEvents = ∅`; correlation query по новому receipt возвращает `totalCount: 0`, `complete: true`;
+- точный replay того же `commandId` возвращает исходный receipt/correlation, а reuse этого ID с другим canonical path/body/type даёт `409 COMMAND_ID_REUSED`;
 - beneficiary/norm берутся сервером из WorkCard, не из request;
 - WorkCard version не увеличивается, потому что lifecycle state не меняется;
-- два concurrent first exports дают одну payroll row и одно событие.
+- два concurrent first exports дают одну payroll row и одно событие; обе successful команды с разными `commandId` имеют receipts, а проигравшая insert-race — пустой event set.
 
 ## Command receipts
 
@@ -137,6 +140,7 @@ Canonical request hash включает command type, path target и норма�
 - non-replayable command с тем же receipt не выполняется повторно;
 - special replay для final acceptance возвращает сохранённый resource;
 - payroll имеет дополнительную business idempotency по `workCardId`.
+- новый successful payroll no-op не является replay receipt: он сохраняет отдельные `commandId`/`correlationId` и ссылку на существующий result;
 
 ## Audit/version invariant
 
@@ -145,7 +149,7 @@ Canonical request hash включает command type, path target и норма�
 SQL constraints не могут самостоятельно доказать «каждая changed row имеет event», поэтому обязательны:
 
 - единый transaction API, не выдающий repositories вне command unit of work;
-- application assertion `changedAggregates == pendingEvents` и единая пара command/correlation у всего набора;
+- application assertion `changedAggregates == pendingEvents` и единая пара command/correlation у всего набора; для разрешённого payroll no-op обе стороны равны пустому множеству `∅`, а receipt всё равно хранит пару command/correlation;
 - integration tests `AC-TXN-001` и `AC-AUD-004` для каждой command family.
 
 ## Conflict response
@@ -159,5 +163,6 @@ API возвращает `409` с безопасным code и перечнем 
 - serial assignment не увеличивает set version;
 - final acceptance не изменяет WorkCard/WorkCardSet versions;
 - payroll export не изменяет WorkCard version;
+- новый разрешённый payroll `commandId` при существующей row сохраняет receipt/correlation без domain event, а его reuse с другим path/body отклоняется;
 - deadlock/serialization/constraint failure не оставляет state, receipt или audit subset;
 - concurrent final acceptance и payroll export сохраняют ровно один immutable result.
