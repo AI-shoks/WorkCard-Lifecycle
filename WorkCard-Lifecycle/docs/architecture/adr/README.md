@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.adr-index
 status: active
-version: 2
+version: 3
 owner: architecture
 updated: 2026-07-18
 aliases:
@@ -10,7 +10,9 @@ aliases:
 
 # ADR Index
 
-Архитектурные решения неизменяемо фиксируют контекст, варианты, принятое решение, последствия и проверку. Замещение выполняется только по [[document-governance]] с reciprocal `supersedes`/`superseded_by`.
+До merge review-ветки в каноническую ветку accepted ADR может быть скорректирован по результатам review с повышением версии и отдельным correction commit. Причина фиксируется в [[decision-log]] или review.
+
+После merge в каноническую ветку изменение принятого архитектурного решения выполняется только новым ADR по [[document-governance]]: старый ADR получает `superseded_by`, новый — `supersedes`, ссылки взаимны.
 
 ## Принятые ADR этапа 5
 

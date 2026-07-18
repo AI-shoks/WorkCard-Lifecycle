@@ -1,9 +1,9 @@
 ---
 artifact_id: project.document-governance
 status: accepted
-version: 2
+version: 3
 owner: project
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Document Governance
@@ -56,12 +56,15 @@ Product brief, MVP scope, glossary, domain model, business rules и другие
 
 ## Decisions and ADR
 
-Принятые архитектурные решения не переписываются задним числом. При изменении решения:
+До merge review-ветки в каноническую ветку accepted ADR может быть скорректирован по результатам review с повышением версии и отдельным correction commit. Причина должна быть зафиксирована в [[decision-log]] или review.
+
+После merge в каноническую ветку изменение принятого архитектурного решения выполняется только новым ADR:
 
 1. создаётся новый ADR;
 2. старый получает `status: superseded` и ссылку `superseded_by`;
 3. новый получает ссылку `supersedes`;
-4. оба документа сохраняются как история причин и последствий.
+4. ссылки `supersedes` и `superseded_by` взаимны;
+5. оба документа сохраняются как история причин и последствий.
 
 ## Правила уникальности
 
