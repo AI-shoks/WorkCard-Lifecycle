@@ -1,9 +1,9 @@
 ---
 artifact_id: project.risk-register
 status: active
-version: 3
+version: 4
 owner: project
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Risk Register
@@ -21,3 +21,7 @@ updated: 2026-07-17
 | R-009 | Внутренне согласованные документы расходятся с подтверждённым AS-IS | средняя | высокое | Вести [[decision-provenance]] и выполнять семантический проход отдельно от структурного аудита |
 | R-010 | Технический ID карточки будет воспринят как номер физической детали | средняя | высокое | Не хранить `sequenceNumber`, не показывать пользовательские `#01`/`3 из N`, явно отделять UUID от серийной прослеживаемости |
 | R-011 | Портфолио завысит зрелость UX, назвав текстовые wireframes проходимым прототипом | средняя | среднее | Не закрывать соответствующий exit criterion без интерактивного артефакта или явной смены критерия |
+| R-012 | Реализация разойдётся с принятой ER/API/transaction architecture | средняя | высокое | Генерировать OpenAPI, применять explicit SQL migrations и связать integration tests с [[requirements-traceability]] |
+| R-013 | Массовая операция сохранит неполный или несопоставимый audit-набор | средняя | высокое | Transaction assertion, unique event/version и отдельный server query по `correlationId` из [[audit-log-design]] |
+| R-014 | Demo session ошибочно примут за production IAM | средняя | высокое | Явно маркировать prepared identities, соблюдать [[security-baseline]] и не заявлять production authentication |
+| R-015 | Major/minor dependencies устареют или изменят совместимость до реализации | средняя | среднее | На этапе 6 pin lockfile/images, проверить official support и обновлять major только новой версией [[technology-stack]] |

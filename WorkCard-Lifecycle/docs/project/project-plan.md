@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 10
+version: 11
 owner: project
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Project Plan
@@ -26,7 +26,7 @@ updated: 2026-07-17
 | 2 | Доменная спецификация | `[x]` скорректировано | Кардинальности, нормы, роли и first-article gate описаны до кода |
 | 3 | Требования и acceptance criteria | `[x]` скорректировано | Новая модель покрыта объективными критериями |
 | 4 | UX-проектирование | `[x]` скорректировано | UX-спецификация и отдельный 14-шаговый прототип соответствуют новой модели |
-| 5 | Техническая архитектура | `[ ]` не начато | Следующая контрольная точка после review коррекции |
+| 5 | Техническая архитектура | `[x]` выполнено | Приняты stack, system/data/API boundaries, транзакции, audit, security и ADR |
 | 6 | Инженерный фундамент | `[ ]` не начато | Проект воспроизводимо запускается и проверяется |
 | 7 | Backend vertical slice | `[ ]` не начато | Основной сценарий работает через API и БД |
 | 8 | Frontend vertical slice | `[ ]` не начато | Основной сценарий выполняется в браузере |
@@ -88,17 +88,19 @@ updated: 2026-07-17
 
 **Скорректирован:** 2026-07-17. Пять UX-документов версии 4, канонические правила UX-текста и отдельный 14-шаговый прототип покрывают основной процесс `UC-001 → UC-002 → UC-003(first article) → UC-004 → UC-005 → UC-003(serial) → UC-004 → UC-006 → UC-015 → UC-009`. Производственный интерфейс использует русский язык, явно разделяет три контрольных действия и скрывает исходные технические коды во вложенном закрытом блоке «Технические коды для разработчика»; read-only UX-copy audit проверяет все шаги, роли и расположение технических исключений.
 
-## Этап 5. Техническая архитектура — не начато
+## Этап 5. Техническая архитектура — выполнено
 
-- [ ] [[technology-stack|Выбор стека]]
-- [ ] [[system-context|Структура frontend и backend]]
-- [ ] [[er-model]]
-- [ ] [[api-contracts]]
-- [ ] [[transactions-concurrency|Транзакции и конфликтующие изменения]]
-- [ ] [[audit-log-design]]
-- [ ] [[mock-integrations]]
-- [ ] [[security-baseline]]
-- [ ] [[adr-index|ADR]]
+- [x] [[technology-stack|Выбор стека]]
+- [x] [[system-context|Структура frontend и backend]]
+- [x] [[er-model]]
+- [x] [[api-contracts]]
+- [x] [[transactions-concurrency|Транзакции и конфликтующие изменения]]
+- [x] [[audit-log-design]]
+- [x] [[mock-integrations]]
+- [x] [[security-baseline]]
+- [x] [[adr-index|ADR]]
+
+**Закрыт:** 2026-07-18. Принят TypeScript modular monolith с React SPA, Fastify API и PostgreSQL; current state отделён от append-only audit без event sourcing. API сохраняет отдельный server query событий по `correlationId`, явные expected versions и command receipts. Шесть ADR фиксируют stack, physical aggregate mapping, транзакции, audit, mock payroll и demo authorization. Архитектура не меняет `FinalBatchAcceptance`, state machine, роли или 14-шаговый UX-сценарий.
 
 ## Этап 6. Инженерный фундамент
 

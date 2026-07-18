@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 6
+version: 7
 owner: project
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Documentation Index
@@ -51,3 +51,14 @@ docs/
 - интерактивный прототип является отдельным deliverable и не подменяется текстовыми wireframes.
 - [[ux-copy-guidelines|Правила UX-текста]] задают русский производственный язык интерфейса, словарь отображения, границу технических сведений и read-only UX-copy audit.
 - текущее aggregate-level решение прослеживается как `ASIS-010 + ASIS-011 → D-021 → BR-036–BR-039 → UC-015 → US-021 → AC-FBA-* → Future Tests`; физические подписи остаются отдельным AS-IS-свидетельством.
+
+## Принятая архитектурная основа
+
+- [[technology-stack]] и [[system-context]] фиксируют TypeScript modular monolith, browser/API trust boundary и PostgreSQL;
+- [[er-model]] хранит current state, snapshots и отдельные immutable результаты без `sequenceNumber` и единой нормы партии;
+- [[api-contracts]] покрывает команды/запросы и отдельный server query полного event set по `correlationId`;
+- [[transactions-concurrency]] и [[audit-log-design]] фиксируют optimistic versions, atomic state/events и append-only history без event sourcing;
+- [[mock-integrations]] и [[security-baseline]] задают честную local mock boundary и demo authorization;
+- [[adr-index]] хранит шесть принятых решений этапа 5.
+
+Архитектурные документы имеют status `accepted`; исполняемый foundation, migrations, OpenAPI и код остаются результатом этапов 6–8, а не текущего checkout.

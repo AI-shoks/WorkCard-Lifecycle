@@ -1,9 +1,9 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 12
+version: 13
 owner: project
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Backlog
@@ -79,17 +79,27 @@ updated: 2026-07-17
 - [x] Добавить [[ux-copy-guidelines|канонические правила UX-текста]], репозиторные инструкции и read-only DOM-аудит.
 - [x] Перенести технические ID, enum, команды, события и версии во вложенный закрытый блок «Технические коды для разработчика»; верхний уровень «Сведений о прототипе» оставить полностью русским.
 
-## Далее — этап 5 (не начато)
+## Выполнено — этап 5
 
-- [ ] Принять [[technology-stack|технологический стек]].
-- [ ] Описать [[system-context|системный контекст и границы frontend/backend]].
-- [ ] Подготовить [[er-model]] и [[api-contracts]].
-- [ ] В [[api-contracts]] выбрать способ полного аудита массовой операции: отдельный query событий по `correlationId` (предпочтительно для событий разных агрегатов) либо доказуемо полное клиентское сопоставление историй карточек.
-- [ ] Зафиксировать [[transactions-concurrency|транзакции и конкурентность]].
-- [ ] Спроектировать [[audit-log-design|хранение аудита]] и [[mock-integrations|mock-интеграции]].
-- [ ] Принять [[security-baseline]] и необходимые ADR.
+- [x] Принять [[technology-stack|технологический стек]].
+- [x] Описать [[system-context|системный контекст и границы frontend/backend]].
+- [x] Подготовить [[er-model]] и [[api-contracts]].
+- [x] В [[api-contracts]] принять отдельный server query событий по `correlationId` как источник полного аудита массовой операции.
+- [x] Зафиксировать [[transactions-concurrency|транзакции и конкурентность]].
+- [x] Спроектировать [[audit-log-design|хранение аудита]] и [[mock-integrations|mock-интеграции]].
+- [x] Принять [[security-baseline]] и шесть [[adr-index|ADR]].
+- [x] Сохранить каноническую доменную логику `FinalBatchAcceptance`, роли, state machine и UX-сценарий без изменений.
 
-Эти задачи начинать только по отдельному указанию после review доменной коррекции. В архитектуре сохранить отдельный server query по `correlationId` как предпочтительный вариант полного аудита массовой операции; UX endpoint не предрешает.
+Server correlation query закрывает отложенное решение `UC-014`: клиентское объединение отдельных card histories не является доказательством полноты. Архитектура остаётся одним PostgreSQL transaction boundary; реальная payroll/ERP, отрицательная приёмка и rework не добавлены.
+
+## Далее — этап 6 (не начато)
+
+- [ ] Зафиксировать [[repository-structure]].
+- [ ] Настроить [[local-development|Docker и локальный запуск]].
+- [ ] Описать [[environments|окружения и секреты]].
+- [ ] Подготовить [[database-bootstrap|миграции и seed-данные]].
+- [ ] Настроить [[quality-gates|lint, format и typecheck]].
+- [ ] Подготовить [[ci-pipeline|CI]].
 
 ## Icebox — после MVP
 

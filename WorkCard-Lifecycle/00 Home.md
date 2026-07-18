@@ -6,9 +6,9 @@ tags:
   - case-study
   - workcard
 status: active
-version: 7
+version: 8
 owner: navigation
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Production Work Card Workflow
@@ -19,9 +19,11 @@ updated: 2026-07-17
 
 **Этапы 1–3 семантически скорректированы:** модель соответствует подтверждённому AS-IS и явным TO-BE решениям.
 
-**Этап 4 скорректирован:** UX-документы, [[ux-copy-guidelines|канонические правила UX-текста]] и отдельный [14-шаговый кликабельный прототип](docs/ux/prototype.html) включают цифровую финальную приёмку партии. Технические сведения отделены от производственного интерфейса. Этап 5 не начат и остаётся следующей контрольной точкой после review.
+**Этап 4 скорректирован:** UX-документы, [[ux-copy-guidelines|канонические правила UX-текста]] и отдельный [14-шаговый кликабельный прототип](docs/ux/prototype.html) включают цифровую финальную приёмку партии. Технические сведения отделены от производственного интерфейса.
 
-**Последняя проверка:** 48 документов, 0 errors, 0 warnings; semantic, ID, metadata и prototype gates — PASS.
+**Этап 5 выполнен:** приняты [[technology-stack|стек]], [[system-context|системная граница]], [[er-model|physical data model]], [[api-contracts|API]], [[transactions-concurrency|транзакции]], [[audit-log-design|audit]], [[mock-integrations|mock boundaries]], [[security-baseline|security baseline]] и [[adr-index|шесть ADR]]. Этап 6 «Инженерный фундамент» — следующая контрольная точка; работающего backend/frontend checkout пока не заявляет.
+
+**Последняя проверка:** 55 документов, 0 errors, 0 warnings; architecture semantic/ID/metadata gates — PASS. Принятый 14-шаговый прототип не изменён.
 
 ## Управление проектом
 
@@ -55,9 +57,14 @@ updated: 2026-07-17
 
 ### Architecture
 
+- [[technology-stack]]
 - [[system-context]]
 - [[er-model]]
 - [[api-contracts]]
+- [[transactions-concurrency]]
+- [[audit-log-design]]
+- [[mock-integrations]]
+- [[security-baseline]]
 - [[adr-index|ADR]]
 
 ### Delivery
