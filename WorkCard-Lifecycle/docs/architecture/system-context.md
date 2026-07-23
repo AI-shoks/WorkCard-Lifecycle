@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.system-context
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-07-18
 ---
@@ -22,7 +22,7 @@ flowchart LR
 
     subgraph system["Production Work Card Workflow"]
         spa["React SPA\nрусский role-aware UI"]
-        api["Fastify API\napplication + domain modules"]
+        api["FastAPI backend\napplication + domain modules"]
         db[("PostgreSQL\nstate + audit + mock payroll")]
         mock["Mock payroll adapter\nлокальный application port"]
 
@@ -65,7 +65,7 @@ Browser считается недоверенной средой. Actor и role 
 - после `409` не повторяет команду автоматически, а перечитывает затронутые ресурсы;
 - не выводит UUID как номер детали и не выводит `FinalBatchAcceptance` из `CLOSED` карточек.
 
-### Fastify API
+### FastAPI backend
 
 - устанавливает trusted demo identity и проверяет permission до раскрытия целевых данных;
 - валидирует schema, предметные предусловия, gate, state и versions;

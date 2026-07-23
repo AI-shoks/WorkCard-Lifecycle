@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 11
+version: 12
 owner: project
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # Project Plan
@@ -27,7 +27,7 @@ updated: 2026-07-18
 | 3 | Требования и acceptance criteria | `[x]` скорректировано | Новая модель покрыта объективными критериями |
 | 4 | UX-проектирование | `[x]` скорректировано | UX-спецификация и отдельный 14-шаговый прототип соответствуют новой модели |
 | 5 | Техническая архитектура | `[x]` выполнено | Приняты stack, system/data/API boundaries, транзакции, audit, security и ADR |
-| 6 | Инженерный фундамент | `[ ]` не начато | Проект воспроизводимо запускается и проверяется |
+| 6 | Инженерный фундамент | `[-]` Gate 1 validated locally; publication CI pending | Foundation реализован; последующие slices не начаты |
 | 7 | Backend vertical slice | `[ ]` не начато | Основной сценарий работает через API и БД |
 | 8 | Frontend vertical slice | `[ ]` не начато | Основной сценарий выполняется в браузере |
 | 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
@@ -100,16 +100,20 @@ updated: 2026-07-18
 - [x] [[security-baseline]]
 - [x] [[adr-index|ADR]]
 
-**Закрыт:** 2026-07-18. Принят TypeScript modular monolith с React SPA, Fastify API и PostgreSQL; current state отделён от append-only audit без event sourcing. API сохраняет отдельный server query событий по `correlationId`, явные expected versions и command receipts. Шесть ADR фиксируют stack, physical aggregate mapping, транзакции, audit, mock payroll и demo authorization. Архитектура не меняет `FinalBatchAcceptance`, state machine, роли или 14-шаговый UX-сценарий.
+**Закрыт:** 2026-07-18. Текущий backend stack — Python 3.12/FastAPI в modular monolith, будущая React/TypeScript SPA и PostgreSQL; ADR-0007 заменил только stack-часть исторического ADR-0001. Current state отделён от append-only audit без event sourcing. API сохраняет отдельный server query событий по `correlationId`, явные expected versions и command receipts. Семь ADR сохраняют историю stack, physical aggregate mapping, транзакции, audit, mock payroll и demo authorization. Архитектура не меняет `FinalBatchAcceptance`, state machine, роли или 14-шаговый UX-сценарий.
 
-## Этап 6. Инженерный фундамент
+## Этап 6. Инженерный фундамент — в работе
 
-- [ ] [[repository-structure]]
-- [ ] [[local-development|Docker и локальный запуск]]
-- [ ] [[environments|Конфигурация окружений и секреты]]
-- [ ] [[database-bootstrap|Миграции и seed-данные]]
-- [ ] [[quality-gates|Lint, format и typecheck]]
-- [ ] [[ci-pipeline|CI]]
+- [x] [[repository-structure]]
+- [x] [[local-development|Docker и локальный запуск]]
+- [x] [[environments|Конфигурация окружений и секреты]]
+- [x] [[database-bootstrap|Миграции и seed-данные]]
+- [x] [[quality-gates|Lint, format и typecheck]]
+- [x] [[ci-pipeline|CI]]
+
+**Gate 1 Foundation:** application factory, configuration, PostgreSQL pool/migrations, health/observability, prepared demo-session, server-side PostgreSQL revocation registry, Problem Details/OpenAPI, least-privilege roles, dependency/secret gates и CI configuration реализованы. Local remediation на Python 3.12/PostgreSQL 15.10 прошла; статус — `Gate 1 remediation validated; publication CI pending`.
+
+**Не закрыто:** GitHub Actions ещё не выполнялся; PostgreSQL 18.1 и Docker image/container smoke локально не проверялись. Публикационный CI должен подтвердить эти gates. Gate 2, import/generation/assignment/lifecycle/БТК/payroll/background jobs и frontend не начинались, поэтому этап 6 полностью завершённым не считается.
 
 ## Этап 7. Backend vertical slice
 

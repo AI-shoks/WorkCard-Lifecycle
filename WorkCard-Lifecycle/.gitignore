@@ -4,3 +4,17 @@
 
 # Obsidian local trash
 .trash/
+
+# Local environment and Python artifacts
+.env
+.local-packages/
+__pycache__/
+*.py[cod]
+
+# Local quality and coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

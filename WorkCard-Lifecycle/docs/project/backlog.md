@@ -1,9 +1,9 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 13
+version: 14
 owner: project
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # Backlog
@@ -92,14 +92,26 @@ updated: 2026-07-18
 
 Server correlation query закрывает отложенное решение `UC-014`: клиентское объединение отдельных card histories не является доказательством полноты. Архитектура остаётся одним PostgreSQL transaction boundary; реальная payroll/ERP, отрицательная приёмка и rework не добавлены.
 
-## Далее — этап 6 (не начато)
+## Выполнено локально — Gate 1 этапа 6
 
-- [ ] Зафиксировать [[repository-structure]].
-- [ ] Настроить [[local-development|Docker и локальный запуск]].
-- [ ] Описать [[environments|окружения и секреты]].
-- [ ] Подготовить [[database-bootstrap|миграции и seed-данные]].
-- [ ] Настроить [[quality-gates|lint, format и typecheck]].
-- [ ] Подготовить [[ci-pipeline|CI]].
+- [x] Зафиксировать [[repository-structure]].
+- [x] Настроить [[local-development|native и Docker local path]].
+- [x] Описать [[environments|окружения, три DSN и секреты]].
+- [x] Подготовить [[database-bootstrap|миграции `0001–0003`, seed и session registry]].
+- [x] Настроить [[quality-gates|format/lint/typecheck/audit/tests/docs/OpenAPI gates]].
+- [x] Подготовить [[ci-pipeline|PostgreSQL 18.1, separate roles и container smoke CI]].
+- [x] Устранить replay после logout/role switch и проверить expiry/CSRF matrix.
+- [x] Унифицировать runtime/OpenAPI Problem Details, включая `404/405/503`.
+- [x] Проверить least-privilege runtime role и сохранение исходной migration error.
+
+Текущий статус: `Gate 1 remediation validated; publication CI pending`.
+
+## Осталось в этапе 6
+
+- [ ] Выполнить опубликованный GitHub Actions run на PostgreSQL 18.1.
+- [ ] Подтвердить Docker image build и container readiness smoke.
+- [ ] После успешного publication CI отдельно решить вопрос окончательного закрытия Gate 1.
+- [ ] Gate 2 и последующие slices не начинать до отдельного решения.
 
 ## Icebox — после MVP
 

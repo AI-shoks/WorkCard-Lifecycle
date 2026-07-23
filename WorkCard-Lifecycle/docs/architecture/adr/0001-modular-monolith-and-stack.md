@@ -1,16 +1,19 @@
 ---
 artifact_id: architecture.adr.0001
-status: accepted
-version: 1
+status: superseded
+version: 2
 owner: architecture
 updated: 2026-07-18
+superseded_by: "[[0007-python-fastapi-backend-stack]]"
 ---
 
 # ADR-0001: Modular monolith and TypeScript stack
 
 ## Статус
 
-Принято 2026-07-18.
+Принято 2026-07-18. Заменено [[0007-python-fastapi-backend-stack|ADR-0007]] 2026-07-18.
+
+ADR-0001 сохранён как историческая запись исходного решения. ADR-0007 сохраняет модульный монолит, browser/API trust boundary, React SPA и PostgreSQL, но заменяет backend runtime, язык, framework, schema/tooling и способ фиксации зависимостей.
 
 ## Контекст
 

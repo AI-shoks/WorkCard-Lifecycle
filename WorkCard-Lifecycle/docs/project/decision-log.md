@@ -1,9 +1,9 @@
 ---
 artifact_id: project.decision-log
 status: active
-version: 10
+version: 11
 owner: project
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # Decision Log
@@ -34,3 +34,4 @@ updated: 2026-07-18
 | D-020 | 2026-07-17 | Разделить подтверждённые самоконтроль/финальную приёмку и синтетическое per-card закрытие WorkCard | принято | Самоконтроль рабочего не получает отдельной команды; `FinalBatchAcceptance` всей партии и подписи БТК остаются фактами `CONFIRMED_AS_IS`; `ConfirmWorkCardQuality` сохраняет выбранную per-card гранулярность MVP, но не считается записью финальной приёмки или цифровой подписью |
 | D-021 | 2026-07-17 | Включить в MVP v1 отдельную цифровую финальную приёмку всей завершённой партии | принято | `QUALITY_CONTROLLER` выполняет `RecordFinalBatchAcceptance` только после first-article gates и закрытия всех обязательных WorkCard; создаются одна неизменяемая `FinalBatchAcceptance` и `FinalBatchAccepted` в одной транзакции, но цифровая запись не заменяет подписи БТК на физических карточках |
 | D-022 | 2026-07-18 | Разрешить корректировку accepted ADR по результатам review до merge в каноническую ветку | принято | Требуются повышение version и отдельный correction commit; после merge изменение решения выполняется только новым ADR с reciprocal supersedes/superseded_by |
+| D-023 | 2026-07-19 | Уточнить prepared demo-session серверным PostgreSQL registry активных `jti` без расширения до production IAM | принято | Подписанная cookie остаётся указателем; logout/role switch атомарно отзывают server-side state, replay после рестарта или между процессами отклоняется |

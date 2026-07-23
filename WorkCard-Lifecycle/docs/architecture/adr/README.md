@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.adr-index
 status: active
-version: 3
+version: 4
 owner: architecture
 updated: 2026-07-18
 aliases:
@@ -14,16 +14,17 @@ aliases:
 
 После merge в каноническую ветку изменение принятого архитектурного решения выполняется только новым ADR по [[document-governance]]: старый ADR получает `superseded_by`, новый — `supersedes`, ссылки взаимны.
 
-## Принятые ADR этапа 5
+## Действующие и исторические ADR
 
 | ADR | Решение | Связанные артефакты |
 |---|---|---|
-| [[0001-modular-monolith-and-stack|ADR-0001]] | TypeScript modular monolith: React SPA, Fastify API, PostgreSQL | [[technology-stack]], [[system-context]] |
+| [[0001-modular-monolith-and-stack|ADR-0001]] | Историческое решение: TypeScript/Fastify stack; заменено ADR-0007 | [[0007-python-fastapi-backend-stack|ADR-0007]] |
 | [[0002-relational-state-and-aggregate-mapping|ADR-0002]] | реляционное current state, explicit SQL и audit без event sourcing | [[er-model]], [[domain-model]] |
 | [[0003-concurrency-and-transactions|ADR-0003]] | optimistic versions, ordered locks и согласованная final acceptance | [[transactions-concurrency]] |
 | [[0004-transactional-audit-and-correlation-query|ADR-0004]] | transactional append-only audit и server query по `correlationId` | [[audit-log-design]], [[api-contracts]] |
 | [[0005-command-replay-and-mock-payroll|ADR-0005]] | receipts, idempotency и local mock payroll adapter | [[mock-integrations]], [[api-contracts]] |
 | [[0006-demo-session-and-authorization|ADR-0006]] | prepared identities, signed session и backend authorization | [[security-baseline]], [[roles-permissions]] |
+| [[0007-python-fastapi-backend-stack|ADR-0007]] | Python/FastAPI backend при сохранении modular monolith, React SPA и PostgreSQL | [[technology-stack]], [[system-context]] |
 
 ## Как добавить или заменить решение
 

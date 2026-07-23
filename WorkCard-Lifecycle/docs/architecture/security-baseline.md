@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.security-baseline
 status: accepted
-version: 1
+version: 3
 owner: architecture
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # Security Baseline
@@ -22,15 +22,16 @@ updated: 2026-07-18
 ## Demo authentication
 
 - `GET /demo-identities` возвращает только prepared display identities;
-- `GET /session/bootstrap` выдаёт short-lived signed anonymous cookie со случайным nonce/CSRF binding, но без actor/role;
-- `PUT /session/demo` принимает ID из allowlist только с bootstrap/current cookie, связанным CSRF token и trusted Origin, затем rotates cookie/token;
+- `GET /session/bootstrap` создаёт server-side anonymous session со случайным уникальным `jti` и выдаёт short-lived signed cookie/CSRF binding без actor/role;
+- `PUT /session/demo` принимает ID из allowlist только с active bootstrap/current session, связанным CSRF token и trusted Origin, затем атомарно отзывает старый `jti` и выдаёт новый;
 - cookie: `HttpOnly`, `Secure` вне localhost, `SameSite=Strict`, narrow `Path`, ограниченный lifetime;
 - signing secret хранится вне repository и меняется между environments;
-- actor/role извлекаются backend из проверенной session; body/header role ignored/rejected;
-- logout/role switch rotates cookie и CSRF token, очищает permission-sensitive client cache;
+- cookie содержит подписанный `jti`, но не является единственным источником доверия: active/expiry/revocation и identity/role binding проверяются в PostgreSQL;
+- actor/role извлекаются backend из active registry и prepared identity; body/header role ignored/rejected;
+- logout отзывает текущий `jti`; role switch отзывает старый и создаёт новый, после чего client очищает permission-sensitive cache;
 - arbitrary account creation, passwords, OAuth и production SSO вне MVP.
 
-Подписанная session доказывает только выбранный demo context, а не личность реального сотрудника. Это явно отражается в README/demo.
+Registry разделяется всеми процессами приложения и сохраняется после рестарта, поэтому старая подписанная cookie после logout/switch не оживает. Prepared session доказывает только выбранный demo context, а не личность реального сотрудника. Это явно отражается в README/demo.
 
 ## Authorization
 
@@ -47,14 +48,14 @@ updated: 2026-07-18
 
 - deployment same-origin; permissive CORS не включается;
 - первый role selection получает CSRF token из public `GET /session/bootstrap`; дальнейшие mutations — session-bound token из `GET /session`;
-- bootstrap и authenticated tokens связаны с nonce в signed cookie, имеют короткий срок и rotate при role switch;
+- bootstrap и authenticated tokens связаны с `jti`, имеют короткий срок и rotate вместе с server-side revocation при role switch;
 - backend проверяет token и `Origin`/`Sec-Fetch-Site` там, где header доступен;
 - обычные GET/HEAD не меняют domain/session state; единственное исключение — bootstrap GET, который выдаёт anonymous cookie/token и не создаёт trusted identity или business effect;
 - role switch использует idempotent `PUT` + CSRF и не является domain command.
 
 ## Input и output validation
 
-- Fastify route schemas запрещают unknown properties у command bodies;
+- Pydantic request models FastAPI запрещают unknown properties у command bodies;
 - UUID, enum, integer/decimal limits, array cardinality и duplicate card IDs проверяются до domain service;
 - body size и mass assignment ограничены; canonical maximum assignment — `500` cards;
 - SQL использует только parameters; dynamic sort/filter выбирается из allowlist;
@@ -84,6 +85,7 @@ updated: 2026-07-18
 - migration role отделена и не используется приложением;
 - PostgreSQL не опубликован в internet и доступен только application network;
 - application role не имеет update/delete на audit/final acceptance/payroll immutable rows;
+- session registry даёт runtime только заявленный DML и column-level update `revoked_at`;
 - backups/dumps не входят в repository; production-like secrets/data не попадают в fixtures;
 - TLS к удалённой DB обязателен; localhost compose может использовать isolated network.
 
@@ -120,7 +122,8 @@ updated: 2026-07-18
 - каждая command role matrix: allow owner, deny остальные;
 - direct protected audit/payroll URL безопасно отклоняется;
 - actor/role/assignee/purpose/ID/version tampering не проходит;
-- CSRF missing/invalid и cross-origin mutation отклоняются;
+- CSRF missing/invalid, missing/untrusted Origin и trusted Origin с cross-site fetch отклоняются;
+- saved cookie после logout, old cookie/CSRF после role switch, expired/revoked/malformed/unknown `jti` отклоняются, включая новый процесс приложения;
 - unknown JSON fields, oversized body/mass set, injection strings отклоняются;
 - stale/replayed/concurrent commands сохраняют единичный корректный result;
 - errors/logs не содержат cookie, CSRF, SQL или stack;

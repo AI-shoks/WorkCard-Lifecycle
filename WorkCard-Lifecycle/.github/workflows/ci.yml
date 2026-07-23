@@ -1,0 +1,87 @@
+name: quality
+
+on:
+  push:
+    branches: ["codex/stage-6-mvp-implementation"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.1-bookworm
+        env:
+          POSTGRES_DB: workcard_test
+          POSTGRES_USER: workcard_admin
+          POSTGRES_PASSWORD: synthetic_admin_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workcard_admin -d workcard_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      PYTHONPATH: src
+      WORKCARD_ENVIRONMENT: test
+      WORKCARD_DATABASE_URL: postgresql://workcard_app:synthetic_runtime_password@localhost:5432/workcard_test
+      WORKCARD_MIGRATION_DATABASE_URL: postgresql://workcard_migrator:synthetic_migration_password@localhost:5432/workcard_test
+      WORKCARD_TEST_DATABASE_URL: postgresql://workcard_admin:synthetic_admin_password@localhost:5432/workcard_test
+      WORKCARD_SESSION_SIGNING_SECRET: ci-only-signing-secret-at-least-32-characters
+      WORKCARD_ALLOWED_ORIGINS: '["http://testserver"]'
+      WORKCARD_COOKIE_SECURE: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.11"
+          cache: pip
+      - run: python -m pip install --upgrade pip==26.1.2
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pip check
+      - run: python scripts/bootstrap_test_database.py
+      - name: Audit runtime dependencies
+        run: python -m pip_audit -r requirements.txt
+      - name: Audit installed dev/build environment
+        run: python -m pip_audit
+      - run: python -m ruff format --check .
+      - run: python -m ruff check .
+      - run: python -m mypy
+      - run: python -m bandit -c pyproject.toml -r src scripts
+      - run: python scripts/check_no_secrets.py
+      - run: python -m workcard_api.migrations up
+      - run: python -m pytest
+      - run: python scripts/export_openapi.py --check
+      - run: git diff --check
+      - name: Build application image
+        run: docker build --tag workcard-foundation:ci .
+      - name: Start container smoke test
+        run: >-
+          docker run --detach --rm --name workcard-foundation-smoke --network host
+          --env WORKCARD_ENVIRONMENT=test
+          --env WORKCARD_DATABASE_URL
+          --env WORKCARD_SESSION_SIGNING_SECRET
+          --env WORKCARD_ALLOWED_ORIGINS
+          --env WORKCARD_COOKIE_SECURE=false
+          workcard-foundation:ci
+      - name: Verify container readiness
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs workcard-foundation-smoke
+          exit 1
+      - name: Stop smoke container
+        if: always()
+        run: docker rm --force workcard-foundation-smoke || true

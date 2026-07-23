@@ -1,20 +1,20 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 2
+version: 4
 owner: architecture
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # API Contracts
 
-HTTP-контракт MVP v1 для команд и запросов из [[commands-events]]. Каноническая machine-readable версия будет сгенерирована как OpenAPI `3.1` из route schemas на этапе реализации; этот документ фиксирует ресурсы, семантику и обязательные поля до кода.
+HTTP-контракт MVP v1 для команд и запросов из [[commands-events]]. Каноническая machine-readable версия генерируется FastAPI как OpenAPI `3.1` из Pydantic models и route metadata. Committed snapshot Gate 1 содержит только реализованные health/session endpoints; описанные ниже business endpoints остаются контрактом следующих vertical slices, а не скрытой реализацией Gate 2.
 
 ## Общие правила
 
 - base path: `/api/v1`;
 - формат: JSON UTF-8; errors — `application/problem+json`;
-- browser session — signed `HttpOnly` cookie, выданная backend по подготовленной demo identity;
+- browser session — signed `HttpOnly` cookie с `jti`; active state, expiry, revocation и prepared identity/role binding хранятся в PostgreSQL;
 - все business-command mutations требуют `X-CSRF-Token` и `X-Command-Id: <uuid>`; bootstrap GET выдаёт token, а session switch/logout требуют CSRF, но не являются business commands и не получают `commandId`/event;
 - backend создаёт один `correlationId` на каждую новую successful command transaction, включая допустимый no-op повторного payroll export, и использует его во всех событиях этой транзакции, если события есть;
 - client передаёт ожидаемые версии в command body; resource response содержит `version` и `ETag: "v{version}"`;
@@ -30,9 +30,11 @@ HTTP-контракт MVP v1 для команд и запросов из [[comm
 | `GET /session/bootstrap` | public | выдаёт short-lived signed anonymous bootstrap cookie и связанный CSRF token; domain state отсутствует |
 | `PUT /session/demo` | bootstrap или authenticated session + CSRF + trusted Origin | body `{ "demoIdentityId": uuid }`; backend сверяет allowlist, rotates bootstrap/current cookie и выдаёт authenticated signed session + новый CSRF token |
 | `GET /session` | authenticated | trusted actor, role, permissions и новый CSRF token; без предметного изменения |
-| `DELETE /session` | authenticated + CSRF | удаляет только session cookie |
+| `DELETE /session` | authenticated + CSRF | отзывает текущий server-side `jti` и удаляет session cookie |
 
-Bootstrap cookie содержит случайный session nonce, expiry и CSRF binding, но не actor/role. `SameSite=Strict`, проверка `Origin`/`Sec-Fetch-Site` и совпадение token binding применяются уже к первому `PUT`. После выбора identity старые bootstrap/session token и cookie недействительны на клиенте.
+Bootstrap cookie содержит только подписанный случайный `jti`, но не actor/role. Registry хранит issued/expiry timestamps и optional identity/role binding. `SameSite=Strict`, проверка `Origin`/`Sec-Fetch-Site` и совпадение CSRF binding применяются уже к первому `PUT`. Role switch атомарно отзывает старый `jti` и создаёт новый; logout отзывает текущий. Старые cookie/token недействительны server-side между процессами и после рестарта.
+
+`expiresInSeconds` во всех session responses означает фактический оставшийся TTL до registry `expires_at`. Значение не увеличивается, около expiry приближается к нулю, а после expiry `GET /session` возвращает `401`.
 
 Client не может передать произвольные `actorId` или role. Role switch — новый выбор prepared identity, а не business command; `commandId`, domain event и version для него отсутствуют.
 
@@ -257,11 +259,15 @@ Backend сначала проверяет роль `ADMIN_AUDITOR`, затем �
 | `401` | session отсутствует/недействительна | без раскрытия ресурса |
 | `403` | trusted role не имеет права | проверяется до resource lookup |
 | `404` | доступная роли цель отсутствует | passport/batch/set/card/record |
+| `405` | route существует, но метод не поддерживается | единый `METHOD_NOT_ALLOWED` Problem Details |
 | `409` | version, state, gate, terminal, idempotency или uniqueness conflict | `VERSION_CONFLICT`, `SERIAL_GATE_CLOSED`, `BATCH_FINAL_ACCEPTED`, `COMMAND_ID_REUSED` |
 | `422` | семантически неверные данные | неположительное quantity, неактивный паспорт, assignee не `WORKER` |
 | `500` | unexpected failure | transaction rolled back; безопасное общее сообщение |
+| `503` | readiness dependency недоступна | `READINESS_UNAVAILABLE` для `/health/ready` |
 
 `errors` содержит field paths только для безопасной input validation. Protected existence, SQL details, stack traces, cookie/CSRF values и event data не раскрываются.
+
+Runtime handlers для request validation, application errors, `401`, `403`, `404`, `405`, `500` и readiness `503` возвращают одну Pydantic-модель `ProblemDetails` с media type `application/problem+json`. Malformed body/shape возвращает `400`; семантический `422 DEMO_IDENTITY_INVALID` остаётся отдельным фактическим контрактом. Generated OpenAPI не публикует автоматический `HTTPValidationError`, когда runtime его не возвращает.
 
 ## Порядок обработки
 
@@ -295,7 +301,7 @@ Receipt lookup не обходит текущую authorization: replay result �
 
 На этапе реализации CI должен проверять:
 
-- route schema присутствует у каждого endpoint;
+- Pydantic request/response schema и FastAPI metadata присутствуют у каждого endpoint;
 - generated OpenAPI не содержит undocumented command;
 - frontend client генерируется из committed OpenAPI без diff;
 - каждый command имеет positive, permission, validation/state и version-contract tests по [[requirements-traceability]];

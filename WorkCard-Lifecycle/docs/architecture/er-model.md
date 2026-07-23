@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.er-model
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # ER Model
@@ -23,6 +23,7 @@ erDiagram
     DEMO_USERS ||--o{ FINAL_BATCH_ACCEPTANCES : records
     WORK_CARDS ||--o| PAYROLL_RECORDS : exported_as
     DEMO_USERS ||--o{ PAYROLL_RECORDS : benefits
+    DEMO_USERS ||--o{ DEMO_SESSIONS : binds
     COMMAND_RECEIPTS ||--o{ AUDIT_EVENTS : correlates
 
     PRODUCTION_PASSPORTS {
@@ -117,6 +118,14 @@ erDiagram
       text role
       boolean active
     }
+    DEMO_SESSIONS {
+      uuid jti PK
+      uuid identity_id FK
+      text identity_role FK
+      timestamptz issued_at
+      timestamptz expires_at
+      timestamptz revoked_at
+    }
 ```
 
 ## Общие соглашения
@@ -155,6 +164,20 @@ erDiagram
 ### `demo_users`
 
 `role` ограничен значениями `PLANNER`, `MASTER`, `WORKER`, `QUALITY_CONTROLLER`, `ADMIN_AUDITOR`. Только `active = true` identity может быть выбрана demo-session. Assignee/beneficiary обязан ссылаться на пользователя с ролью `WORKER`; это межтабличное правило проверяет application service и integration test.
+
+### `demo_sessions`
+
+Foundation registry хранит server-side active state prepared demo-session и не является production IAM:
+
+- `jti` — случайный application-generated UUID и единственный session identifier в подписанной cookie;
+- anonymous bootstrap имеет null identity/role; authenticated session связывает оба поля одновременно;
+- composite FK `(identity_id, identity_role) → demo_users(id, role)` не позволяет отделить сохранённую роль от prepared identity;
+- `expires_at > issued_at`, а `revoked_at` либо null, либо не раньше выдачи;
+- active lookup требует `revoked_at IS NULL AND expires_at > clock_timestamp()`;
+- indexes поддерживают expiry cleanup и active identity lookup;
+- runtime может читать/создавать/удалять session rows и обновлять только `revoked_at`; DDL и произвольное изменение binding запрещены.
+
+Logout отзывает текущий `jti`. Role switch в одной DB transaction отзывает старый `jti` и создаёт новый. Истёкшие более суток строки удаляются при следующей выдаче session; до удаления они не проходят active lookup.
 
 ## Производственное состояние
 

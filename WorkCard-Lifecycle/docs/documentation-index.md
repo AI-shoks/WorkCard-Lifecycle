@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 7
+version: 9
 owner: project
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # Documentation Index
@@ -54,11 +54,11 @@ docs/
 
 ## Принятая архитектурная основа
 
-- [[technology-stack]] и [[system-context]] фиксируют TypeScript modular monolith, browser/API trust boundary и PostgreSQL;
+- [[technology-stack]] и [[system-context]] фиксируют Python/FastAPI backend модульного монолита, будущую React SPA, browser/API trust boundary и PostgreSQL;
 - [[er-model]] хранит current state, snapshots и отдельные immutable результаты без `sequenceNumber` и единой нормы партии;
 - [[api-contracts]] покрывает команды/запросы и отдельный server query полного event set по `correlationId`;
 - [[transactions-concurrency]] и [[audit-log-design]] фиксируют optimistic versions, atomic state/events и append-only history без event sourcing;
 - [[mock-integrations]] и [[security-baseline]] задают честную local mock boundary и demo authorization;
-- [[adr-index]] хранит шесть принятых решений этапа 5.
+- [[adr-index]] хранит семь ADR: шесть исходных решений этапа 5 и ADR-0007, которое исторически заменяет stack-часть ADR-0001.
 
-Архитектурные документы имеют status `accepted`; исполняемый foundation, migrations, OpenAPI и код остаются результатом этапов 6–8, а не текущего checkout.
+Foundation Gate 1 этапа 6 реализован и прошёл local remediation: configuration, FastAPI application factory, PostgreSQL pool/migrations/session registry, health, logging/request ID, Prometheus, session replay/CSRF/origin, Problem Details/OpenAPI, least-privilege test matrix, dependency/secret gates, Docker/Compose и CI configuration. Статус: `Gate 1 remediation validated; publication CI pending`. PostgreSQL 18.1, Docker runtime и GitHub Actions локально не подтверждены; business endpoints Gate 2 и frontend не начаты.

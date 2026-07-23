@@ -1,14 +1,14 @@
 ---
 artifact_id: architecture.technology-stack
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-07-18
 ---
 
 # Technology Stack
 
-Принятый стек MVP v1. Он оптимизирован для небольшого проверяемого vertical slice, явных транзакций PostgreSQL и одного языка между браузером и backend. Решение подробно обосновано в [[0001-modular-monolith-and-stack]].
+Принятый стек MVP v1. Он оптимизирован для небольшого проверяемого vertical slice, явных транзакций PostgreSQL и machine-readable контракта между разными frontend/backend toolchains. Исходное решение сохранено в [[0001-modular-monolith-and-stack]], каноническая замена backend stack обоснована в [[0007-python-fastapi-backend-stack]].
 
 ## Критерии выбора
 
@@ -24,28 +24,28 @@ updated: 2026-07-18
 
 | Слой | Выбор | Назначение |
 |---|---|---|
-| Runtime | Node.js `24.x` LTS | единый поддерживаемый runtime для frontend tooling и API |
-| Язык | TypeScript со строгими проверками | frontend, backend, тесты и сгенерированный API client |
-| Workspace | `pnpm` workspaces | один lockfile, разделение приложений и пакетов без преждевременного микросервисного дробления |
+| Backend runtime | Python `3.12.x` | API, migrations, scripts и backend tests |
+| Backend язык | Python со strict mypy | application/domain code, adapters и tests с явной статической проверкой |
+| Backend dependencies | `pyproject.toml`, `requirements.txt`, `requirements-dev.txt` с exact top-level pins/constraints | project metadata, container/runtime install и quality-tool install без заявления отсутствующего lock-файла |
 | Frontend | React `19.x`, Vite, React Router, TanStack Query | клиентская SPA, маршруты `S-01`–`S-07`, server-state и явное восстановление после conflict |
-| Backend | Fastify `5.x` | модульный HTTP API, JSON Schema validation, security plugins и тестирование через `inject()` |
-| Контракт | JSON Schema на маршрутах + OpenAPI `3.1` | единственный HTTP-контракт и генерация типизированного frontend client |
-| Доступ к данным | `pg`, parameterized SQL и версионируемые SQL migrations | видимые транзакции, locks, constraints и отсутствие скрытой ORM-семантики |
+| Backend | FastAPI `0.139.x`, Starlette `1.3.x`, Pydantic `2.x` | модульный HTTP API, validation, application factory и TestClient |
+| Контракт | Pydantic request/response models + OpenAPI `3.1` | единственный HTTP-контракт и будущая генерация типизированного frontend client |
+| Доступ к данным | psycopg `3.x`, connection pool, parameterized SQL и versioned SQL migrations | видимые транзакции, locks, constraints и отсутствие скрытой ORM-семантики |
 | База данных | PostgreSQL `18.x`, актуальный minor | текущее состояние, snapshots, optimistic versions, append-only audit и mock payroll |
-| Unit/component tests | Vitest, React Testing Library | доменные правила и UI-состояния |
-| API/DB integration | Fastify `inject()`, PostgreSQL container | permissions, constraints, транзакции, конкурентность и audit |
+| Backend unit/API tests | Pytest, FastAPI TestClient | configuration, session/security, health, logging и contract behavior |
+| API/DB integration | Pytest, psycopg, отдельная PostgreSQL database | migrations, constraints, readiness и prepared reference data |
 | Browser E2E | Playwright | сквозной сценарий, role switch и conflict recovery |
-| Static quality | TypeScript, ESLint, Prettier | typecheck, lint и format gates этапа 6 |
+| Backend static/security quality | Ruff, mypy, Bandit, pip-audit | format, lint, type, source-security и production dependency gates |
 | Packaging | multi-stage Docker image + PostgreSQL service | одинаковые артефакты для локального запуска и будущего deployment |
 
-Точные minor/patch версии и image digests фиксируются lockfile и container manifests на этапе 6. Major-линии не обновляются автоматически: изменение major требует проверки совместимости и новой версии этого документа.
+Gate 1 фиксирует top-level runtime/development versions и Starlette security constraint в трёх согласованных manifests, Python image `3.12.11` и PostgreSQL image `18.1`. Отдельного Python lock/constraints-файла нет, поэтому документ не заявляет полную фиксацию transitive resolution; минимальное дальнейшее усиление — reviewed constraints-файл без смены package manager. Immutable image digests относятся к release hardening этапа 10. Major-линии не обновляются автоматически: изменение major требует проверки совместимости и новой версии этого документа.
 
 ## Форма приложения
 
 - React собирается как SPA; server-side rendering и React Server Components не нужны для demo-системы с защищёнными данными.
-- Fastify реализуется как модульный монолит с модулями identity, reference data, batch/release, work-card lifecycle, audit и mock payroll.
+- FastAPI реализуется как модульный монолит; Gate 1 содержит только foundation/session, а identity, reference data, batch/release, work-card lifecycle, audit и mock payroll добавляются соответствующими vertical slices.
 - В production-образе один application container отдаёт статические SPA-файлы и `/api/v1`; PostgreSQL остаётся отдельным service.
-- Доменные функции не импортируют Fastify, SQL или React. Прикладные сервисы координируют агрегаты и транзакции через порты репозиториев.
+- Доменные функции не импортируют FastAPI, SQL или React. Прикладные сервисы координируют агрегаты и транзакции через порты репозиториев.
 - Схемы OpenAPI описывают wire format. Доменные типы не становятся публичным контрактом автоматически.
 
 ## Политика БД
@@ -69,7 +69,7 @@ updated: 2026-07-18
 
 ## Граница этапов
 
-Этап 5 принимает компоненты и контракты. Структура каталогов, lockfile, контейнеры, миграции, CI и исполняемый код относятся к этапу 6 и последующим vertical slices.
+Этап 5 принимает компоненты и контракты. Структура каталогов, dependency manifests, контейнеры, миграции, CI и foundation-код относятся к этапу 6; business endpoints и UI остаются последующим vertical slices.
 
 ## Проверка решения
 
@@ -81,7 +81,7 @@ updated: 2026-07-18
 
 ## Официальные ориентиры
 
-- [Node.js release policy](https://nodejs.org/en/about/previous-releases)
+- [Python version status](https://devguide.python.org/versions/)
 - [React 19](https://react.dev/blog/2024/12/05/react-19)
-- [Fastify LTS policy](https://fastify.dev/docs/latest/Reference/LTS/)
+- [FastAPI documentation](https://fastapi.tiangolo.com/)
 - [PostgreSQL versioning policy](https://www.postgresql.org/support/versioning/)
