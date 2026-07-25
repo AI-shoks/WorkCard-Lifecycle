@@ -1,0 +1,219 @@
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "Repository policy permanently prohibits pushing changes.",
+    match = [
+        "git push origin main",
+        "git push --force-with-lease origin feature",
+    ],
+    not_match = [
+        "git pull",
+        "git status",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "merge"],
+    decision = "forbidden",
+    justification = "Repository policy permanently prohibits direct merges.",
+    match = [
+        "git merge feature",
+        "git merge --no-ff feature",
+    ],
+    not_match = [
+        "git merge-base main feature",
+        "git status",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "-C", [".", "WorkCard-Lifecycle"], ["push", "merge"]],
+    decision = "forbidden",
+    justification = "Block push and merge through the repository's canonical relative -C paths without blocking read-only Git commands.",
+    match = [
+        "git -C WorkCard-Lifecycle push origin main",
+        "git -C WorkCard-Lifecycle merge feature",
+        "git -C . push origin main",
+        "git -C . merge feature",
+    ],
+    not_match = [
+        "git -C WorkCard-Lifecycle status",
+        "git -C WorkCard-Lifecycle diff",
+        "git -C WorkCard-Lifecycle rev-parse HEAD",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "merge"],
+    decision = "forbidden",
+    justification = "Repository policy permanently prohibits merging pull requests.",
+    match = [
+        "gh pr merge 1",
+        "gh pr merge 1 --squash",
+    ],
+    not_match = [
+        "gh pr view 1",
+        "gh pr checks 1",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gh", "release", "create"],
+    decision = "forbidden",
+    justification = "Publishing GitHub releases is prohibited.",
+    match = [
+        "gh release create v1.0.0",
+        "gh release create v1.0.0 artifact.whl",
+    ],
+    not_match = [
+        "gh release view v1.0.0",
+        "gh release list",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gh", "release", "delete"],
+    decision = "forbidden",
+    justification = "Deleting published GitHub releases is an external destructive action and is prohibited.",
+    match = [
+        "gh release delete v1.0.0 --yes",
+        "gh release delete v1.0.0 --cleanup-tag --yes",
+    ],
+    not_match = [
+        "gh release view v1.0.0",
+        "gh release list",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gh", "repo", "delete"],
+    decision = "forbidden",
+    justification = "Deleting the GitHub repository is an external destructive action and is prohibited.",
+    match = [
+        "gh repo delete AI-shoks/WorkCard-Lifecycle --yes",
+    ],
+    not_match = [
+        "gh repo view AI-shoks/WorkCard-Lifecycle",
+        "gh repo list AI-shoks",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "push"],
+    decision = "forbidden",
+    justification = "Publishing deployment images to a container registry is prohibited.",
+    match = [
+        "docker push example/image:tag",
+        "docker push registry.example.com/workcard:latest",
+    ],
+    not_match = [
+        "docker build .",
+        "docker image inspect example/image:tag",
+    ],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "push"],
+    decision = "forbidden",
+    justification = "Publishing Compose service images to a container registry is prohibited.",
+    match = [
+        "docker compose push",
+        "docker compose push api",
+    ],
+    not_match = [
+        "docker compose config",
+        "docker compose images",
+    ],
+)
+
+prefix_rule(
+    pattern = ["dropdb"],
+    decision = "forbidden",
+    justification = "Dropping PostgreSQL databases is prohibited; use an isolated synthetic test database without destructive cleanup.",
+    match = [
+        "dropdb example_database",
+        "dropdb --if-exists example_database",
+    ],
+    not_match = [
+        "createdb example_database",
+        "pg_isready -d example_database",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "commit"],
+    decision = "prompt",
+    justification = "Creating or amending commits requires explicit approval.",
+    match = [
+        "git commit -m test",
+        "git commit --amend --no-edit",
+    ],
+    not_match = [
+        "git status",
+        "git diff --cached",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "tag"],
+    decision = "prompt",
+    justification = "Creating, changing, or deleting tags requires explicit approval.",
+    match = [
+        "git tag v1.0.0",
+        "git tag -d v1.0.0",
+    ],
+    not_match = [
+        "git show v1.0.0",
+        "git describe --tags",
+    ],
+)
+
+prefix_rule(
+    pattern = [
+        "gh",
+        "pr",
+        ["create", "edit", "close", "reopen", "ready", "review", "comment"],
+    ],
+    decision = "prompt",
+    justification = "Every supported pull-request mutation requires explicit approval.",
+    match = [
+        "gh pr create --title test",
+        "gh pr edit 1 --title test",
+        "gh pr close 1",
+        "gh pr reopen 1",
+        "gh pr ready 1",
+        "gh pr ready 1 --undo",
+        "gh pr review 1 --approve",
+        "gh pr comment 1 --body test",
+    ],
+    not_match = [
+        "gh pr view 1",
+        "gh pr checks 1",
+    ],
+)
+
+prefix_rule(
+    pattern = ["python", "-m", "workcard_api.migrations", "up"],
+    decision = "prompt",
+    justification = "Applying repository SQL migrations requires explicit approval.",
+    match = [
+        "python -m workcard_api.migrations up",
+    ],
+    not_match = [
+        "python -m pytest",
+        "python -m workcard_api.app",
+    ],
+)
+
+prefix_rule(
+    pattern = ["python", "scripts/bootstrap_test_database.py"],
+    decision = "prompt",
+    justification = "Changing PostgreSQL test roles and grants requires explicit approval and an isolated synthetic database.",
+    match = [
+        "python scripts/bootstrap_test_database.py",
+    ],
+    not_match = [
+        "python scripts/check_no_secrets.py",
+        "python scripts/export_openapi.py --check",
+    ],
+)
