@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 4
+version: 5
 owner: architecture
-updated: 2026-07-19
+updated: 2026-07-25
 ---
 
 # API Contracts
@@ -20,7 +20,7 @@ HTTP-контракт MVP v1 для команд и запросов из [[comm
 - client передаёт ожидаемые версии в command body; resource response содержит `version` и `ETag: "v{version}"`;
 - UUID — технические идентификаторы. API не возвращает `sequenceNumber`, part number или позицию `n из N`;
 - успешный read не создаёт receipt/event и не меняет version;
-- даты — ISO 8601 UTC, количества — integer, `normHours` — decimal string, например `"1.25"`.
+- даты — ISO 8601 UTC, количества — integer, `normHours` — decimal string с ровно двумя знаками после десятичной точки, например `"1.25"`.
 
 ## Trusted demo session
 
@@ -101,11 +101,47 @@ Backend сначала проверяет роль `ADMIN_AUDITOR`, затем �
 
 Новые ресурсы возвращают `201`; изменённые или уже существующие идемпотентные ресурсы — `200`; body отсутствует только там, где read-back не нужен. Commit должен завершиться до ответа. `correlationId` возвращается инициатору как opaque metadata успешной команды и сам по себе не даёт права на audit query.
 
+### Canonical command identity и request hash
+
+Для `CreateProductionBatch` fingerprint строится только из следующего логического объекта:
+
+```json
+{
+  "body": {
+    "productionPassportId": "canonical-lowercase-uuid",
+    "quantity": 112
+  },
+  "commandType": "CreateProductionBatch",
+  "targetPath": "/api/v1/production-batches"
+}
+```
+
+Canonical serialization выполняется так:
+
+- JSON keys рекурсивно сортируются в лексикографическом порядке;
+- separators — `,` и `:` без пробелов;
+- результат кодируется UTF-8 без BOM;
+- UUID приводится к lowercase canonical hyphenated representation;
+- `quantity` остаётся JSON integer и не преобразуется в string;
+- insignificant whitespace и завершающий перевод строки отсутствуют;
+- request headers, session identity, `Origin` и CSRF в fingerprint не входят;
+- `request_hash` — SHA-256 canonical UTF-8 bytes, сохранённый как 64-character lowercase hexadecimal digest.
+
+Точный canonical JSON для passport UUID `00000000-0000-0000-0000-000000000000` и quantity `112`:
+
+```json
+{"body":{"productionPassportId":"00000000-0000-0000-0000-000000000000","quantity":112},"commandType":"CreateProductionBatch","targetPath":"/api/v1/production-batches"}
+```
+
+Его SHA-256 digest: `7fc64c99fe76535b4990792ca88efb1379bc16ca9317243062618f8c9f4a3057`.
+
+Тот же `commandId` и тот же digest для `CreateProductionBatch` дают `409 COMMAND_ALREADY_PROCESSED`; тот же `commandId` и другой command type, target path или digest дают `409 COMMAND_ID_REUSED`. Create command не возвращает сохранённый resource при replay. SHA-256 collision не вводится как отдельный штатный outcome.
+
 ## Commands партии
 
 ### `CreateProductionBatch`
 
-`POST /production-batches`
+`POST /api/v1/production-batches`
 
 ```json
 {
@@ -115,8 +151,46 @@ Backend сначала проверяет роль `ADMIN_AUDITOR`, затем �
 ```
 
 - роль: `PLANNER`;
-- успех `201`: batch `CREATED`, version `1`, immutable passport snapshot;
-- route не принимает operation plans или norm.
+- route не принимает operation plans или norm;
+- server строит полный snapshot по точной схеме [[commands-events]] и сохраняет одну и ту же логическую JSON-структуру в batch, event и response;
+- успех после commit — `201` со следующим точным body:
+
+```json
+{
+  "data": {
+    "batchId": "uuid",
+    "productionPassportId": "uuid",
+    "quantity": 112,
+    "lifecycleStatus": "CREATED",
+    "version": 1,
+    "passportSnapshot": {
+      "productionPassportId": "uuid",
+      "code": "nonblank string",
+      "revision": "nonblank string",
+      "productName": "nonblank string",
+      "operationPlans": [
+        {
+          "operationPlanId": "uuid",
+          "position": 1,
+          "operationScope": {
+            "code": "string",
+            "displayName": "string"
+          },
+          "normHours": "1.50",
+          "plannedCardCount": 112
+        }
+      ]
+    }
+  },
+  "meta": {
+    "commandId": "uuid из X-Command-Id",
+    "correlationId": "server-generated uuid",
+    "replayed": false
+  }
+}
+```
+
+`data.batchId` равен event `aggregateId`, `ProductionBatchCreated.data.batchId` и receipt `result_id`; `data.productionPassportId` равен выбранному passport ID и `data.passportSnapshot.productionPassportId`. UUID в response используют lowercase canonical hyphenated representation. `createdAt`, `releasedAt`, sets и cards в create response отсутствуют.
 
 ### `ReleaseWorkCards`
 
@@ -264,6 +338,24 @@ Backend сначала проверяет роль `ADMIN_AUDITOR`, затем �
 | `422` | семантически неверные данные | неположительное quantity, неактивный паспорт, assignee не `WORKER` |
 | `500` | unexpected failure | transaction rolled back; безопасное общее сообщение |
 | `503` | readiness dependency недоступна | `READINESS_UNAVAILABLE` для `/health/ready` |
+
+### Problem Details для `POST /api/v1/production-batches`
+
+Для create contract используются ровно следующие identifiers; дополнительные alias для этих outcomes запрещены:
+
+| Outcome | HTTP status | Machine code | Полный `type` URI |
+|---|---:|---|---|
+| malformed JSON или invalid request schema | `400` | `REQUEST_VALIDATION_FAILED` | `https://workcard.example/problems/request-validation-failed` |
+| authentication failure: session отсутствует или недействительна | `401` | `AUTHENTICATION_REQUIRED` | `https://workcard.example/problems/authentication-required` |
+| trusted role не имеет permission `CreateProductionBatch` | `403` | `PERMISSION_DENIED` | `https://workcard.example/problems/permission-denied` |
+| выбранный passport не найден | `404` | `RESOURCE_NOT_FOUND` | `https://workcard.example/problems/resource-not-found` |
+| тот же command ID и тот же canonical request digest | `409` | `COMMAND_ALREADY_PROCESSED` | `https://workcard.example/problems/command-already-processed` |
+| тот же command ID и другой command type, target path или digest | `409` | `COMMAND_ID_REUSED` | `https://workcard.example/problems/command-id-reused` |
+| concurrent/database command conflict | `409` | `CONCURRENT_MODIFICATION` | `https://workcard.example/problems/concurrent-modification` |
+| semantic invalid batch, passport или operation plans | `422` | `PRODUCTION_BATCH_INVALID` | `https://workcard.example/problems/production-batch-invalid` |
+| unexpected internal failure | `500` | `INTERNAL_ERROR` | `https://workcard.example/problems/internal-error` |
+
+`REQUEST_VALIDATION_FAILED`, `RESOURCE_NOT_FOUND` и `INTERNAL_ERROR` сохраняют shared runtime naming. `CONCURRENT_MODIFICATION`, `COMMAND_ALREADY_PROCESSED` и `COMMAND_ID_REUSED` сохраняют уже принятые architecture codes. Codes `AUTHENTICATION_REQUIRED`, `PERMISSION_DENIED` и `PRODUCTION_BATCH_INVALID` становятся каноническими identifiers для ранее неидентифицированных create outcomes.
 
 `errors` содержит field paths только для безопасной input validation. Protected existence, SQL details, stack traces, cookie/CSRF values и event data не раскрываются.
 

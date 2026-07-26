@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.audit-log
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-07-18
+updated: 2026-07-25
 ---
 
 # Audit Log Design
@@ -72,6 +72,37 @@ Append-only журнал успешных business commands MVP v1. Он обе�
 - display names могут храниться как snapshots, но permission logic не читает их из event;
 - `sequenceNumber`, номер детали, physical signature, money и actual time отсутствуют;
 - event schema version добавляется внутрь `data` только при несовместимом изменении payload; event type задним числом не переписывается.
+
+### `ProductionBatchCreated.data`
+
+Для создания партии полный immutable passport snapshot необходим для независимой audit-интерпретации. Поэтому `ProductionBatchCreated` использует не сокращённую projection, а следующий точный allowlisted payload:
+
+```json
+{
+  "batchId": "uuid",
+  "quantity": 112,
+  "passportSnapshot": {
+    "productionPassportId": "uuid",
+    "code": "nonblank string",
+    "revision": "nonblank string",
+    "productName": "nonblank string",
+    "operationPlans": [
+      {
+        "operationPlanId": "uuid",
+        "position": 1,
+        "operationScope": {
+          "code": "string",
+          "displayName": "string"
+        },
+        "normHours": "1.50",
+        "plannedCardCount": 112
+      }
+    ]
+  }
+}
+```
+
+`batchId` равен event `aggregateId` и созданному `production_batches.id`; `quantity` равен `production_batches.batch_quantity`; `passportSnapshot` логически равен `production_batches.passport_snapshot` и успешному response snapshot. Полная схема snapshot и правила сортировки/serialization определены в [[commands-events]]. `status` и `version` в `data` отсутствуют; envelope содержит `aggregateVersion = 1`. Server генерирует `occurredAt` в UTC внутри той же command transaction. Ровно один такой event создаётся только для успешной новой `CreateProductionBatch`.
 
 ## Формирование и commit
 

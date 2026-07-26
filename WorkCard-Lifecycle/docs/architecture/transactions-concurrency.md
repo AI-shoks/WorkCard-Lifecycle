@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.transactions-concurrency
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-07-18
+updated: 2026-07-25
 ---
 
 # Transactions and Concurrency
@@ -62,6 +62,40 @@ RETURNING *;
 | `ConfirmWorkCardQuality` | lock/read set, conditional card update | set gate version + card | только card `+1` |
 | `RecordFinalBatchAcceptance` | `SERIALIZABLE`; lock batch, consistent aggregate completion query | batch | batch `+1`; acceptance version не изменяется |
 | `ExportWorkCardToPayroll` | `READ COMMITTED`; lock/read card; `INSERT ... ON CONFLICT DO NOTHING` | WorkCard read version | первый export создаёт immutable PayrollRecord; при существующей row state/version не меняются |
+
+## Создание партии
+
+`CreateProductionBatch` выполняется одной `READ COMMITTED` transaction:
+
+1. после session/CSRF, permission и schema checks backend canonicalizes request и проверяет committed receipt;
+2. passport и его непустые operation plans читаются согласованно, plans сортируются по `position ASC`, затем server строит полный allowlisted immutable snapshot по [[commands-events]];
+3. application генерирует `batchId`, один `correlationId` и event timestamp UTC внутри transaction;
+4. вставляются `production_batches` версии `1`, `command_receipts` и ровно один `ProductionBatchCreated` с `aggregateVersion = 1`;
+5. transaction commits до формирования `201` response.
+
+Любая validation, serialization, receipt, batch, event или database failure откатывает все три записи. Частичный commit запрещён.
+
+### Точный command receipt
+
+| Поле | Значение |
+|---|---|
+| `command_id` | UUID из `X-Command-Id` |
+| `command_type` | `CreateProductionBatch` |
+| `request_hash` | SHA-256 digest canonical request по точному алгоритму [[api-contracts]] |
+| `correlation_id` | тот же server-generated UUID, что в event и success `meta.correlationId` |
+| `result_type` | `ProductionBatch` |
+| `result_id` | `batchId` созданной строки, event aggregate ID и success `data.batchId` |
+| `result_summary` | точный JSON object ниже |
+
+```json
+{
+  "batchId": "uuid",
+  "lifecycleStatus": "CREATED",
+  "version": 1
+}
+```
+
+Receipt, batch и event вставляются и фиксируются только вместе. `result_summary` не является create replay response: для этого non-replayable command сохранённый resource не возвращается.
 
 ## Атомарный выпуск
 
@@ -132,15 +166,18 @@ RETURNING *;
 
 ## Command receipts
 
-Canonical request hash включает command type, path target и нормализованный body, но не session cookie/CSRF. Глобальный unique `command_id` предотвращает повторное выполнение после неопределённого network result.
+Canonical request hash включает только `body`, `commandType` и `targetPath` по точной serialization/UTF-8/SHA-256 procedure из [[api-contracts]]; headers, session identity, `Origin` и CSRF исключены. Глобальный unique `command_id` предотвращает повторное выполнение после неопределённого network result.
 
 - receipt вставляется только внутри successful transaction;
 - duplicate ID с другим hash/type всегда `409 COMMAND_ID_REUSED`;
+- для `CreateProductionBatch` duplicate ID с теми же type/path/digest всегда `409 COMMAND_ALREADY_PROCESSED`; сохранённый resource не возвращается;
 - после session/CSRF, текущей permission и schema/hash receipt lookup выполняется до загрузки текущего state/version; иначе replay терминальной final acceptance был бы ошибочно отклонён;
 - non-replayable command с тем же receipt не выполняется повторно;
 - special replay для final acceptance возвращает сохранённый resource;
 - payroll имеет дополнительную business idempotency по `workCardId`.
 - новый successful payroll no-op не является replay receipt: он сохраняет отдельные `commandId`/`correlationId` и ссылку на существующий result;
+
+Receipt insert race обрабатывается без частичного результата: transaction, проигравшая unique `command_id` race, полностью откатывается вместе со своими batch/event inserts; после rollback service повторно читает committed winning receipt и выполняет то же сравнение command type, target path и digest. Совпадение для create даёт `COMMAND_ALREADY_PROCESSED`, любое различие — `COMMAND_ID_REUSED`. SHA-256 collision не рассматривается как отдельный штатный outcome.
 
 ## Audit/version invariant
 

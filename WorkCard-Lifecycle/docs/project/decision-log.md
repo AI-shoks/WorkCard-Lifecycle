@@ -1,9 +1,9 @@
 ---
 artifact_id: project.decision-log
 status: active
-version: 11
+version: 12
 owner: project
-updated: 2026-07-19
+updated: 2026-07-25
 ---
 
 # Decision Log
@@ -35,3 +35,4 @@ updated: 2026-07-19
 | D-021 | 2026-07-17 | Включить в MVP v1 отдельную цифровую финальную приёмку всей завершённой партии | принято | `QUALITY_CONTROLLER` выполняет `RecordFinalBatchAcceptance` только после first-article gates и закрытия всех обязательных WorkCard; создаются одна неизменяемая `FinalBatchAcceptance` и `FinalBatchAccepted` в одной транзакции, но цифровая запись не заменяет подписи БТК на физических карточках |
 | D-022 | 2026-07-18 | Разрешить корректировку accepted ADR по результатам review до merge в каноническую ветку | принято | Требуются повышение version и отдельный correction commit; после merge изменение решения выполняется только новым ADR с reciprocal supersedes/superseded_by |
 | D-023 | 2026-07-19 | Уточнить prepared demo-session серверным PostgreSQL registry активных `jti` без расширения до production IAM | принято | Подписанная cookie остаётся указателем; logout/role switch атомарно отзывают server-side state, replay после рестарта или между процессами отклоняется |
+| D-024 | 2026-07-25 | Уточнить Gate 2.1A единым immutable passport snapshot, точным `ProductionBatchCreated.data`, canonical SHA-256 command identity и точными receipt/success/Problem Details контрактами создания партии | принято | Gate 2.1B и Gate 2.1C используют одну allowlisted snapshot schema и не придумывают поля, replay semantics или error identifiers в реализации |

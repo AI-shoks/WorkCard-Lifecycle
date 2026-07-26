@@ -1,9 +1,9 @@
 ---
 artifact_id: domain.commands-events
 status: accepted
-version: 4
+version: 5
 owner: domain
-updated: 2026-07-17
+updated: 2026-07-25
 ---
 
 # Commands and Domain Events
@@ -27,6 +27,71 @@ updated: 2026-07-17
 | Событие | `ProductionBatchCreated` |
 
 Маршрут, состав operations и нормы не вводятся этой командой: их источники — подготовленные данные технолога/БТБ.
+
+#### Канонический `ProductionPassportSnapshot`
+
+При создании партии backend один раз строит полный immutable JSON object и без сокращённой event projection использует одну и ту же логическую структуру в `production_batches.passport_snapshot`, `ProductionBatchCreated.data.passportSnapshot` и успешном `data.passportSnapshot`:
+
+```json
+{
+  "productionPassportId": "uuid",
+  "code": "nonblank string",
+  "revision": "nonblank string",
+  "productName": "nonblank string",
+  "operationPlans": [
+    {
+      "operationPlanId": "uuid",
+      "position": 1,
+      "operationScope": {
+        "code": "string",
+        "displayName": "string"
+      },
+      "normHours": "1.50",
+      "plannedCardCount": 112
+    }
+  ]
+}
+```
+
+- `productionPassportId` и `operationPlanId` сериализуются как lowercase canonical hyphenated UUID strings;
+- `code`, `revision`, `productName`, `operationScope.code` и `operationScope.displayName` — непустые strings;
+- `operationPlans` — непустой массив, строго отсортированный по `position ASC`;
+- `position` и `plannedCardCount` — положительные JSON integers;
+- `normHours` — JSON string с ровно двумя знаками после десятичной точки, соответствующая PostgreSQL `numeric(8,2)`;
+- `operationScope` — server-copied allowlisted object только с ключами `code` и `displayName`; optional group members и любые другие ключи исходного JSONB в snapshot не переносятся;
+- `active`, единый batch-level `normHours`, `sequenceNumber`, physical serial/part number и агрегированный `plannedCardCount` в snapshot отсутствуют;
+- последующие изменения паспорта или operation plans не изменяют сохранённый snapshot.
+
+#### `ProductionBatchCreated`
+
+Envelope сохраняет `eventId`, `eventType = ProductionBatchCreated`, `occurredAt`, `aggregateType = ProductionBatch`, `aggregateId`, `aggregateVersion = 1`, `actorId`, `actorRole = PLANNER`, `commandId`, `correlationId` и `data`. Точная `data`:
+
+```json
+{
+  "batchId": "uuid",
+  "quantity": 112,
+  "passportSnapshot": {
+    "productionPassportId": "uuid",
+    "code": "nonblank string",
+    "revision": "nonblank string",
+    "productName": "nonblank string",
+    "operationPlans": [
+      {
+        "operationPlanId": "uuid",
+        "position": 1,
+        "operationScope": {
+          "code": "string",
+          "displayName": "string"
+        },
+        "normHours": "1.50",
+        "plannedCardCount": 112
+      }
+    ]
+  }
+}
+```
+
+`batchId` равен `aggregateId` и ID созданной строки `production_batches`; `quantity` равен `production_batches.batch_quantity`; `passportSnapshot` логически равен `production_batches.passport_snapshot` и подчиняется точной схеме выше. Отдельная сокращённая event projection запрещена. `status` и `version` в `data` не дублируются: resulting version находится в envelope, а состояние подтверждается созданным aggregate. `occurredAt` генерируется сервером в UTC внутри command transaction. Для успешной новой команды событие создаётся ровно один раз.
 
 ### `ReleaseWorkCards`
 
