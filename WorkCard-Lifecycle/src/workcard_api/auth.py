@@ -14,29 +14,10 @@ from workcard_api.config import Settings
 from workcard_api.database import DatabaseGateway
 from workcard_api.errors import Problem, ProblemError
 from workcard_api.models import DemoIdentity, Role, SessionRecord
+from workcard_api.permissions import ROLE_PERMISSIONS as ROLE_PERMISSIONS
 
 COOKIE_NAME: Final = "workcard_demo_session"
 CSRF_HEADER: Final = "X-CSRF-Token"
-
-ROLE_PERMISSIONS: dict[Role, tuple[str, ...]] = {
-    "PLANNER": ("passport:read", "batch:read", "batch:create", "batch:release"),
-    "MASTER": ("passport:read", "batch:read", "card:read", "card:assign", "card:record"),
-    "WORKER": ("passport:read", "batch:read", "card:read-own"),
-    "QUALITY_CONTROLLER": (
-        "passport:read",
-        "batch:read",
-        "card:read",
-        "quality:record",
-        "batch:final-accept",
-    ),
-    "ADMIN_AUDITOR": (
-        "passport:read",
-        "batch:read",
-        "card:read",
-        "audit:read",
-        "payroll:export-mock",
-    ),
-}
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 5
+version: 6
 owner: architecture
-updated: 2026-07-25
+updated: 2026-07-26
 ---
 
 # API Contracts
@@ -151,6 +151,8 @@ Canonical serialization выполняется так:
 ```
 
 - роль: `PLANNER`;
+- `quantity` — JSON integer в диапазоне `1..2147483647` включительно; верхняя
+  граница соответствует PostgreSQL `integer` в `production_batches.batch_quantity`;
 - route не принимает operation plans или norm;
 - server строит полный snapshot по точной схеме [[commands-events]] и сохраняет одну и ту же логическую JSON-структуру в batch, event и response;
 - успех после commit — `201` со следующим точным body:
@@ -335,7 +337,7 @@ Canonical serialization выполняется так:
 | `404` | доступная роли цель отсутствует | passport/batch/set/card/record |
 | `405` | route существует, но метод не поддерживается | единый `METHOD_NOT_ALLOWED` Problem Details |
 | `409` | version, state, gate, terminal, idempotency или uniqueness conflict | `VERSION_CONFLICT`, `SERIAL_GATE_CLOSED`, `BATCH_FINAL_ACCEPTED`, `COMMAND_ID_REUSED` |
-| `422` | семантически неверные данные | неположительное quantity, неактивный паспорт, assignee не `WORKER` |
+| `422` | семантически неверные данные | quantity вне `1..2147483647`, неактивный паспорт, assignee не `WORKER` |
 | `500` | unexpected failure | transaction rolled back; безопасное общее сообщение |
 | `503` | readiness dependency недоступна | `READINESS_UNAVAILABLE` для `/health/ready` |
 
