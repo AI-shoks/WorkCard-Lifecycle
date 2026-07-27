@@ -4,14 +4,15 @@ import logging
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any, Literal, cast
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, Header, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StrictInt, ValidationError
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from workcard_api.auth import (
@@ -33,6 +34,24 @@ from workcard_api.logging import (
 from workcard_api.migrations import latest_migration_version
 from workcard_api.models import DemoIdentity, Role
 from workcard_api.observability import Metrics
+from workcard_api.permissions import has_permission
+from workcard_api.postgres_production_batches import PostgresCreateProductionBatchGateway
+from workcard_api.production_batches import (
+    BATCH_CREATE_PERMISSION,
+    CommandAlreadyProcessed,
+    CommandIdReused,
+    ConcurrentCommandConflict,
+    CreateProductionBatchCommand,
+    CreateProductionBatchFailure,
+    CreateProductionBatchGateway,
+    CreateProductionBatchHandler,
+    CreateProductionBatchResult,
+    PermissionDenied,
+    ProductionBatchInvalid,
+    ProductionPassportNotFound,
+    TrustedActor,
+    UnexpectedPersistenceFailure,
+)
 
 LOGGER = logging.getLogger("workcard_api.http")
 
@@ -74,6 +93,66 @@ class HealthResponse(BaseModel):
 class ReadinessResponse(BaseModel):
     status: str
     checks: dict[str, str]
+
+
+class CreateProductionBatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    productionPassportId: UUID
+    quantity: StrictInt
+
+
+class OperationScopeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    displayName: str
+
+
+class OperationPlanResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operationPlanId: UUID
+    position: int
+    operationScope: OperationScopeResponse
+    normHours: str
+    plannedCardCount: int
+
+
+class ProductionPassportSnapshotResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    productionPassportId: UUID
+    code: str
+    revision: str
+    productName: str
+    operationPlans: list[OperationPlanResponse]
+
+
+class CreateProductionBatchDataResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    batchId: UUID
+    productionPassportId: UUID
+    quantity: int
+    lifecycleStatus: Literal["CREATED"]
+    version: Literal[1]
+    passportSnapshot: ProductionPassportSnapshotResponse
+
+
+class CommandMetaResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    commandId: UUID
+    correlationId: UUID
+    replayed: Literal[False]
+
+
+class CreateProductionBatchResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    data: CreateProductionBatchDataResponse
+    meta: CommandMetaResponse
 
 
 def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
@@ -118,9 +197,135 @@ def set_session_cookie(response: Response, cookie: str, settings: Settings) -> N
     )
 
 
+def create_production_batch_response(
+    result: CreateProductionBatchResult,
+) -> CreateProductionBatchResponse:
+    return CreateProductionBatchResponse(
+        data=CreateProductionBatchDataResponse(
+            batchId=result.batch_id,
+            productionPassportId=result.production_passport_id,
+            quantity=result.quantity,
+            lifecycleStatus=result.lifecycle_status,
+            version=result.version,
+            passportSnapshot=ProductionPassportSnapshotResponse.model_validate(
+                result.passport_snapshot.to_json()
+            ),
+        ),
+        meta=CommandMetaResponse(
+            commandId=result.command_id,
+            correlationId=result.correlation_id,
+            replayed=result.replayed,
+        ),
+    )
+
+
+async def validated_create_production_batch_request(
+    request: Request,
+) -> CreateProductionBatchRequest:
+    media_type = request.headers.get("content-type", "").partition(";")[0].strip().lower()
+    if media_type != "application/json":
+        raise RequestValidationError(
+            [
+                {
+                    "type": "json_type",
+                    "loc": ("body",),
+                    "msg": "Input should be valid JSON with application/json content type",
+                    "input": None,
+                }
+            ]
+        )
+    body = await request.body()
+    try:
+        return CreateProductionBatchRequest.model_validate_json(body)
+    except ValidationError as error:
+        errors = [{**item, "loc": ("body", *item["loc"])} for item in error.errors()]
+        raise RequestValidationError(errors, body=body) from error
+
+
+def authentication_required_problem() -> Problem:
+    return Problem(
+        status=401,
+        code="AUTHENTICATION_REQUIRED",
+        title="Требуется аутентификация",
+        detail="Выберите подготовленную демонстрационную роль.",
+        type_slug="authentication-required",
+    )
+
+
+def permission_denied_problem() -> Problem:
+    return Problem(
+        status=403,
+        code="PERMISSION_DENIED",
+        title="Недостаточно прав",
+        detail="Текущая роль не может выполнить это действие.",
+        type_slug="permission-denied",
+    )
+
+
+def create_production_batch_problem(error: CreateProductionBatchFailure) -> Problem:
+    if isinstance(error, PermissionDenied):
+        return permission_denied_problem()
+    if isinstance(error, ProductionPassportNotFound):
+        return Problem(
+            status=404,
+            code="RESOURCE_NOT_FOUND",
+            title="Ресурс не найден",  # noqa: RUF001 - intentional Russian UI copy
+            detail="Выбранный производственный паспорт не найден.",
+            type_slug="resource-not-found",
+        )
+    if isinstance(error, CommandAlreadyProcessed):
+        return Problem(
+            status=409,
+            code="COMMAND_ALREADY_PROCESSED",
+            title="Команда уже обработана",
+            detail="Создайте новую команду для повторного действия.",
+            type_slug="command-already-processed",
+        )
+    if isinstance(error, CommandIdReused):
+        return Problem(
+            status=409,
+            code="COMMAND_ID_REUSED",
+            title="Идентификатор команды уже использован",
+            detail="Повторите действие с новым идентификатором команды.",  # noqa: RUF001
+            type_slug="command-id-reused",
+        )
+    if isinstance(error, ConcurrentCommandConflict):
+        return Problem(
+            status=409,
+            code="CONCURRENT_MODIFICATION",
+            title="Конкурирующее изменение",
+            detail="Обновите данные и повторите действие.",
+            type_slug="concurrent-modification",
+        )
+    if isinstance(error, ProductionBatchInvalid):
+        return Problem(
+            status=422,
+            code="PRODUCTION_BATCH_INVALID",
+            title="Партия не может быть создана",
+            detail="Проверьте количество и выбранный производственный паспорт.",
+            type_slug="production-batch-invalid",
+        )
+    if isinstance(error, UnexpectedPersistenceFailure):
+        return Problem(
+            status=500,
+            code="INTERNAL_ERROR",
+            title="Внутренняя ошибка",
+            detail="Повторите запрос позднее.",
+            type_slug="internal-error",
+        )
+    return Problem(
+        status=500,
+        code="INTERNAL_ERROR",
+        title="Внутренняя ошибка",
+        detail="Повторите запрос позднее.",
+        type_slug="internal-error",
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     database: DatabaseGateway | None = None,
+    create_batch_gateway: CreateProductionBatchGateway | None = None,
 ) -> FastAPI:
     app_settings = settings or get_settings()
     configure_logging(app_settings.log_level)
@@ -131,6 +336,10 @@ def create_app(
         timeout=app_settings.database_timeout_seconds,
     )
     sessions = SessionManager(app_settings, db)
+    batch_gateway = create_batch_gateway or PostgresCreateProductionBatchGateway(
+        cast(PostgresDatabase, db)
+    )
+    create_batch_handler = CreateProductionBatchHandler(batch_gateway)
     metrics = Metrics.create()
     expected_migration = latest_migration_version()
 
@@ -186,6 +395,45 @@ def create_app(
                     json_content = content.pop("application/json", None)
                     if json_content is not None:
                         content["application/problem+json"] = json_content
+        components = schema.setdefault("components", {})
+        components.setdefault("schemas", {})["CreateProductionBatchRequest"] = (
+            CreateProductionBatchRequest.model_json_schema(
+                ref_template="#/components/schemas/{model}"
+            )
+        )
+        components.setdefault("securitySchemes", {})["SessionCookie"] = {
+            "type": "apiKey",
+            "in": "cookie",
+            "name": COOKIE_NAME,
+        }
+        create_batch_operation = schema["paths"][f"{app_settings.api_prefix}/production-batches"][
+            "post"
+        ]
+        create_batch_operation["security"] = [{"SessionCookie": []}]
+        create_batch_operation.setdefault("parameters", []).extend(
+            [
+                {
+                    "name": "Origin",
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "string", "title": "Origin"},
+                },
+                {
+                    "name": CSRF_HEADER,
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "string", "title": CSRF_HEADER},
+                },
+            ]
+        )
+        create_batch_operation["requestBody"] = {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/CreateProductionBatchRequest"}
+                }
+            },
+        }
         app.openapi_schema = schema
         return schema
 
@@ -426,6 +674,56 @@ def create_app(
         response.delete_cookie(COOKIE_NAME, path=app_settings.api_prefix)
         response.status_code = 204
         return response
+
+    def trusted_create_batch_actor(request: Request) -> TrustedActor:
+        try:
+            current, identity = authenticated_identity(request, sessions, db)
+        except ProblemError as error:
+            if error.problem.status != 401:
+                raise
+            raise ProblemError(authentication_required_problem()) from error
+        if identity.role != "PLANNER" or not has_permission(identity.role, BATCH_CREATE_PERMISSION):
+            raise ProblemError(permission_denied_problem())
+        validate_origin(request, app_settings)
+        sessions.verify_csrf(current, request.headers.get(CSRF_HEADER))
+        return TrustedActor(actor_id=identity.id, role=identity.role)
+
+    @api.post(
+        "/production-batches",
+        status_code=201,
+        response_model=CreateProductionBatchResponse,
+        responses={
+            201: {
+                "description": "Production batch created",
+                "headers": {
+                    "ETag": {
+                        "description": "Version of the created production batch",
+                        "schema": {"type": "string", "example": '"v1"'},
+                    }
+                },
+            },
+            **problem_responses(400, 401, 403, 404, 405, 409, 422, 500),
+        },
+        tags=["production-batches"],
+    )
+    async def create_production_batch(
+        request: Request,
+        response: Response,
+        command_id: Annotated[UUID, Header(alias="X-Command-Id")],
+        actor: TrustedActor = Depends(trusted_create_batch_actor),  # noqa: B008
+    ) -> CreateProductionBatchResponse:
+        payload = await validated_create_production_batch_request(request)
+        command = CreateProductionBatchCommand(
+            command_id=command_id,
+            production_passport_id=payload.productionPassportId,
+            quantity=payload.quantity,
+        )
+        try:
+            result = await run_in_threadpool(create_batch_handler.handle, actor, command)
+        except CreateProductionBatchFailure as error:
+            raise ProblemError(create_production_batch_problem(error)) from error
+        response.headers["ETag"] = f'"v{result.version}"'
+        return create_production_batch_response(result)
 
     app.include_router(api)
     return app

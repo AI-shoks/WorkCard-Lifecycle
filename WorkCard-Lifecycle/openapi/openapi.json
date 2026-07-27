@@ -19,6 +19,112 @@
         "title": "BootstrapResponse",
         "type": "object"
       },
+      "CommandMetaResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "format": "uuid",
+            "title": "Commandid",
+            "type": "string"
+          },
+          "correlationId": {
+            "format": "uuid",
+            "title": "Correlationid",
+            "type": "string"
+          },
+          "replayed": {
+            "const": false,
+            "title": "Replayed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "commandId",
+          "correlationId",
+          "replayed"
+        ],
+        "title": "CommandMetaResponse",
+        "type": "object"
+      },
+      "CreateProductionBatchDataResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "batchId": {
+            "format": "uuid",
+            "title": "Batchid",
+            "type": "string"
+          },
+          "lifecycleStatus": {
+            "const": "CREATED",
+            "title": "Lifecyclestatus",
+            "type": "string"
+          },
+          "passportSnapshot": {
+            "$ref": "#/components/schemas/ProductionPassportSnapshotResponse"
+          },
+          "productionPassportId": {
+            "format": "uuid",
+            "title": "Productionpassportid",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batchId",
+          "productionPassportId",
+          "quantity",
+          "lifecycleStatus",
+          "version",
+          "passportSnapshot"
+        ],
+        "title": "CreateProductionBatchDataResponse",
+        "type": "object"
+      },
+      "CreateProductionBatchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "productionPassportId": {
+            "format": "uuid",
+            "title": "Productionpassportid",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "productionPassportId",
+          "quantity"
+        ],
+        "title": "CreateProductionBatchRequest",
+        "type": "object"
+      },
+      "CreateProductionBatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CreateProductionBatchDataResponse"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CommandMetaResponse"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "CreateProductionBatchResponse",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -78,6 +184,59 @@
           "role"
         ],
         "title": "IdentityResponse",
+        "type": "object"
+      },
+      "OperationPlanResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "normHours": {
+            "title": "Normhours",
+            "type": "string"
+          },
+          "operationPlanId": {
+            "format": "uuid",
+            "title": "Operationplanid",
+            "type": "string"
+          },
+          "operationScope": {
+            "$ref": "#/components/schemas/OperationScopeResponse"
+          },
+          "plannedCardCount": {
+            "title": "Plannedcardcount",
+            "type": "integer"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "operationPlanId",
+          "position",
+          "operationScope",
+          "normHours",
+          "plannedCardCount"
+        ],
+        "title": "OperationPlanResponse",
+        "type": "object"
+      },
+      "OperationScopeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "displayName"
+        ],
+        "title": "OperationScopeResponse",
         "type": "object"
       },
       "ProblemDetails": {
@@ -147,6 +306,44 @@
         "title": "ProblemFieldError",
         "type": "object"
       },
+      "ProductionPassportSnapshotResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "operationPlans": {
+            "items": {
+              "$ref": "#/components/schemas/OperationPlanResponse"
+            },
+            "title": "Operationplans",
+            "type": "array"
+          },
+          "productName": {
+            "title": "Productname",
+            "type": "string"
+          },
+          "productionPassportId": {
+            "format": "uuid",
+            "title": "Productionpassportid",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "productionPassportId",
+          "code",
+          "revision",
+          "productName",
+          "operationPlans"
+        ],
+        "title": "ProductionPassportSnapshotResponse",
+        "type": "object"
+      },
       "ReadinessResponse": {
         "properties": {
           "checks": {
@@ -213,6 +410,13 @@
         "title": "SessionResponse",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "SessionCookie": {
+        "in": "cookie",
+        "name": "workcard_demo_session",
+        "type": "apiKey"
+      }
     }
   },
   "info": {
@@ -269,6 +473,161 @@
         "summary": "List Demo Identities",
         "tags": [
           "session"
+        ]
+      }
+    },
+    "/api/v1/production-batches": {
+      "post": {
+        "operationId": "create_production_batch_api_v1_production_batches_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Command-Id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Command-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "title": "Origin",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "title": "X-CSRF-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductionBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateProductionBatchResponse"
+                }
+              }
+            },
+            "description": "Production batch created",
+            "headers": {
+              "ETag": {
+                "description": "Version of the created production batch",
+                "schema": {
+                  "example": "\"v1\"",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "405": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Create Production Batch",
+        "tags": [
+          "production-batches"
         ]
       }
     },
