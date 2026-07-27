@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.audit-log
 status: accepted
-version: 3
+version: 4
 owner: architecture
-updated: 2026-07-25
+updated: 2026-07-27
 ---
 
 # Audit Log Design
@@ -104,6 +104,68 @@ Append-only журнал успешных business commands MVP v1. Он обе�
 
 `batchId` равен event `aggregateId` и созданному `production_batches.id`; `quantity` равен `production_batches.batch_quantity`; `passportSnapshot` логически равен `production_batches.passport_snapshot` и успешному response snapshot. Полная схема snapshot и правила сортировки/serialization определены в [[commands-events]]. `status` и `version` в `data` отсутствуют; envelope содержит `aggregateVersion = 1`. Server генерирует `occurredAt` в UTC внутри той же command transaction. Ровно один такой event создаётся только для успешной новой `CreateProductionBatch`.
 
+### Exact event set `ReleaseWorkCards`
+
+Release формирует один immutable event на каждую resulting aggregate version. Все events имеют trusted `actorRole = PLANNER`, исходный `commandId` и один server-generated `correlationId`.
+
+Точная `ProductionBatchReleased.data`:
+
+```json
+{
+  "batchId": "00000000-0000-0000-0000-000000000000",
+  "workCardSetIds": [
+    "22000000-0000-4000-8000-000000000001",
+    "22000000-0000-4000-8000-000000000002",
+    "22000000-0000-4000-8000-000000000003"
+  ],
+  "setCount": 3,
+  "cardCountTotal": 250
+}
+```
+
+Envelope имеет `aggregateType = ProductionBatch`, `aggregateId = batchId`, `aggregateVersion = 2` для canonical release. `workCardSetIds` содержит все и только созданные set IDs в порядке snapshot `position ASC`.
+
+Точная `WorkCardSetCreated.data` для каждого plan:
+
+```json
+{
+  "setId": "uuid",
+  "batchId": "uuid",
+  "operationPlanId": "uuid",
+  "position": 1,
+  "operationScope": {
+    "code": "string",
+    "displayName": "string"
+  },
+  "normHours": "1.25",
+  "plannedCardCount": 112,
+  "gateStatus": "FIRST_ARTICLE_PENDING"
+}
+```
+
+Envelope имеет `aggregateType = WorkCardSet`, `aggregateId = setId`, `aggregateVersion = 1`. `operationPlanId` является canonical source ID и точно соответствует сохранённому `operation_plan_key`; `position` задаёт response/batch-event ordering, но не порядок физических деталей.
+
+Точная `WorkCardReleased.data` для каждой карточки:
+
+```json
+{
+  "workCardId": "uuid",
+  "setId": "uuid",
+  "batchId": "uuid",
+  "batchQuantitySnapshot": 112,
+  "operationScope": {
+    "code": "string",
+    "displayName": "string"
+  },
+  "normHours": "1.25",
+  "status": "RELEASED"
+}
+```
+
+Envelope имеет `aggregateType = WorkCard`, `aggregateId = workCardId`, `aggregateVersion = 1`. Payload не содержит `purpose`, assignee, position/sequence или physical part identity. Во всех release payloads UUID canonical lowercase, `operationScope` содержит ровно `code`/`displayName`, `normHours` имеет два decimal places; дополнительные keys запрещены.
+
+Для fixture event set состоит ровно из `1 ProductionBatchReleased + 3 WorkCardSetCreated + 250 WorkCardReleased = 254` events. Receipt, batch transition, все rows и все `254` events commit/rollback совместно. `changedAggregates == pendingEvents`; missing, duplicate или extra release event откатывает команду.
+
 ## Формирование и commit
 
 1. application service применяет domain command либо распознаёт явно разрешённый successful no-op в unit of work;
@@ -142,7 +204,7 @@ Streams не сливаются в ложную общую version sequence. Rol
 
 Принят отдельный `GET /api/v1/audit/operations/{correlationId}/events`. После authorization backend находит command receipt по `correlationId`, затем выполняет прямой indexed query events, а не собирает результат из N card histories.
 
-- release: один batch event, по одному событию на каждый из трёх sets и `250` cards — `254` events одного correlation;
+- release: один batch event, по одному событию на каждый из трёх sets и `250` cards — ровно `254` events одного correlation; `ProductionBatchReleased.data.workCardSetIds` упорядочен по plan `position ASC`, а query items сохраняют общий canonical order `occurredAt`, затем `eventId`;
 - first-article assignment: set selection + card assignment;
 - serial assignment: одно card event на каждую выбранную WorkCard;
 - first-article acceptance: card quality + set gate events;

@@ -1,9 +1,9 @@
 ---
 artifact_id: project.decision-log
 status: active
-version: 12
+version: 13
 owner: project
-updated: 2026-07-25
+updated: 2026-07-27
 ---
 
 # Decision Log
@@ -36,3 +36,4 @@ updated: 2026-07-25
 | D-022 | 2026-07-18 | Разрешить корректировку accepted ADR по результатам review до merge в каноническую ветку | принято | Требуются повышение version и отдельный correction commit; после merge изменение решения выполняется только новым ADR с reciprocal supersedes/superseded_by |
 | D-023 | 2026-07-19 | Уточнить prepared demo-session серверным PostgreSQL registry активных `jti` без расширения до production IAM | принято | Подписанная cookie остаётся указателем; logout/role switch атомарно отзывают server-side state, replay после рестарта или между процессами отклоняется |
 | D-024 | 2026-07-25 | Уточнить Gate 2.1A единым immutable passport snapshot, точным `ProductionBatchCreated.data`, canonical SHA-256 command identity и точными receipt/success/Problem Details контрактами создания партии | принято | Gate 2.1B и Gate 2.1C используют одну allowlisted snapshot schema и не придумывают поля, replay semantics или error identifiers в реализации |
+| D-025 | 2026-07-27 | Закрепить Gate 2.2 за `UC-002` / `ReleaseWorkCards` и до реализации уточнить canonical request identity, response/receipt, ordering, audit payloads, concurrency/replay/race и Problem Details | принято | Gate 2.2B/C используют фактический versioned route, canonical `operationPlanId` как `operation_plan_key`, атомарный результат `112 → 250` с `254` correlated events и существующую схему без новой migration; реализация не придумывает дополнительные поля или error identifiers |

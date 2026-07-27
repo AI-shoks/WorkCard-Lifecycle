@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 6
+version: 7
 owner: architecture
-updated: 2026-07-26
+updated: 2026-07-27
 ---
 
 # API Contracts
@@ -137,6 +137,28 @@ Canonical serialization выполняется так:
 
 Тот же `commandId` и тот же digest для `CreateProductionBatch` дают `409 COMMAND_ALREADY_PROCESSED`; тот же `commandId` и другой command type, target path или digest дают `409 COMMAND_ID_REUSED`. Create command не возвращает сохранённый resource при replay. SHA-256 collision не вводится как отдельный штатный outcome.
 
+Для `ReleaseWorkCards` fingerprint строится из фактического versioned path с canonical `batchId`, а не из route template:
+
+```json
+{
+  "body": {
+    "expectedVersion": 1
+  },
+  "commandType": "ReleaseWorkCards",
+  "targetPath": "/api/v1/production-batches/00000000-0000-0000-0000-000000000000/actions/release-work-cards"
+}
+```
+
+Применяется та же recursive key sorting, compact separators, UTF-8/SHA-256 и UUID normalization. `expectedVersion` остаётся JSON integer. `batchId` входит только в фактический `targetPath`; path template, query string, headers, actor/session и повторное поле `batchId` в body отсутствуют. Точный canonical JSON для показанного batch UUID и `expectedVersion = 1`:
+
+```json
+{"body":{"expectedVersion":1},"commandType":"ReleaseWorkCards","targetPath":"/api/v1/production-batches/00000000-0000-0000-0000-000000000000/actions/release-work-cards"}
+```
+
+Его SHA-256 digest: `2d6b9a0cf41ec0b4573fd229b9e3adb5e23366d83b443a7893997903269dc3bc`.
+
+`ReleaseWorkCards` — non-replayable command: тот же `commandId` и тот же digest дают `409 COMMAND_ALREADY_PROCESSED` без возврата сохранённого resource; отличие command type, фактического target path либо digest даёт `409 COMMAND_ID_REUSED`.
+
 ## Commands партии
 
 ### `CreateProductionBatch`
@@ -196,16 +218,79 @@ Canonical serialization выполняется так:
 
 ### `ReleaseWorkCards`
 
-`POST /production-batches/{batchId}/actions/release-work-cards`
+`POST /api/v1/production-batches/{batchId}/actions/release-work-cards`
 
 ```json
 { "expectedVersion": 1 }
 ```
 
 - роль: `PLANNER`;
-- успех `200`: batch `RELEASED`, version `2`, set/card totals и ссылки на sets;
-- для fixture: sets `112`, `112`, `26`, total `250`;
-- весь выпуск, receipt и `254` audit events фиксируются атомарно.
+- `batchId` — lowercase canonical UUID path parameter; `expectedVersion` — JSON integer `1..2147483647`;
+- request не принимает operation plans, counts, UUID создаваемых sets/cards или snapshots;
+- server использует только сохранённый batch passport snapshot и отображение из [[commands-events]];
+- успех после commit — `200`, `Content-Type: application/json` и `ETag: "v2"` со следующим точным body:
+
+```json
+{
+  "data": {
+    "batchId": "00000000-0000-0000-0000-000000000000",
+    "lifecycleStatus": "RELEASED",
+    "version": 2,
+    "setCount": 3,
+    "cardCountTotal": 250,
+    "workCardSets": [
+      {
+        "setId": "22000000-0000-4000-8000-000000000001",
+        "operationPlanId": "21000000-0000-4000-8000-000000000001",
+        "position": 1,
+        "operationScope": {
+          "code": "SYN-OP-10",
+          "displayName": "Синтетическая операция А"
+        },
+        "normHours": "1.25",
+        "plannedCardCount": 112,
+        "gateStatus": "FIRST_ARTICLE_PENDING",
+        "version": 1
+      },
+      {
+        "setId": "22000000-0000-4000-8000-000000000002",
+        "operationPlanId": "21000000-0000-4000-8000-000000000002",
+        "position": 2,
+        "operationScope": {
+          "code": "SYN-OP-20",
+          "displayName": "Синтетическая операция Б"
+        },
+        "normHours": "0.75",
+        "plannedCardCount": 112,
+        "gateStatus": "FIRST_ARTICLE_PENDING",
+        "version": 1
+      },
+      {
+        "setId": "22000000-0000-4000-8000-000000000003",
+        "operationPlanId": "21000000-0000-4000-8000-000000000003",
+        "position": 3,
+        "operationScope": {
+          "code": "SYN-GRP-30",
+          "displayName": "Синтетическая группа операций В"
+        },
+        "normHours": "2.00",
+        "plannedCardCount": 26,
+        "gateStatus": "FIRST_ARTICLE_PENDING",
+        "version": 1
+      }
+    ]
+  },
+  "meta": {
+    "commandId": "uuid из X-Command-Id",
+    "correlationId": "server-generated uuid",
+    "replayed": false
+  }
+}
+```
+
+`data.batchId` равен path ID, receipt `result_id` и aggregate ID `ProductionBatchReleased`. `workCardSets` содержит ровно один summary на operation plan в `position ASC`; `setId` соответствует `WorkCardSetCreated.aggregateId`, а `operationPlanId` — canonical source ID и сохранённому `operation_plan_key`. `version = 2` и ETag относятся к batch; каждый новый set имеет version `1`. Response не содержит массив `WorkCard`, card IDs, `releasedAt`, sequence или part/serial numbers.
+
+Для fixture set counts равны `112`, `112`, `26`, `setCount = 3`, `cardCountTotal = 250`; весь выпуск, receipt и `254` audit events фиксируются атомарно.
 
 ### `RecordFinalBatchAcceptance`
 
@@ -336,7 +421,7 @@ Canonical serialization выполняется так:
 | `403` | trusted role не имеет права | проверяется до resource lookup |
 | `404` | доступная роли цель отсутствует | passport/batch/set/card/record |
 | `405` | route существует, но метод не поддерживается | единый `METHOD_NOT_ALLOWED` Problem Details |
-| `409` | version, state, gate, terminal, idempotency или uniqueness conflict | `VERSION_CONFLICT`, `SERIAL_GATE_CLOSED`, `BATCH_FINAL_ACCEPTED`, `COMMAND_ID_REUSED` |
+| `409` | version, state, gate, terminal, idempotency или uniqueness conflict | `VERSION_CONFLICT`, `SERIAL_GATE_CLOSED`, `BATCH_ALREADY_RELEASED`, `BATCH_FINAL_ACCEPTED`, `COMMAND_ID_REUSED` |
 | `422` | семантически неверные данные | quantity вне `1..2147483647`, неактивный паспорт, assignee не `WORKER` |
 | `500` | unexpected failure | transaction rolled back; безопасное общее сообщение |
 | `503` | readiness dependency недоступна | `READINESS_UNAVAILABLE` для `/health/ready` |
@@ -359,6 +444,26 @@ Canonical serialization выполняется так:
 
 `REQUEST_VALIDATION_FAILED`, `RESOURCE_NOT_FOUND` и `INTERNAL_ERROR` сохраняют shared runtime naming. `CONCURRENT_MODIFICATION`, `COMMAND_ALREADY_PROCESSED` и `COMMAND_ID_REUSED` сохраняют уже принятые architecture codes. Codes `AUTHENTICATION_REQUIRED`, `PERMISSION_DENIED` и `PRODUCTION_BATCH_INVALID` становятся каноническими identifiers для ранее неидентифицированных create outcomes.
 
+### Problem Details для `ReleaseWorkCards`
+
+Для `POST /api/v1/production-batches/{batchId}/actions/release-work-cards` используются ровно следующие identifiers; дополнительные alias для этих outcomes запрещены:
+
+| Outcome | HTTP status | Machine code | Полный `type` URI |
+|---|---:|---|---|
+| malformed JSON, invalid UUID/path либо invalid request schema | `400` | `REQUEST_VALIDATION_FAILED` | `https://workcard.example/problems/request-validation-failed` |
+| authentication failure: session отсутствует или недействительна | `401` | `AUTHENTICATION_REQUIRED` | `https://workcard.example/problems/authentication-required` |
+| trusted role не имеет permission `ReleaseWorkCards` | `403` | `PERMISSION_DENIED` | `https://workcard.example/problems/permission-denied` |
+| доступная роли production batch не найдена | `404` | `RESOURCE_NOT_FOUND` | `https://workcard.example/problems/resource-not-found` |
+| тот же command ID и тот же canonical request digest | `409` | `COMMAND_ALREADY_PROCESSED` | `https://workcard.example/problems/command-already-processed` |
+| тот же command ID и другой command type, фактический target path или digest | `409` | `COMMAND_ID_REUSED` | `https://workcard.example/problems/command-id-reused` |
+| batch уже `RELEASED`/`FINAL_ACCEPTED` либо уже имеет выпущенные sets | `409` | `BATCH_ALREADY_RELEASED` | `https://workcard.example/problems/batch-already-released` |
+| `expectedVersion` не равна текущей version доступной `CREATED` batch | `409` | `VERSION_CONFLICT` | `https://workcard.example/problems/version-conflict` |
+| deadlock, serialization либо concurrent database conflict | `409` | `CONCURRENT_MODIFICATION` | `https://workcard.example/problems/concurrent-modification` |
+| immutable passport snapshot невалиден либо рассчитанные counts нарушают release invariants | `422` | `PRODUCTION_BATCH_INVALID` | `https://workcard.example/problems/production-batch-invalid` |
+| unexpected internal failure | `500` | `INTERNAL_ERROR` | `https://workcard.example/problems/internal-error` |
+
+Session, CSRF и trusted-origin failures используют существующие shared security Problem Details без release-specific aliases. Для `VERSION_CONFLICT` response не раскрывает текущую version; клиент перечитывает batch и создаёт новый command с новым `commandId`. Для `BATCH_ALREADY_RELEASED` новые sets/cards, receipt и events отсутствуют.
+
 `errors` содержит field paths только для безопасной input validation. Protected existence, SQL details, stack traces, cookie/CSRF values и event data не раскрываются.
 
 Runtime handlers для request validation, application errors, `401`, `403`, `404`, `405`, `500` и readiness `503` возвращают одну Pydantic-модель `ProblemDetails` с media type `application/problem+json`. Malformed body/shape возвращает `400`; семантический `422 DEMO_IDENTITY_INVALID` остаётся отдельным фактическим контрактом. Generated OpenAPI не публикует автоматический `HTTPValidationError`, когда runtime его не возвращает.
@@ -376,6 +481,8 @@ Runtime handlers для request validation, application errors, `401`, `403`, `4
 9. вернуть authoritative read-back.
 
 Receipt lookup не обходит текущую authorization: replay result выдаётся только роли, которая сейчас имеет право на command class. Для `RecordFinalBatchAcceptance` точный replay старого body с прежней `expectedVersion` возвращает исходную acceptance до проверки уже терминального batch; новый `commandId` проходит обычный flow и получает `BATCH_FINAL_ACCEPTED`.
+
+Для release initial receipt lookup выполняется до batch lookup. Если lookup не увидел concurrent uncommitted winner и ожидание batch lock завершилось после чужого commit, backend повторно читает receipt до классификации state/version: matching release receipt даёт `COMMAND_ALREADY_PROCESSED`, mismatch — `COMMAND_ID_REUSED`. При другом `commandId` уже выпущенная batch даёт `BATCH_ALREADY_RELEASED`. Для доступной `CREATED` batch state/invariants проверяются до `expectedVersion`, поэтому только она может вернуть `VERSION_CONFLICT`.
 
 Одинаковый безопасный postcondition действует для `400`–`500`: неуспех не оставляет предметного состояния или success event.
 

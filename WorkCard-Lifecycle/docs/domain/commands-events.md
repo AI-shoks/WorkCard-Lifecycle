@@ -1,9 +1,9 @@
 ---
 artifact_id: domain.commands-events
 status: accepted
-version: 5
+version: 6
 owner: domain
-updated: 2026-07-25
+updated: 2026-07-27
 ---
 
 # Commands and Domain Events
@@ -105,6 +105,74 @@ Envelope сохраняет `eventId`, `eventType = ProductionBatchCreated`, `oc
 | Атомарность | `BR-012`–`BR-016`, `BR-050`–`BR-062` |
 
 Для канонического fixture результат — три комплекта `112`, `112`, `26`, всего `250`; все карточки имеют `batchQuantitySnapshot = 112` и не имеют sequence.
+
+#### Каноническое отображение operation plans
+
+Release читает только сохранённый `ProductionBatch.passportSnapshot`; текущие reference rows паспорта и operation plans повторно не читаются. `operationPlans` обрабатываются в сохранённом порядке `position ASC`. Для каждого plan:
+
+- `operationPlanId` приводится к lowercase canonical hyphenated UUID string и без префикса либо иной производной сохраняется как `work_card_sets.operation_plan_key`;
+- создаётся ровно один `WorkCardSet` версии `1` с `gateStatus = FIRST_ARTICLE_PENDING`;
+- `operationScope`, `normHours` и `plannedCardCount` копируются без расширения из allowlisted snapshot;
+- создаётся ровно `plannedCardCount` карточек версии `1` со статусом `RELEASED`, null `purpose`/`assigneeId` и snapshot партии/комплекта;
+- UUID sets/cards генерируются приложением и не являются sequence, позицией или номером детали.
+
+`workCardSetIds` в `ProductionBatchReleased.data` и set summaries успешного ответа используют один порядок: `position ASC`. Карточки не возвращаются release-response массивом и не получают предметного порядка; server-side audit query сохраняет свой канонический порядок `occurredAt`, затем `eventId`.
+
+#### Exact события `ReleaseWorkCards`
+
+Успешная команда использует один `commandId`, один server-generated `correlationId` и trusted `actorRole = PLANNER` во всём event set.
+
+`ProductionBatchReleased` имеет `aggregateType = ProductionBatch`, `aggregateId = batchId`, `aggregateVersion = expectedVersion + 1` и точную `data`:
+
+```json
+{
+  "batchId": "00000000-0000-0000-0000-000000000000",
+  "workCardSetIds": [
+    "22000000-0000-4000-8000-000000000001",
+    "22000000-0000-4000-8000-000000000002",
+    "22000000-0000-4000-8000-000000000003"
+  ],
+  "setCount": 3,
+  "cardCountTotal": 250
+}
+```
+
+Каждый `WorkCardSetCreated` имеет `aggregateType = WorkCardSet`, `aggregateId = setId`, `aggregateVersion = 1` и точную `data`:
+
+```json
+{
+  "setId": "uuid",
+  "batchId": "uuid",
+  "operationPlanId": "uuid",
+  "position": 1,
+  "operationScope": {
+    "code": "string",
+    "displayName": "string"
+  },
+  "normHours": "1.25",
+  "plannedCardCount": 112,
+  "gateStatus": "FIRST_ARTICLE_PENDING"
+}
+```
+
+Каждый `WorkCardReleased` имеет `aggregateType = WorkCard`, `aggregateId = workCardId`, `aggregateVersion = 1` и точную `data`:
+
+```json
+{
+  "workCardId": "uuid",
+  "setId": "uuid",
+  "batchId": "uuid",
+  "batchQuantitySnapshot": 112,
+  "operationScope": {
+    "code": "string",
+    "displayName": "string"
+  },
+  "normHours": "1.25",
+  "status": "RELEASED"
+}
+```
+
+Во всех трёх payload schemas UUID используют lowercase canonical representation, `operationScope` содержит ровно `code`/`displayName`, а `normHours` — строку с двумя decimal places. Дополнительные keys, `sequenceNumber`, part/serial number, `purpose`, `assigneeId`, batch-level norm и дублирование envelope version в `data` запрещены. Канонический fixture создаёт ровно `1 + 3 + 250 = 254` таких событий; неполный или избыточный набор откатывает всю команду.
 
 ## Назначение и выполнение
 
@@ -211,7 +279,7 @@ Envelope сохраняет `eventId`, `eventType = ProductionBatchCreated`, `oc
 |---|---|---|
 | `ProductionBatchCreated` | `ProductionBatch` | `batchId`, `quantity`, `passportSnapshot` |
 | `ProductionBatchReleased` | `ProductionBatch` | `batchId`, `workCardSetIds`, `setCount`, `cardCountTotal` |
-| `WorkCardSetCreated` | `WorkCardSet` | `setId`, `batchId`, `operationScope`, `normHours`, `plannedCardCount`, `gateStatus` |
+| `WorkCardSetCreated` | `WorkCardSet` | `setId`, `batchId`, `operationPlanId`, `position`, `operationScope`, `normHours`, `plannedCardCount`, `gateStatus` |
 | `WorkCardReleased` | `WorkCard` | `workCardId`, `setId`, `batchId`, `batchQuantitySnapshot`, `operationScope`, `normHours`, `status` |
 | `FirstArticleWorkCardSelected` | `WorkCardSet` | `setId`, `workCardId`, `gateStatus` |
 | `WorkCardAssigned` | `WorkCard` | `workCardId`, `assigneeId`, `purpose`, `status` |
