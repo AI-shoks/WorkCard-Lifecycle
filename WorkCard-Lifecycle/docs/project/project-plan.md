@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 12
+version: 13
 owner: project
-updated: 2026-07-19
+updated: 2026-07-31
 ---
 
 # Project Plan
@@ -27,7 +27,7 @@ updated: 2026-07-19
 | 3 | Требования и acceptance criteria | `[x]` скорректировано | Новая модель покрыта объективными критериями |
 | 4 | UX-проектирование | `[x]` скорректировано | UX-спецификация и отдельный 14-шаговый прототип соответствуют новой модели |
 | 5 | Техническая архитектура | `[x]` выполнено | Приняты stack, system/data/API boundaries, транзакции, audit, security и ADR |
-| 6 | Инженерный фундамент | `[-]` Gate 1 validated locally; publication CI pending | Foundation реализован; последующие slices не начаты |
+| 6 | Инженерный фундамент и backend slices | `[-]` Gate 2.2C remediation/re-review pending | Gate 2.2B реализован; Gate 2.2C и Stage 6 не закрыты |
 | 7 | Backend vertical slice | `[ ]` не начато | Основной сценарий работает через API и БД |
 | 8 | Frontend vertical slice | `[ ]` не начато | Основной сценарий выполняется в браузере |
 | 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
@@ -102,7 +102,7 @@ updated: 2026-07-19
 
 **Закрыт:** 2026-07-18. Текущий backend stack — Python 3.12/FastAPI в modular monolith, будущая React/TypeScript SPA и PostgreSQL; ADR-0007 заменил только stack-часть исторического ADR-0001. Current state отделён от append-only audit без event sourcing. API сохраняет отдельный server query событий по `correlationId`, явные expected versions и command receipts. Семь ADR сохраняют историю stack, physical aggregate mapping, транзакции, audit, mock payroll и demo authorization. Архитектура не меняет `FinalBatchAcceptance`, state machine, роли или 14-шаговый UX-сценарий.
 
-## Этап 6. Инженерный фундамент — в работе
+## Этап 6. Инженерный фундамент и backend slices — в работе
 
 - [x] [[repository-structure]]
 - [x] [[local-development|Docker и локальный запуск]]
@@ -113,7 +113,13 @@ updated: 2026-07-19
 
 **Gate 1 Foundation:** application factory, configuration, PostgreSQL pool/migrations, health/observability, prepared demo-session, server-side PostgreSQL revocation registry, Problem Details/OpenAPI, least-privilege roles, dependency/secret gates и CI configuration реализованы. Local remediation на Python 3.12/PostgreSQL 15.10 прошла; статус — `Gate 1 remediation validated; publication CI pending`.
 
-**Не закрыто:** GitHub Actions ещё не выполнялся; PostgreSQL 18.1 и Docker image/container smoke локально не проверялись. Публикационный CI должен подтвердить эти gates. Gate 2, import/generation/assignment/lifecycle/БТК/payroll/background jobs и frontend не начинались, поэтому этап 6 полностью завершённым не считается.
+**Gate 2.1:** contracts, domain/PostgreSQL implementation и versioned production-batch API находятся в commits `cc370a7ce4cec971edfdac412fd1d804efd93dbe`, `194c19210ea7e9ad9b106219c76880c22bd9a141` и `2852e3c3b3c24f0533b6cbc9106c5bd8cc1be081`.
+
+**Gate 2.2A/B:** `ReleaseWorkCards` contracts находятся в `c1f1ceb7e6cb42f7289d49604d5966db1ea27759`, domain/PostgreSQL implementation — в `a4bcc72f107c41f4016857395a0cbc4a6b2d26b9`.
+
+**Gate 2.2C:** API/test/OpenAPI worktree diff существует, но confirmed operation-level OpenAPI security finding ожидает remediation по [[gate-2-2c-remediation|TASK-001 rev 1]] и новый independent re-review. Это не статус completed.
+
+**Не закрыто:** GitHub Actions, Docker image/container smoke и PostgreSQL 18.1 independent verification для текущего review не подтверждены. Gate 2.2C, последующие slices, frontend и Stage 6 остаются открытыми.
 
 ## Этап 7. Backend vertical slice
 

@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 9
+version: 10
 owner: project
-updated: 2026-07-19
+updated: 2026-07-31
 ---
 
 # Documentation Index
@@ -39,6 +39,12 @@ docs/
 └── portfolio/     demo script и упаковка case study
 ```
 
+## Активное операционное состояние
+
+- [[project-state]] — единственный compact router принятого прогресса, gaps и следующего шага;
+- [[gate-2-2c-remediation]] — active `TASK-001 rev 1` с frozen baseline, narrow scope и re-review boundary;
+- [[project-plan]], [[backlog]] и [[decision-log]] остаются living trackers и не заменяют task Contract или Evidence.
+
 ## Правило готовности
 
 Файл считается принятой точкой опоры только со статусом `accepted`. Изменение принятого артефакта должно увеличивать версию и обновлять связанные решения, требования и тесты. Операционные документы используют статус `active`.
@@ -61,4 +67,4 @@ docs/
 - [[mock-integrations]] и [[security-baseline]] задают честную local mock boundary и demo authorization;
 - [[adr-index]] хранит семь ADR: шесть исходных решений этапа 5 и ADR-0007, которое исторически заменяет stack-часть ADR-0001.
 
-Foundation Gate 1 этапа 6 реализован и прошёл local remediation: configuration, FastAPI application factory, PostgreSQL pool/migrations/session registry, health, logging/request ID, Prometheus, session replay/CSRF/origin, Problem Details/OpenAPI, least-privilege test matrix, dependency/secret gates, Docker/Compose и CI configuration. Статус: `Gate 1 remediation validated; publication CI pending`. PostgreSQL 18.1, Docker runtime и GitHub Actions локально не подтверждены; business endpoints Gate 2 и frontend не начаты.
+Stage 6 находится в работе. Gate 1 прошёл local remediation с publication CI pending; Gate 2.1 и Gate 2.2A/B представлены committed vertical slices, включая `ReleaseWorkCards` domain/PostgreSQL implementation в `a4bcc72f107c41f4016857395a0cbc4a6b2d26b9`. Gate 2.2C имеет сохранённый незакоммиченный API/test/OpenAPI diff и confirmed OpenAPI security finding; remediation и independent re-review ещё не выполнены. PostgreSQL 18.1 independent verification для текущего review остаётся `GAP`. Gate 2.2C и Stage 6 не закрыты.
