@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.adr.0006
 status: accepted
-version: 1
+version: 2
 owner: architecture
-updated: 2026-07-18
+updated: 2026-07-28
 ---
 
 # ADR-0006: Demo session and backend authorization
@@ -29,6 +29,8 @@ Prototype переключает пять ролей, но production IAM вне
 
 Same-origin deployment, `SameSite=Strict`, synchronizer CSRF token и restrictive CORS/CSP входят в baseline. Demo session не заявляется как production authentication.
 
+Для отсутствующей, повреждённой или истёкшей authenticated session protected endpoint возвращает `401` с точным challenge `WWW-Authenticate: WorkcardSession realm="workcard-api"`. `WorkcardSession` — project-defined HTTP authentication scheme: credential передаётся только существующей cookie `workcard_demo_session`, которую client получает через `GET /session/bootstrap`, а затем заменяет на authenticated cookie через `PUT /session/demo`. Заголовки `Authorization: Bearer ...` и `Authorization: WorkcardSession ...` не поддерживаются и не заменяют cookie. OpenAPI продолжает описывать credential как cookie `apiKey`; `WorkcardSession` публикуется только как challenge ответа, а не как Bearer, OpenID или OAuth security scheme. После успешной аутентификации недостаточные права возвращают `403` без `WWW-Authenticate`.
+
 ## Последствия
 
 - DOM/request tampering не даёт прав;
@@ -36,10 +38,12 @@ Same-origin deployment, `SameSite=Strict`, synchronizer CSRF token и restrictiv
 - permission-sensitive cache очищается на switch;
 - production accounts/MFA/departments потребуют нового identity design;
 - replay result всё равно требует текущую разрешённую role.
+- project-defined challenge даёт client однозначный сигнал повторить demo-session flow, не создавая ложный token-based authentication contract.
 
 ## Проверка
 
 - role matrix integration tests для каждой command/read class;
 - arbitrary actor/role, invalid CSRF и direct protected route отклоняются;
+- missing, malformed и expired cookie возвращают точный `WorkcardSession` challenge, а permission denial — `403` без challenge;
 - role switch не меняет domain state/version/audit;
 - errors не раскрывают protected resource existence.

@@ -13,6 +13,7 @@ from workcard_api.auth import COOKIE_NAME
 from workcard_api.config import Settings
 
 ORIGIN_HEADERS = {"Origin": "http://testserver", "Sec-Fetch-Site": "same-origin"}
+SESSION_CHALLENGE = 'WorkcardSession realm="workcard-api"'
 
 
 def bootstrap(client: TestClient) -> str:
@@ -232,6 +233,7 @@ def test_remaining_ttl_does_not_increase_and_expiry_is_rejected(
     fake_database.expire_all_sessions()
     expired = client.get("/api/v1/session")
     assert expired.status_code == 401
+    assert expired.headers.get_list("WWW-Authenticate") == [SESSION_CHALLENGE]
 
 
 def test_revoked_and_malformed_jti_are_rejected(

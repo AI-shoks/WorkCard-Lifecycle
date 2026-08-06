@@ -365,6 +365,136 @@
         "title": "ReadinessResponse",
         "type": "object"
       },
+      "ReleaseWorkCardSetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "gateStatus": {
+            "const": "FIRST_ARTICLE_PENDING",
+            "title": "Gatestatus",
+            "type": "string"
+          },
+          "normHours": {
+            "title": "Normhours",
+            "type": "string"
+          },
+          "operationPlanId": {
+            "format": "uuid",
+            "title": "Operationplanid",
+            "type": "string"
+          },
+          "operationScope": {
+            "$ref": "#/components/schemas/OperationScopeResponse"
+          },
+          "plannedCardCount": {
+            "title": "Plannedcardcount",
+            "type": "integer"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "setId": {
+            "format": "uuid",
+            "title": "Setid",
+            "type": "string"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "setId",
+          "operationPlanId",
+          "position",
+          "operationScope",
+          "normHours",
+          "plannedCardCount",
+          "gateStatus",
+          "version"
+        ],
+        "title": "ReleaseWorkCardSetResponse",
+        "type": "object"
+      },
+      "ReleaseWorkCardsDataResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "batchId": {
+            "format": "uuid",
+            "title": "Batchid",
+            "type": "string"
+          },
+          "cardCountTotal": {
+            "title": "Cardcounttotal",
+            "type": "integer"
+          },
+          "lifecycleStatus": {
+            "const": "RELEASED",
+            "title": "Lifecyclestatus",
+            "type": "string"
+          },
+          "setCount": {
+            "title": "Setcount",
+            "type": "integer"
+          },
+          "version": {
+            "const": 2,
+            "title": "Version",
+            "type": "integer"
+          },
+          "workCardSets": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseWorkCardSetResponse"
+            },
+            "title": "Workcardsets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batchId",
+          "lifecycleStatus",
+          "version",
+          "setCount",
+          "cardCountTotal",
+          "workCardSets"
+        ],
+        "title": "ReleaseWorkCardsDataResponse",
+        "type": "object"
+      },
+      "ReleaseWorkCardsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "title": "Expectedversion",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "title": "ReleaseWorkCardsRequest",
+        "type": "object"
+      },
+      "ReleaseWorkCardsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReleaseWorkCardsDataResponse"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CommandMetaResponse"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "ReleaseWorkCardsResponse",
+        "type": "object"
+      },
       "SelectIdentityRequest": {
         "additionalProperties": false,
         "properties": {
@@ -557,7 +687,16 @@
                 }
               }
             },
-            "description": "Problem Details error response"
+            "description": "Problem Details error response",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Project-defined cookie session authentication challenge",
+                "schema": {
+                  "const": "WorkcardSession realm=\"workcard-api\"",
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -631,6 +770,181 @@
         ]
       }
     },
+    "/api/v1/production-batches/{batchId}/actions/release-work-cards": {
+      "post": {
+        "operationId": "release_work_cards_api_v1_production_batches__batchId__actions_release_work_cards_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batchId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+              "title": "Batchid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Command-Id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Command-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "title": "Origin",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": true,
+            "schema": {
+              "title": "X-CSRF-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseWorkCardsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseWorkCardsResponse"
+                }
+              }
+            },
+            "description": "Work cards released",
+            "headers": {
+              "ETag": {
+                "description": "Version of the released production batch",
+                "schema": {
+                  "example": "\"v2\"",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Project-defined cookie session authentication challenge",
+                "schema": {
+                  "const": "WorkcardSession realm=\"workcard-api\"",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "405": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Problem Details error response"
+          }
+        },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
+        "summary": "Release Work Cards",
+        "tags": [
+          "production-batches"
+        ]
+      }
+    },
     "/api/v1/session": {
       "delete": {
         "operationId": "delete_session_api_v1_session_delete",
@@ -646,7 +960,16 @@
                 }
               }
             },
-            "description": "Problem Details error response"
+            "description": "Problem Details error response",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Project-defined cookie session authentication challenge",
+                "schema": {
+                  "const": "WorkcardSession realm=\"workcard-api\"",
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -689,6 +1012,11 @@
             "description": "Problem Details error response"
           }
         },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
         "summary": "Delete Session",
         "tags": [
           "session"
@@ -715,7 +1043,16 @@
                 }
               }
             },
-            "description": "Problem Details error response"
+            "description": "Problem Details error response",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Project-defined cookie session authentication challenge",
+                "schema": {
+                  "const": "WorkcardSession realm=\"workcard-api\"",
+                  "type": "string"
+                }
+              }
+            }
           },
           "404": {
             "content": {
@@ -748,6 +1085,11 @@
             "description": "Problem Details error response"
           }
         },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
         "summary": "Get Session",
         "tags": [
           "session"
@@ -847,7 +1189,16 @@
                 }
               }
             },
-            "description": "Problem Details error response"
+            "description": "Problem Details error response",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Project-defined cookie session authentication challenge",
+                "schema": {
+                  "const": "WorkcardSession realm=\"workcard-api\"",
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -900,6 +1251,11 @@
             "description": "Problem Details error response"
           }
         },
+        "security": [
+          {
+            "SessionCookie": []
+          }
+        ],
         "summary": "Select Demo Identity",
         "tags": [
           "session"

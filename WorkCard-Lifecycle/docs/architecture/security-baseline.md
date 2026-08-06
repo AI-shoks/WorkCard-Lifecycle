@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.security-baseline
 status: accepted
-version: 3
+version: 4
 owner: architecture
-updated: 2026-07-19
+updated: 2026-07-28
 ---
 
 # Security Baseline
@@ -32,6 +32,10 @@ updated: 2026-07-19
 - arbitrary account creation, passwords, OAuth и production SSO вне MVP.
 
 Registry разделяется всеми процессами приложения и сохраняется после рестарта, поэтому старая подписанная cookie после logout/switch не оживает. Prepared session доказывает только выбранный demo context, а не личность реального сотрудника. Это явно отражается в README/demo.
+
+### Authentication challenge
+
+`WorkcardSession` — project-defined HTTP authentication scheme для существующей cookie-session. Credential передаётся только `HttpOnly` cookie `workcard_demo_session`, выданной flow `GET /session/bootstrap` → `PUT /session/demo`; `Authorization: Bearer ...` и `Authorization: WorkcardSession ...` не поддерживаются. Отсутствующая, повреждённая или истёкшая authenticated session возвращает `401` с точным `WWW-Authenticate: WorkcardSession realm="workcard-api"`. Недостаточные права после успешной аутентификации возвращают `403` без `WWW-Authenticate`. В OpenAPI credential остаётся cookie `apiKey`; challenge не моделируется как Bearer, OpenID или OAuth security scheme.
 
 ## Authorization
 

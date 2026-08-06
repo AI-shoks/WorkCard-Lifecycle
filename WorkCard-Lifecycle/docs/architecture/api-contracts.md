@@ -1,14 +1,14 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 7
+version: 10
 owner: architecture
-updated: 2026-07-27
+updated: 2026-08-01
 ---
 
 # API Contracts
 
-HTTP-контракт MVP v1 для команд и запросов из [[commands-events]]. Каноническая machine-readable версия генерируется FastAPI как OpenAPI `3.1` из Pydantic models и route metadata. Committed snapshot Gate 1 содержит только реализованные health/session endpoints; описанные ниже business endpoints остаются контрактом следующих vertical slices, а не скрытой реализацией Gate 2.
+HTTP-контракт MVP v1 для команд и запросов из [[commands-events]]. Каноническая machine-readable версия генерируется FastAPI как OpenAPI `3.1` из Pydantic models и route metadata. Текущий `openapi/openapi.json` — generated working-tree snapshot: он содержит реализованные health/session endpoints и business-контракты создания производственной партии и выпуска маршрутных карт, но имеет незакоммиченный diff относительно baseline `785b1a7aa635237135cd15a94e5500ac581e4600` и не является committed snapshot этой revision. Остальные описанные ниже business endpoints остаются контрактами будущих vertical slices. Наличие текущих business-контрактов не означает, что Gate 2.2C, Gate 2 или Stage 6 приняты либо закрыты.
 
 ## Общие правила
 
@@ -37,6 +37,18 @@ Bootstrap cookie содержит только подписанный случа
 `expiresInSeconds` во всех session responses означает фактический оставшийся TTL до registry `expires_at`. Значение не увеличивается, около expiry приближается к нулю, а после expiry `GET /session` возвращает `401`.
 
 Client не может передать произвольные `actorId` или role. Role switch — новый выбор prepared identity, а не business command; `commandId`, domain event и version для него отсутствуют.
+
+### HTTP authentication challenge
+
+`WorkcardSession` — project-defined HTTP authentication scheme для challenge cookie-session, а не стандартная token scheme. Credential всегда передаётся существующей `HttpOnly` cookie `workcard_demo_session`: client сначала вызывает `GET /session/bootstrap`, получает anonymous cookie и CSRF token, затем вызывает `PUT /session/demo` и получает rotated authenticated cookie. `Authorization: Bearer ...` и `Authorization: WorkcardSession ...` endpoints не поддерживают.
+
+Отсутствующая, повреждённая или истёкшая authenticated session на protected endpoint возвращает `401` и точный header:
+
+```http
+WWW-Authenticate: WorkcardSession realm="workcard-api"
+```
+
+После успешной аутентификации недостаточные права возвращают `403` без `WWW-Authenticate`. OpenAPI сохраняет `SessionCookie` как `type: apiKey`, `in: cookie`; `WorkcardSession` присутствует только в `WWW-Authenticate` response header contract и не объявляется как Bearer, OpenID или OAuth security scheme.
 
 ## Read endpoints
 
@@ -470,15 +482,21 @@ Runtime handlers для request validation, application errors, `401`, `403`, `4
 
 ## Порядок обработки
 
-1. проверить session и CSRF;
-2. проверить role на command/read class;
-3. проверить schema;
-4. canonicalize type/path/body и найти receipt по `commandId`; другой type/path/hash отклонить, а разрешённый точный replay вернуть **до** текущих target state/version checks;
-5. если receipt отсутствует, загрузить доступные targets;
-6. проверить semantic input, purpose, state, gate и invariants;
-7. проверить expected versions;
-8. сохранить state, receipt и audit в одной транзакции;
-9. вернуть authoritative read-back.
+Для реализованного `POST /production-batches/{batchId}/actions/release-work-cards` exact security-to-body precedence фиксирован отдельно и не объединяет соседние проверки:
+
+1. проверить session;
+2. проверить CSRF;
+3. проверить permission `ReleaseWorkCards` для текущей роли;
+4. проверить trusted `Origin` и `Sec-Fetch-Site`;
+5. проверить body schema, включая JSON media type и форму payload;
+6. canonicalize type/path/body и найти receipt по `commandId`; другой type/path/hash отклонить, а разрешённый точный replay вернуть **до** текущих target state/version checks;
+7. если receipt отсутствует, загрузить доступные targets;
+8. проверить semantic input, purpose, state, gate и invariants;
+9. проверить expected versions;
+10. сохранить state, receipt и audit в одной транзакции;
+11. вернуть authoritative read-back.
+
+Таким образом, при одновременных ошибках release endpoint возвращает результат первой применимой ступени строго в порядке `session → CSRF → permission → Origin → body schema`; malformed body не обходит security checks. Для других commands их отдельный route contract остаётся каноничным, а receipt lookup во всех случаях не обходит текущую authorization.
 
 Receipt lookup не обходит текущую authorization: replay result выдаётся только роли, которая сейчас имеет право на command class. Для `RecordFinalBatchAcceptance` точный replay старого body с прежней `expectedVersion` возвращает исходную acceptance до проверки уже терминального batch; новый `commandId` проходит обычный flow и получает `BATCH_FINAL_ACCEPTED`.
 

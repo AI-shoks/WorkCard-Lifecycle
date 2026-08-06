@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal, cast
 from uuid import UUID, uuid4
@@ -36,6 +36,7 @@ from workcard_api.models import DemoIdentity, Role
 from workcard_api.observability import Metrics
 from workcard_api.permissions import has_permission
 from workcard_api.postgres_production_batches import PostgresCreateProductionBatchGateway
+from workcard_api.postgres_release_work_cards import PostgresReleaseWorkCardsGateway
 from workcard_api.production_batches import (
     BATCH_CREATE_PERMISSION,
     CommandAlreadyProcessed,
@@ -52,8 +53,40 @@ from workcard_api.production_batches import (
     TrustedActor,
     UnexpectedPersistenceFailure,
 )
+from workcard_api.release_work_cards import (
+    MAX_POSTGRES_INTEGER,
+    RELEASE_WORK_CARDS_PERMISSION,
+    BatchAlreadyReleased,
+    ProductionBatchNotFound,
+    ReleaseWorkCardsCommand,
+    ReleaseWorkCardsFailure,
+    ReleaseWorkCardsGateway,
+    ReleaseWorkCardsHandler,
+    ReleaseWorkCardsResult,
+    VersionConflict,
+)
+from workcard_api.release_work_cards import (
+    CommandAlreadyProcessed as ReleaseCommandAlreadyProcessed,
+)
+from workcard_api.release_work_cards import (
+    CommandIdReused as ReleaseCommandIdReused,
+)
+from workcard_api.release_work_cards import (
+    ConcurrentCommandConflict as ReleaseConcurrentCommandConflict,
+)
+from workcard_api.release_work_cards import (
+    PermissionDenied as ReleasePermissionDenied,
+)
+from workcard_api.release_work_cards import (
+    ProductionBatchInvalid as ReleaseProductionBatchInvalid,
+)
+from workcard_api.release_work_cards import (
+    UnexpectedPersistenceFailure as ReleaseUnexpectedPersistenceFailure,
+)
 
 LOGGER = logging.getLogger("workcard_api.http")
+CANONICAL_LOWERCASE_UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+SESSION_AUTHENTICATION_CHALLENGE = 'WorkcardSession realm="workcard-api"'
 
 
 class IdentityResponse(BaseModel):
@@ -155,6 +188,43 @@ class CreateProductionBatchResponse(BaseModel):
     meta: CommandMetaResponse
 
 
+class ReleaseWorkCardsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expectedVersion: StrictInt
+
+
+class ReleaseWorkCardSetResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    setId: UUID
+    operationPlanId: UUID
+    position: int
+    operationScope: OperationScopeResponse
+    normHours: str
+    plannedCardCount: int
+    gateStatus: Literal["FIRST_ARTICLE_PENDING"]
+    version: Literal[1]
+
+
+class ReleaseWorkCardsDataResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    batchId: UUID
+    lifecycleStatus: Literal["RELEASED"]
+    version: Literal[2]
+    setCount: int
+    cardCountTotal: int
+    workCardSets: list[ReleaseWorkCardSetResponse]
+
+
+class ReleaseWorkCardsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    data: ReleaseWorkCardsDataResponse
+    meta: CommandMetaResponse
+
+
 def problem_responses(*statuses: int) -> dict[int | str, dict[str, Any]]:
     return {
         status: {
@@ -173,11 +243,16 @@ def identity_response(identity: DemoIdentity) -> IdentityResponse:
     )
 
 
-def problem_response(problem: Problem, trace_id: str) -> JSONResponse:
+def problem_response(
+    problem: Problem,
+    trace_id: str,
+    headers: Mapping[str, str] | None = None,
+) -> JSONResponse:
     return JSONResponse(
         status_code=problem.status,
         content=problem.body(trace_id),
         media_type="application/problem+json",
+        headers=headers,
     )
 
 
@@ -219,6 +294,36 @@ def create_production_batch_response(
     )
 
 
+def release_work_cards_response(result: ReleaseWorkCardsResult) -> ReleaseWorkCardsResponse:
+    return ReleaseWorkCardsResponse(
+        data=ReleaseWorkCardsDataResponse(
+            batchId=result.batch_id,
+            lifecycleStatus=result.lifecycle_status,
+            version=result.version,
+            setCount=result.set_count,
+            cardCountTotal=result.card_count_total,
+            workCardSets=[
+                ReleaseWorkCardSetResponse(
+                    setId=item.set_id,
+                    operationPlanId=item.operation_plan_id,
+                    position=item.position,
+                    operationScope=OperationScopeResponse.model_validate(item.operation_scope),
+                    normHours=item.norm_hours,
+                    plannedCardCount=item.planned_card_count,
+                    gateStatus=item.gate_status,
+                    version=item.version,
+                )
+                for item in result.work_card_sets
+            ],
+        ),
+        meta=CommandMetaResponse(
+            commandId=result.command_id,
+            correlationId=result.correlation_id,
+            replayed=result.replayed,
+        ),
+    )
+
+
 async def validated_create_production_batch_request(
     request: Request,
 ) -> CreateProductionBatchRequest:
@@ -240,6 +345,50 @@ async def validated_create_production_batch_request(
     except ValidationError as error:
         errors = [{**item, "loc": ("body", *item["loc"])} for item in error.errors()]
         raise RequestValidationError(errors, body=body) from error
+
+
+async def validated_release_work_cards_request(request: Request) -> ReleaseWorkCardsRequest:
+    media_type = request.headers.get("content-type", "").partition(";")[0].strip().lower()
+    if media_type != "application/json":
+        raise RequestValidationError(
+            [
+                {
+                    "type": "json_type",
+                    "loc": ("body",),
+                    "msg": "Input should be valid JSON with application/json content type",
+                    "input": None,
+                }
+            ]
+        )
+    body = await request.body()
+    try:
+        return ReleaseWorkCardsRequest.model_validate_json(body)
+    except ValidationError as error:
+        errors = [{**item, "loc": ("body", *item["loc"])} for item in error.errors()]
+        raise RequestValidationError(errors, body=body) from error
+
+
+def validated_release_batch_id(value: str) -> UUID:
+    try:
+        batch_id = UUID(value)
+    except ValueError as error:
+        raise _release_batch_id_validation_error(value) from error
+    if value != str(batch_id):
+        raise _release_batch_id_validation_error(value)
+    return batch_id
+
+
+def _release_batch_id_validation_error(value: str) -> RequestValidationError:
+    return RequestValidationError(
+        [
+            {
+                "type": "uuid_parsing",
+                "loc": ("path", "batchId"),
+                "msg": "Input should be a lowercase canonical UUID",
+                "input": value,
+            }
+        ]
+    )
 
 
 def authentication_required_problem() -> Problem:
@@ -322,10 +471,87 @@ def create_production_batch_problem(error: CreateProductionBatchFailure) -> Prob
     )
 
 
+def release_work_cards_problem(error: ReleaseWorkCardsFailure) -> Problem:
+    if isinstance(error, ReleasePermissionDenied):
+        return permission_denied_problem()
+    if isinstance(error, ProductionBatchNotFound):
+        return Problem(
+            status=404,
+            code="RESOURCE_NOT_FOUND",
+            title="Ресурс не найден",  # noqa: RUF001 - intentional Russian UI copy
+            detail="Выбранная производственная партия не найдена.",
+            type_slug="resource-not-found",
+        )
+    if isinstance(error, ReleaseCommandAlreadyProcessed):
+        return Problem(
+            status=409,
+            code="COMMAND_ALREADY_PROCESSED",
+            title="Команда уже обработана",
+            detail="Создайте новую команду для повторного действия.",
+            type_slug="command-already-processed",
+        )
+    if isinstance(error, ReleaseCommandIdReused):
+        return Problem(
+            status=409,
+            code="COMMAND_ID_REUSED",
+            title="Идентификатор команды уже использован",
+            detail="Повторите действие с новым идентификатором команды.",  # noqa: RUF001
+            type_slug="command-id-reused",
+        )
+    if isinstance(error, BatchAlreadyReleased):
+        return Problem(
+            status=409,
+            code="BATCH_ALREADY_RELEASED",
+            title="Карточки уже выпущены",
+            detail="Повторный выпуск карточек для этой партии запрещён.",
+            type_slug="batch-already-released",
+        )
+    if isinstance(error, VersionConflict):
+        return Problem(
+            status=409,
+            code="VERSION_CONFLICT",
+            title="Данные изменились",
+            detail="Обновите данные партии и повторите действие новой командой.",
+            type_slug="version-conflict",
+        )
+    if isinstance(error, ReleaseConcurrentCommandConflict):
+        return Problem(
+            status=409,
+            code="CONCURRENT_MODIFICATION",
+            title="Конкурирующее изменение",
+            detail="Обновите данные и повторите действие.",
+            type_slug="concurrent-modification",
+        )
+    if isinstance(error, ReleaseProductionBatchInvalid):
+        return Problem(
+            status=422,
+            code="PRODUCTION_BATCH_INVALID",
+            title="Карточки не могут быть выпущены",
+            detail="Проверьте данные партии и её производственного паспорта.",
+            type_slug="production-batch-invalid",
+        )
+    if isinstance(error, ReleaseUnexpectedPersistenceFailure):
+        return Problem(
+            status=500,
+            code="INTERNAL_ERROR",
+            title="Внутренняя ошибка",
+            detail="Повторите запрос позднее.",
+            type_slug="internal-error",
+        )
+    return Problem(
+        status=500,
+        code="INTERNAL_ERROR",
+        title="Внутренняя ошибка",
+        detail="Повторите запрос позднее.",
+        type_slug="internal-error",
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     database: DatabaseGateway | None = None,
     create_batch_gateway: CreateProductionBatchGateway | None = None,
+    release_work_cards_gateway: ReleaseWorkCardsGateway | None = None,
 ) -> FastAPI:
     app_settings = settings or get_settings()
     configure_logging(app_settings.log_level)
@@ -340,6 +566,10 @@ def create_app(
         cast(PostgresDatabase, db)
     )
     create_batch_handler = CreateProductionBatchHandler(batch_gateway)
+    release_gateway = release_work_cards_gateway or PostgresReleaseWorkCardsGateway(
+        cast(PostgresDatabase, db)
+    )
+    release_work_cards_handler = ReleaseWorkCardsHandler(release_gateway)
     metrics = Metrics.create()
     expected_migration = latest_migration_version()
 
@@ -401,6 +631,13 @@ def create_app(
                 ref_template="#/components/schemas/{model}"
             )
         )
+        release_request_schema = ReleaseWorkCardsRequest.model_json_schema(
+            ref_template="#/components/schemas/{model}"
+        )
+        release_request_schema["properties"]["expectedVersion"].update(
+            {"minimum": 1, "maximum": MAX_POSTGRES_INTEGER}
+        )
+        components.setdefault("schemas", {})["ReleaseWorkCardsRequest"] = release_request_schema
         components.setdefault("securitySchemes", {})["SessionCookie"] = {
             "type": "apiKey",
             "in": "cookie",
@@ -409,7 +646,6 @@ def create_app(
         create_batch_operation = schema["paths"][f"{app_settings.api_prefix}/production-batches"][
             "post"
         ]
-        create_batch_operation["security"] = [{"SessionCookie": []}]
         create_batch_operation.setdefault("parameters", []).extend(
             [
                 {
@@ -434,6 +670,59 @@ def create_app(
                 }
             },
         }
+        release_operation = schema["paths"][
+            f"{app_settings.api_prefix}/production-batches/{{batchId}}/actions/release-work-cards"
+        ]["post"]
+        release_operation.setdefault("parameters", []).extend(
+            [
+                {
+                    "name": "Origin",
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "string", "title": "Origin"},
+                },
+                {
+                    "name": CSRF_HEADER,
+                    "in": "header",
+                    "required": True,
+                    "schema": {"type": "string", "title": CSRF_HEADER},
+                },
+            ]
+        )
+        for parameter in release_operation["parameters"]:
+            if parameter.get("name") == "batchId" and parameter.get("in") == "path":
+                parameter["schema"].update(
+                    {
+                        "format": "uuid",
+                        "pattern": CANONICAL_LOWERCASE_UUID_PATTERN,
+                    }
+                )
+        release_operation["requestBody"] = {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/ReleaseWorkCardsRequest"}
+                }
+            },
+        }
+        session_authenticated_operations = (
+            schema["paths"][f"{app_settings.api_prefix}/session/demo"]["put"],
+            schema["paths"][f"{app_settings.api_prefix}/session"]["get"],
+            schema["paths"][f"{app_settings.api_prefix}/session"]["delete"],
+            create_batch_operation,
+            release_operation,
+        )
+        for operation in session_authenticated_operations:
+            operation["security"] = [{"SessionCookie": []}]
+            operation["responses"]["401"]["headers"] = {
+                "WWW-Authenticate": {
+                    "description": "Project-defined cookie session authentication challenge",
+                    "schema": {
+                        "type": "string",
+                        "const": SESSION_AUTHENTICATION_CHALLENGE,
+                    },
+                }
+            }
         app.openapi_schema = schema
         return schema
 
@@ -482,7 +771,12 @@ def create_app(
 
     @app.exception_handler(ProblemError)
     async def handle_problem(request: Request, error: ProblemError) -> JSONResponse:
-        return problem_response(error.problem, request_id(request))
+        headers = (
+            {"WWW-Authenticate": SESSION_AUTHENTICATION_CHALLENGE}
+            if error.problem.status == 401
+            else None
+        )
+        return problem_response(error.problem, request_id(request), headers=headers)
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation(request: Request, error: RequestValidationError) -> JSONResponse:
@@ -531,7 +825,13 @@ def create_app(
                 detail="Запрос не может быть выполнен.",
                 type_slug="http-error",
             )
-        return problem_response(problem, request_id(request))
+        response_headers = None
+        if error.status_code == 405 and error.headers is not None:
+            for header_name, header_value in error.headers.items():
+                if header_name.lower() == "allow":
+                    response_headers = {"Allow": header_value}
+                    break
+        return problem_response(problem, request_id(request), headers=response_headers)
 
     @app.exception_handler(Exception)
     async def handle_unexpected(request: Request, error: Exception) -> JSONResponse:
@@ -724,6 +1024,60 @@ def create_app(
             raise ProblemError(create_production_batch_problem(error)) from error
         response.headers["ETag"] = f'"v{result.version}"'
         return create_production_batch_response(result)
+
+    def trusted_release_work_cards_actor(request: Request) -> TrustedActor:
+        try:
+            current, identity = authenticated_identity(request, sessions, db)
+        except ProblemError as error:
+            if error.problem.status != 401:
+                raise
+            raise ProblemError(authentication_required_problem()) from error
+        sessions.verify_csrf(current, request.headers.get(CSRF_HEADER))
+        if identity.role != "PLANNER" or not has_permission(
+            identity.role, RELEASE_WORK_CARDS_PERMISSION
+        ):
+            raise ProblemError(permission_denied_problem())
+        validate_origin(request, app_settings)
+        return TrustedActor(actor_id=identity.id, role=identity.role)
+
+    @api.post(
+        "/production-batches/{batchId}/actions/release-work-cards",
+        status_code=200,
+        response_model=ReleaseWorkCardsResponse,
+        responses={
+            200: {
+                "description": "Work cards released",
+                "headers": {
+                    "ETag": {
+                        "description": "Version of the released production batch",
+                        "schema": {"type": "string", "example": '"v2"'},
+                    }
+                },
+            },
+            **problem_responses(400, 401, 403, 404, 405, 409, 422, 500),
+        },
+        tags=["production-batches"],
+    )
+    async def release_work_cards(
+        request: Request,
+        response: Response,
+        batchId: str,
+        command_id: Annotated[UUID, Header(alias="X-Command-Id")],
+        actor: TrustedActor = Depends(trusted_release_work_cards_actor),  # noqa: B008
+    ) -> ReleaseWorkCardsResponse:
+        batch_id = validated_release_batch_id(batchId)
+        payload = await validated_release_work_cards_request(request)
+        command = ReleaseWorkCardsCommand(
+            command_id=command_id,
+            batch_id=batch_id,
+            expected_version=payload.expectedVersion,
+        )
+        try:
+            result = await run_in_threadpool(release_work_cards_handler.handle, actor, command)
+        except ReleaseWorkCardsFailure as error:
+            raise ProblemError(release_work_cards_problem(error)) from error
+        response.headers["ETag"] = f'"v{result.version}"'
+        return release_work_cards_response(result)
 
     app.include_router(api)
     return app

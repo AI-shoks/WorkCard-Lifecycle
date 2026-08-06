@@ -13,11 +13,15 @@ from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from psycopg import Connection
 from psycopg.conninfo import make_conninfo
 from psycopg.errors import CheckViolation, UniqueViolation
 from psycopg.types.json import Jsonb
 
+from workcard_api.app import create_app
+from workcard_api.config import Settings
 from workcard_api.database import PostgresDatabase
 from workcard_api.postgres_release_work_cards import (
     PostgresReleaseWorkCardsGateway,
@@ -58,6 +62,7 @@ PLAN_IDS = (
     UUID("21000000-0000-4000-8000-000000000003"),
 )
 FAILURE_RECEIPT_ID = UUID("ff000000-0000-4000-8000-000000000001")
+ORIGIN_HEADERS = {"Origin": "http://testserver", "Sec-Fetch-Site": "same-origin"}
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.usefixtures("prepared_least_privilege_database"),
@@ -173,6 +178,25 @@ class FailingWriteGroupGateway(PostgresReleaseWorkCardsGateway):
                 """,
                 (command.command_id,),
             )
+
+
+def runtime_settings() -> Settings:
+    assert MIGRATION_DSN is not None
+    assert RUNTIME_DSN is not None
+    return Settings(
+        environment="test",
+        database_url=RUNTIME_DSN,
+        migration_database_url=MIGRATION_DSN,
+        session_signing_secret="integration-signing-secret-at-least-32-characters",
+        allowed_origins=["http://testserver"],
+        cookie_secure=False,
+    )
+
+
+def runtime_application() -> FastAPI:
+    assert RUNTIME_DSN is not None
+    database = PostgresDatabase(RUNTIME_DSN, min_size=1, max_size=4, timeout=5)
+    return create_app(runtime_settings(), database)
 
 
 @pytest.fixture(autouse=True)
@@ -349,6 +373,113 @@ def persisted_counts() -> tuple[int, int, int, int, int]:
         ).fetchone()
     assert row is not None
     return row
+
+
+def test_http_release_and_exact_replay_use_real_postgres_gateway() -> None:
+    snapshot = small_snapshot(operation_plan_id=PLAN_IDS[0])
+    operation_plans = snapshot["operationPlans"]
+    assert isinstance(operation_plans, list)
+    operation_plans.append(
+        {
+            "operationPlanId": str(PLAN_IDS[1]),
+            "position": 2,
+            "operationScope": {
+                "code": "SNAP-OP-2",
+                "displayName": "Вторая операция из снимка",
+            },
+            "normHours": "2.00",
+            "plannedCardCount": 1,
+        }
+    )
+    batch_id = insert_batch(snapshot=snapshot)
+    command_id = uuid4()
+    generated_ids = tuple(UUID(f"90000000-0000-4000-8000-{value:012d}") for value in range(1, 13))
+    generated_id_iterator = iter(generated_ids)
+    assert RUNTIME_DSN is not None
+    database = PostgresDatabase(RUNTIME_DSN, min_size=1, max_size=4, timeout=5)
+    release_gateway = PostgresReleaseWorkCardsGateway(
+        database,
+        id_factory=generated_id_iterator.__next__,
+    )
+    application = create_app(
+        runtime_settings(),
+        database,
+        release_work_cards_gateway=release_gateway,
+    )
+
+    with TestClient(application) as client:
+        bootstrap = client.get("/api/v1/session/bootstrap")
+        assert bootstrap.status_code == 200
+        selected = client.put(
+            "/api/v1/session/demo",
+            headers=ORIGIN_HEADERS | {"X-CSRF-Token": bootstrap.json()["csrfToken"]},
+            json={"demoIdentityId": str(PLANNER.actor_id)},
+        )
+        assert selected.status_code == 200
+        headers = ORIGIN_HEADERS | {
+            "X-CSRF-Token": selected.json()["csrfToken"],
+            "X-Command-Id": str(command_id),
+        }
+
+        released = client.post(
+            f"/api/v1/production-batches/{batch_id}/actions/release-work-cards",
+            headers=headers,
+            json={"expectedVersion": 1},
+        )
+        replay = client.post(
+            f"/api/v1/production-batches/{batch_id}/actions/release-work-cards",
+            headers=headers,
+            json={"expectedVersion": 1},
+        )
+
+    assert released.status_code == 200
+    assert released.headers["etag"] == '"v2"'
+    assert released.json() == {
+        "data": {
+            "batchId": str(batch_id),
+            "lifecycleStatus": "RELEASED",
+            "version": 2,
+            "setCount": 2,
+            "cardCountTotal": 3,
+            "workCardSets": [
+                {
+                    "setId": str(generated_ids[1]),
+                    "operationPlanId": str(PLAN_IDS[0]),
+                    "position": 1,
+                    "operationScope": {
+                        "code": "SNAP-OP",
+                        "displayName": "Операция из снимка",
+                    },
+                    "normHours": "1.50",
+                    "plannedCardCount": 2,
+                    "gateStatus": "FIRST_ARTICLE_PENDING",
+                    "version": 1,
+                },
+                {
+                    "setId": str(generated_ids[4]),
+                    "operationPlanId": str(PLAN_IDS[1]),
+                    "position": 2,
+                    "operationScope": {
+                        "code": "SNAP-OP-2",
+                        "displayName": "Вторая операция из снимка",
+                    },
+                    "normHours": "2.00",
+                    "plannedCardCount": 1,
+                    "gateStatus": "FIRST_ARTICLE_PENDING",
+                    "version": 1,
+                },
+            ],
+        },
+        "meta": {
+            "commandId": str(command_id),
+            "correlationId": str(generated_ids[0]),
+            "replayed": False,
+        },
+    }
+    assert replay.status_code == 409
+    assert replay.headers["content-type"].startswith("application/problem+json")
+    assert replay.json()["code"] == "COMMAND_ALREADY_PROCESSED"
+    assert persisted_counts() == (1, 2, 3, 1, 6)
 
 
 def test_canonical_release_persists_exact_3_250_254_atomic_result() -> None:
