@@ -1,9 +1,9 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 15
+version: 16
 owner: project
-updated: 2026-07-31
+updated: 2026-08-06
 ---
 
 # Backlog
@@ -112,23 +112,26 @@ Server correlation query закрывает отложенное решение 
 - [x] Gate 2.2A: зафиксировать `ReleaseWorkCards` contracts и D-025.
 - [x] Gate 2.2B: реализовать `ReleaseWorkCards` domain/PostgreSQL slice в `a4bcc72f107c41f4016857395a0cbc4a6b2d26b9`.
 
-Эти implementation-факты не означают `ACCEPTED`, закрытие Gate 2 или Stage 6.
+Эти implementation-факты не означают `ACCEPTED`: отдельные acceptance-записи Gate 2.1 и Gate 2.2A/B не найдены. Поэтому Gate 2 и Stage 6 не закрыты.
 
-## В работе — Gate 2.2C
+## Завершено — Gate 2.2C
 
 - [x] Восстановить [[project-state]] и [[gate-2-2c-remediation|TASK-001 rev 1]], не меняя существующий Gate 2.2C diff.
-- [-] Исправить confirmed OpenAPI security finding только в трёх разрешённых файлах.
-- [ ] Выполнить focused/unit/OpenAPI/static/diff и independent semantic security gates.
-- [ ] Подготовить `READY FOR RE-REVIEW` package.
-- [ ] Выполнить новый independent security/OpenAPI re-review; прежний PASS не переносить.
+- [x] Создать `TASK-001 rev 2 / LIN-002` и выполнить narrow remediation F-002–F-004 без изменения frozen history.
+- [x] Доказать `REQ-201`–`REQ-206` focused/unit/OpenAPI/static/diff и semantic gates.
+- [x] Получить независимый финальный re-review с verdict `ACCEPTED`; открытых findings нет.
+- [x] Получить ручную приёмку Gate 2.2C от пользователя 2026-08-06.
+- [x] Зафиксировать принятый scope commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0` и синхронизировать task-card до `SYNCED` без push/PR.
 
 ## Осталось в этапе 6
 
 - [ ] Выполнить опубликованный GitHub Actions run на PostgreSQL 18.1.
 - [ ] Подтвердить Docker image build и container readiness smoke.
 - [ ] После успешного publication CI отдельно решить вопрос окончательного закрытия Gate 1.
-- [ ] Сохранить PostgreSQL 18.1 independent verification текущего review как `GAP`, пока она фактически не выполнена.
-- [ ] Не закрывать Gate 2.2C, Gate 2 или Stage 6 без remediation evidence, independent re-review и отдельной manual acceptance.
+- [ ] Получить и записать отдельную manual acceptance обязательных Gate 2.1 и Gate 2.2A/B, затем отдельно решить закрытие Gate 2.
+- [ ] Сохранить PostgreSQL 18.1 independent verification Stage 6 как `GAP`, пока она фактически не выполнена.
+- [ ] Не закрывать Stage 6 до закрытия Gate 1 и Gate 2 и выполнения publication runtime criteria.
+- [ ] Не начинать Stage 7 в рамках controlled closure Stage 6.
 
 ## Icebox — после MVP
 

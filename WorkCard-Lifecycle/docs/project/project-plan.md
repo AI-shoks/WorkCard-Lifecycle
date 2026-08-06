@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 13
+version: 14
 owner: project
-updated: 2026-07-31
+updated: 2026-08-06
 ---
 
 # Project Plan
@@ -27,7 +27,7 @@ updated: 2026-07-31
 | 3 | Требования и acceptance criteria | `[x]` скорректировано | Новая модель покрыта объективными критериями |
 | 4 | UX-проектирование | `[x]` скорректировано | UX-спецификация и отдельный 14-шаговый прототип соответствуют новой модели |
 | 5 | Техническая архитектура | `[x]` выполнено | Приняты stack, system/data/API boundaries, транзакции, audit, security и ADR |
-| 6 | Инженерный фундамент и backend slices | `[-]` Gate 2.2C remediation/re-review pending | Gate 2.2B реализован; Gate 2.2C и Stage 6 не закрыты |
+| 6 | Инженерный фундамент и backend slices | `[-]` Gate 2.2C accepted; Gate 1/Gate 2 closure pending | Gate 2.2C закрыт; Gate 2 и Stage 6 не закрыты |
 | 7 | Backend vertical slice | `[ ]` не начато | Основной сценарий работает через API и БД |
 | 8 | Frontend vertical slice | `[ ]` не начато | Основной сценарий выполняется в браузере |
 | 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
@@ -113,13 +113,15 @@ updated: 2026-07-31
 
 **Gate 1 Foundation:** application factory, configuration, PostgreSQL pool/migrations, health/observability, prepared demo-session, server-side PostgreSQL revocation registry, Problem Details/OpenAPI, least-privilege roles, dependency/secret gates и CI configuration реализованы. Local remediation на Python 3.12/PostgreSQL 15.10 прошла; статус — `Gate 1 remediation validated; publication CI pending`.
 
-**Gate 2.1:** contracts, domain/PostgreSQL implementation и versioned production-batch API находятся в commits `cc370a7ce4cec971edfdac412fd1d804efd93dbe`, `194c19210ea7e9ad9b106219c76880c22bd9a141` и `2852e3c3b3c24f0533b6cbc9106c5bd8cc1be081`.
+**Gate 2.1:** contracts, domain/PostgreSQL implementation и versioned production-batch API находятся в commits `cc370a7ce4cec971edfdac412fd1d804efd93dbe`, `194c19210ea7e9ad9b106219c76880c22bd9a141` и `2852e3c3b3c24f0533b6cbc9106c5bd8cc1be081`; отдельная manual acceptance-запись не найдена.
 
-**Gate 2.2A/B:** `ReleaseWorkCards` contracts находятся в `c1f1ceb7e6cb42f7289d49604d5966db1ea27759`, domain/PostgreSQL implementation — в `a4bcc72f107c41f4016857395a0cbc4a6b2d26b9`.
+**Gate 2.2A/B:** `ReleaseWorkCards` contracts находятся в `c1f1ceb7e6cb42f7289d49604d5966db1ea27759`, domain/PostgreSQL implementation — в `a4bcc72f107c41f4016857395a0cbc4a6b2d26b9`; отдельные manual acceptance-записи не найдены.
 
-**Gate 2.2C:** API/test/OpenAPI worktree diff существует, но confirmed operation-level OpenAPI security finding ожидает remediation по [[gate-2-2c-remediation|TASK-001 rev 1]] и новый independent re-review. Это не статус completed.
+**Gate 2.2C:** `TASK-001 rev 2 / LIN-002` прошёл независимый финальный re-review с verdict `ACCEPTED`; подтверждённых findings нет, F-002–F-004 закрыты, REQ-201–REQ-206 доказаны. Пользователь вручную принял Gate 2.2C 2026-08-06. Принятый scope находится в commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; task-card синхронизирована. Gate 2.2C закрыт.
 
-**Не закрыто:** GitHub Actions, Docker image/container smoke и PostgreSQL 18.1 independent verification для текущего review не подтверждены. Gate 2.2C, последующие slices, frontend и Stage 6 остаются открытыми.
+**Не закрыто:** Gate 2 не принят целиком без acceptance обязательных Gate 2.1 и Gate 2.2A/B. GitHub Actions, Docker image/container smoke и PostgreSQL 18.1 verification не подтверждены; Gate 1 сохраняет `publication CI pending`. Поэтому Stage 6 остаётся открытым. Stage 7 не начат.
+
+**Lifecycle-решение:** `2026-08-06T19:52:12+03:00`; Gate 2.2C — `CLOSED / ACCEPTED`, Gate 2 — `OPEN`, Stage 6 — `OPEN`. Push и PR не выполнялись.
 
 ## Этап 7. Backend vertical slice
 

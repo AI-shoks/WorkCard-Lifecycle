@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 10
+version: 11
 owner: project
-updated: 2026-07-31
+updated: 2026-08-06
 ---
 
 # Documentation Index
@@ -42,7 +42,7 @@ docs/
 ## Активное операционное состояние
 
 - [[project-state]] — единственный compact router принятого прогресса, gaps и следующего шага;
-- [[gate-2-2c-remediation]] — active `TASK-001 rev 1` с frozen baseline, narrow scope и re-review boundary;
+- [[gate-2-2c-remediation]] — закрытая task-card `TASK-001 rev 2 / LIN-002`, состояние `SYNCED`; активной task-card нет;
 - [[project-plan]], [[backlog]] и [[decision-log]] остаются living trackers и не заменяют task Contract или Evidence.
 
 ## Правило готовности
@@ -67,4 +67,4 @@ docs/
 - [[mock-integrations]] и [[security-baseline]] задают честную local mock boundary и demo authorization;
 - [[adr-index]] хранит семь ADR: шесть исходных решений этапа 5 и ADR-0007, которое исторически заменяет stack-часть ADR-0001.
 
-Stage 6 находится в работе. Gate 1 прошёл local remediation с publication CI pending; Gate 2.1 и Gate 2.2A/B представлены committed vertical slices, включая `ReleaseWorkCards` domain/PostgreSQL implementation в `a4bcc72f107c41f4016857395a0cbc4a6b2d26b9`. Gate 2.2C имеет сохранённый незакоммиченный API/test/OpenAPI diff и confirmed OpenAPI security finding; remediation и independent re-review ещё не выполнены. PostgreSQL 18.1 independent verification для текущего review остаётся `GAP`. Gate 2.2C и Stage 6 не закрыты.
+Stage 6 остаётся в работе. Gate 2.2C независимо проверен с verdict `ACCEPTED`, вручную принят пользователем и зафиксирован implementation commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; `TASK-001 rev 2 / LIN-002` синхронизирован. Gate 2 не закрыт: отдельные acceptance-записи Gate 2.1 и Gate 2.2A/B отсутствуют. Gate 1 сохраняет статус `publication CI pending`; GitHub Actions на PostgreSQL 18.1, Docker image build и container readiness smoke не подтверждены. Поэтому Stage 6 не закрыт, Stage 7 не начат.

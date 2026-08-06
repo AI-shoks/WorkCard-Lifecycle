@@ -1,9 +1,9 @@
 ---
 artifact_id: project.state
 status: active
-version: 1
+version: 2
 owner: project
-updated: 2026-07-31
+updated: 2026-08-06
 ---
 
 # Project State
@@ -14,28 +14,29 @@ updated: 2026-07-31
 
 | Поле | Значение |
 |---|---|
-| Обновлено | `2026-07-31T00:28:25+03:00; Codex по решению пользователя` |
-| Текущий гейт проекта | `Stage 6 / Gate 2.2C — remediation Contract READY; remediation и re-review не выполнены` |
-| Последний принятый Git-идентификатор | `N/A` |
-| Контекст принятого идентификатора | manual acceptance record и прежний project-state в repository/history отсутствуют; `GAP-S6-002` |
-| Активная task-card | [[gate-2-2c-remediation]]; `TASK-001 rev 1`; `LIN-001` |
+| Обновлено | `2026-08-06T19:52:12+03:00; controlled closure по прямому решению пользователя` |
+| Текущий гейт проекта | `Stage 6 / Gate 2 — Gate 2.2C CLOSED; Gate 2 и Stage 6 OPEN` |
+| Последний принятый Git-идентификатор | `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0` |
+| Контекст принятого идентификатора | `Gate 2.2C; independent final re-review ACCEPTED; manual acceptance 2026-08-06` |
+| Активная task-card | `нет`; [[gate-2-2c-remediation]] закрыта как `TASK-001 rev 2 / LIN-002 / SYNCED` |
 
 ## Текущий прогресс
 
-- Stage 6 находится в работе и не закрыт.
-- Gate 2.2B `ReleaseWorkCards` domain/PostgreSQL implementation находится в commit `a4bcc72f107c41f4016857395a0cbc4a6b2d26b9`.
-- Gate 2.2C имеет сохранённый незакоммиченный API/test/OpenAPI diff, confirmed OpenAPI security finding `F-001` и frozen remediation Contract.
-- Governance recovery не исправляет finding и не означает `READY FOR RE-REVIEW`, acceptance или закрытие Gate/Stage.
+- Gate 2.2C закрыт: независимый финальный re-review имеет verdict `ACCEPTED`, подтверждённых findings нет, F-002–F-004 закрыты, REQ-201–REQ-206 доказаны; пользователь вручную принял gate.
+- Принятый Gate 2.2C scope зафиксирован commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; push и PR не выполнялись.
+- Gate 2.1 и Gate 2.2A/B имеют implementation commits, но отдельные manual acceptance-записи не найдены. Gate 2 остаётся открыт.
+- Gate 1 сохраняет `publication CI pending`; GitHub Actions на PostgreSQL 18.1 и Docker image/readiness smoke не подтверждены.
+- Stage 6 находится в работе и не закрыт. Stage 7 не начат.
 
 ## Канонические источники
 
 | Источник | Revision/раздел | Область истины |
 |---|---|---|
-| [[gate-2-2c-remediation]] | `TASK-001 rev 1` | remediation baseline, scope, criteria, checks, preservation и review boundary |
-| [[project-plan]] | `v13, Stage 6` | этапы и gate progress |
-| [[backlog]] | `v15, Stage 6 / Gate 2` | выполненные и следующие действия |
-| [[decision-log]] | `v14, D-025–D-026` | Gate 2.2 boundary и governance recovery |
-| [[documentation-index]] | `v10` | documentation router |
+| [[gate-2-2c-remediation]] | `v3; TASK-001 rev 2 / LIN-002` | frozen Contract, append-only evidence, review, acceptance и `SYNCED` status |
+| [[project-plan]] | `v14, Stage 6` | этапы и gate progress |
+| [[backlog]] | `v16, Stage 6 / Gate 2` | выполненные и следующие действия |
+| [[decision-log]] | `v15, D-025–D-027` | Gate 2.2 boundary, governance recovery и manual acceptance |
+| [[documentation-index]] | `v11` | documentation router |
 | [[repository-structure]] | `v2` | engineering structure и границы slices |
 | [[document-governance]] | `v3` | metadata/living-doc rules |
 
@@ -47,28 +48,32 @@ Task-specific priority определяется только Contract task-card;
 |---|---|---|---|---|
 | `D-025` | Gate 2.2 закреплён за `UC-002 / ReleaseWorkCards` без новой migration | [[decision-log]] | 2026-07-27 | Gate 2.2A/B/C |
 | `D-026` | Восстановить project-state и narrow Gate 2.2C task-card; синхронизировать обязательные living-docs; не закрывать Gate/Stage | [[decision-log]] и пользователь | 2026-07-31 | TASK-001 |
+| `D-027` | Принять Gate 2.2C после independent `ACCEPTED`, закрыть task как `SYNCED`, не закрывая Gate 2/Stage 6 без их критериев | [[decision-log]] и пользователь | 2026-08-06 | TASK-001 |
 
 ## Открытые блокеры
 
-Открытых project-level blockers для начала `TASK-001 rev 1` нет. Расхождение actual root/branch, implementation baseline plus permitted governance overlay, dirty fingerprint или index создаёт task-level `BLOCKER` до изменений.
+- `BLOCK-S6-001`: Gate 1 не закрыт — publication GitHub Actions на PostgreSQL 18.1, Docker image build и container readiness smoke не подтверждены.
+- `BLOCK-S6-002`: Gate 2 не закрыт — для Gate 2.1 и Gate 2.2A/B отсутствуют отдельные manual acceptance-записи.
+- Для закрытого `TASK-001 rev 2` открытых blockers и findings нет.
 
 ## Gaps
 
 | Gap ID | Что не доказано/не синхронизировано | Влияние | Следующий шаг | Task-card |
 |---|---|---|---|---|
-| `GAP-S6-001` | PostgreSQL 18.1 independent verification текущего review не выполнялась | нельзя заявлять verification или закрытие Stage 6 | отдельная authorized verification task | [[gate-2-2c-remediation]] / EV-030 |
-| `GAP-S6-002` | Historical manual acceptance и последний принятый Git ID не найдены | `a4bcc72...` — implemented baseline, не доказанный ACCEPTED/SYNCED | будущая manual acceptance append-only; не восстанавливать по предположению | [[gate-2-2c-remediation]] / EV-031 |
-| `GAP-S6-003` | Intro [[api-contracts]] содержит pre-existing stale Gate 1 state sentence внутри preserved dirty Gate 2.2C файла | эта строка не является project-state | отдельная task/revision; не трогать narrow remediation | [[gate-2-2c-remediation]] / EV-033 |
+| `GAP-S6-001` | PostgreSQL 18.1 independent/publication verification Stage 6 не выполнялась | нельзя заявлять publication verification или закрытие Stage 6 | отдельная authorized verification task | [[gate-2-2c-remediation]] / F4 |
+| `GAP-S6-002` | Historical/manual acceptance Gate 2.1 и Gate 2.2A/B не найдена; tags и Git notes отсутствуют | implementation commits не доказывают acceptance; Gate 2 открыт | отдельная acceptance-запись только по фактам, без реконструкции | [[gate-2-2c-remediation]] / F3–F4 |
+| `GAP-S6-003` | [[api-contracts]] в принятом implementation commit описывает OpenAPI как dirty относительно `785b1a7...`, хотя snapshot теперь committed в `2ab56fc...` | architecture document не является текущим lifecycle router, но требует correction до Stage 6 closure | отдельная correction task; текущая authorization запрещает менять architecture после implementation commit | [[gate-2-2c-remediation]] / F4 |
 
 ## Следующий шаг
 
-Implementer начинает только remediation `TASK-001 rev 1` после повторной baseline/fingerprint проверки; завершает на `READY FOR RE-REVIEW` и передаёт package новому independent security/OpenAPI reviewer.
+Не начинать Stage 7. Отдельно закрыть publication criteria Gate 1, записать acceptance обязательных Gate 2.1/2.2A/B и только затем повторно оценить Gate 2 и Stage 6.
 
 ## Синхронизация документации
 
 | Требуется | Целевые документы | Что синхронизировано | Статус |
 |---|---|---|---|
-| да | [[documentation-index]], [[project-plan]], [[backlog]] | active router и Stage 6 / Gate 2.2C progress | DONE in governance recovery |
-| да | [[decision-log]] | причина recovery и запрет закрытия Gate/Stage | DONE in governance recovery |
-| да | [[repository-structure]] | удалено ложное текущее утверждение, что весь Gate 2 не начат | DONE in governance recovery |
-| нет | domain/architecture implementation docs и migrations | изменения запрещены; pre-existing bytes сохранены | OUT OF SCOPE |
+| да | [[gate-2-2c-remediation]] | final review, manual acceptance, findings/requirements, implementation SHA и task `SYNCED` | DONE in controlled closure |
+| да | [[documentation-index]], [[project-plan]], [[backlog]] | Gate 2.2C closed; Gate 2/Stage 6 open; Stage 7 not started | DONE in controlled closure |
+| да | [[decision-log]] | D-027 manual acceptance и граница closure | DONE in controlled closure |
+| нет | production code, tests, OpenAPI и architecture docs | после implementation commit изменения прямо запрещены; bytes не менялись | OUT OF SCOPE; `GAP-S6-003` recorded |
+| нет | push / PR / deploy / publication | не разрешены и не выполнялись | NOT PERFORMED |

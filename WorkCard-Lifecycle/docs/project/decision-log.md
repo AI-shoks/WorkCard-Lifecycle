@@ -1,9 +1,9 @@
 ---
 artifact_id: project.decision-log
 status: active
-version: 14
+version: 15
 owner: project
-updated: 2026-07-31
+updated: 2026-08-06
 ---
 
 # Decision Log
@@ -38,3 +38,4 @@ updated: 2026-07-31
 | D-024 | 2026-07-25 | Уточнить Gate 2.1A единым immutable passport snapshot, точным `ProductionBatchCreated.data`, canonical SHA-256 command identity и точными receipt/success/Problem Details контрактами создания партии | принято | Gate 2.1B и Gate 2.1C используют одну allowlisted snapshot schema и не придумывают поля, replay semantics или error identifiers в реализации |
 | D-025 | 2026-07-27 | Закрепить Gate 2.2 за `UC-002` / `ReleaseWorkCards` и до реализации уточнить canonical request identity, response/receipt, ordering, audit payloads, concurrency/replay/race и Problem Details | принято | Gate 2.2B/C используют фактический versioned route, canonical `operationPlanId` как `operation_plan_key`, атомарный результат `112 → 250` с `254` correlated events и существующую схему без новой migration; реализация не придумывает дополнительные поля или error identifiers |
 | D-026 | 2026-07-31 | Восстановить [[project-state]] и [[gate-2-2c-remediation|TASK-001 rev 1]] по каноническим personal/repository templates; синхронизировать минимальные living-docs отдельным governance commit | принято | Gate 2.2B фиксируется как implemented baseline `a4bcc72f...`, Gate 2.2C остаётся в remediation/re-review, PostgreSQL 18.1 current-review verification остаётся GAP; Gate 2.2C и Stage 6 не закрываются |
+| D-027 | 2026-08-06 | Вручную принять Gate 2.2C после независимого финального re-review `ACCEPTED`, закрытия F-002–F-004 и доказательства REQ-201–REQ-206; зафиксировать scope commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0` | принято | `TASK-001 rev 2 / LIN-002` переводится в `SYNCED`; Gate 2 остаётся открыт без acceptance Gate 2.1/2.2A/B, Stage 6 — без закрытого Gate 1, PostgreSQL 18.1 и Docker build/smoke; push/PR не выполняются, Stage 7 не начинается |

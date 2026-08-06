@@ -1,14 +1,14 @@
 ---
 artifact_id: project.gate-2-2c-remediation
 status: active
-version: 2
+version: 3
 owner: engineering
-updated: 2026-08-01
+updated: 2026-08-06
 ---
 
 # Gate 2.2C OpenAPI security remediation
 
-Состояние: `READY`
+Состояние: `SYNCED`
 Текущая revision: `2`
 
 Task-card восстановлена до начала remediation по каноническому personal `task-card-template.md` и repository `.codex/templates/remediation.md`. OpenAPI remediation в governance recovery не выполнялась.
@@ -501,3 +501,47 @@ Permission-row по-прежнему выбирает `MASTER_ID` через `se
 | Semantic gates | test matrix exact conflict PASS; OpenAPI 5 protected/4 public PASS; documentation exact precedence PASS |
 | Preservation | 115-file aggregate outside allowed paths unchanged; runtime, OpenAPI and architecture documentation unchanged |
 | Stop condition | `READY FOR RE-REVIEW`; independent final re-review required |
+
+## F. Independent final re-review, manual acceptance and controlled closure — append-only
+
+### F1. Review and acceptance record
+
+Эта запись не проводит повторный review. Она фиксирует прямое решение пользователя от `2026-08-06`: независимый финальный re-review `TASK-001 rev 2 / LIN-002` завершён verdict `ACCEPTED`, подтверждённых findings нет, F-002–F-004 устранены, REQ-201–REQ-206 доказаны. Отдельный reviewer-thread/artifact locator в controlled-closure контекст не передан; источник verdict — текущее явное решение пользователя.
+
+| Evidence ID | Событие | Источник / метод | Результат |
+|---|---|---|---|
+| `EV-089` | controlled-closure baseline | exact root/branch/HEAD/status/stat/index/scope; `git diff --check`; staged checks | exit 0; exact `785b1a7aa635237135cd15a94e5500ac581e4600`, 9 tracked modified + 1 untracked, tracked `1324+/28-`, index empty; exact ten-file scope |
+| `EV-090` | implementation commit | exact staged `9 M + 1 A`; `git diff --cached --check`; commit | exit 0; `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`, subject `feat: add work card release HTTP API`, 10 files, `1989+/28-` |
+| `EV-091` | independent final re-review | direct user-provided result `2026-08-06`; review not repeated in closure | verdict `ACCEPTED`; no confirmed/open findings; F-002–F-004 closed; REQ-201–REQ-206 proven |
+| `EV-092` | manual acceptance | direct explicit user decision `2026-08-06T19:52:12+03:00` | Gate 2.2C accepted; implementation commit authorized and recorded; lifecycle sync authorized |
+| `EV-093` | lifecycle pre-stage verification | project-docs-auditor `--fail-on-warning`; 13-assertion semantic lifecycle gate; `git diff --check`; exact scope and forbidden-path comparison | exits `0 / 0 / 0 / 0`; 59 documents, 0 errors, 0 warnings; 13/13 semantic assertions; only six lifecycle Markdown files; no post-implementation code/test/OpenAPI/architecture diff |
+
+### F2. Final finding and requirement disposition
+
+Исторические строки C/C2 и D/D2/D3 выше не переписываются. Эта append-only запись является актуальным disposition.
+
+| Item | Final status | Evidence |
+|---|---|---|
+| `F-001` | `CLOSED` | exact OpenAPI semantics EV-083; independent verdict `ACCEPTED` EV-091 |
+| `F-002` | `CLOSED` | REQ-201 / EV-061–EV-062; independent verdict `ACCEPTED` EV-091 |
+| `F-003` | `CLOSED` | REQ-202–REQ-203 / EV-077–EV-085; independent verdict `ACCEPTED` EV-091 |
+| `F-004` | `CLOSED` | rev 2 prospective scope and preservation EV-050–EV-058, EV-075, EV-087; independent verdict `ACCEPTED` EV-091 |
+| `REQ-201`–`REQ-206` | `PROVEN` | remediation evidence EV-061–EV-087 and independent verdict `ACCEPTED` EV-091 |
+
+### F3. Lifecycle disposition
+
+| Уровень | Статус на 2026-08-06 | Основание |
+|---|---|---|
+| `TASK-001 rev 2 / LIN-002` | `SYNCED` | Contract выполнен; final re-review `ACCEPTED`; findings closed; manual acceptance записана; implementation commit и lifecycle-doc sync зафиксированы |
+| Gate 2.2C | `CLOSED / ACCEPTED` | task `SYNCED`, implementation commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0` |
+| Gate 2 | `OPEN` | implementation commits Gate 2.1 и Gate 2.2A/B существуют, но отдельные manual acceptance-записи обязательных частей не найдены |
+| Stage 6 | `OPEN` | Gate 1 остаётся `publication CI pending`; GitHub Actions/PostgreSQL 18.1 и Docker image/readiness smoke не подтверждены; Gate 2 не закрыт |
+| Stage 7 | `NOT STARTED` | текущая authorization прямо запрещает начинать Stage 7 |
+
+### F4. Residual gaps and publication status
+
+- `GAP-S6-001`: PostgreSQL 18.1 independent/publication verification Stage 6 не выполнена.
+- `GAP-S6-002`: отдельных manual acceptance-записей Gate 2.1 и Gate 2.2A/B нет; implementation commits не подменяют acceptance.
+- После implementation commit принятая `docs/architecture/api-contracts.md` исторически описывает OpenAPI как dirty относительно `785b1a7...`; её изменение после первого commit прямо запрещено текущей controlled-closure authorization. Актуальный lifecycle-статус хранит [[project-state]]; отдельная correction task потребуется до Stage 6 closure.
+- Push и PR не выполнялись; deploy/publication не выполнялись.
+- Lifecycle commit является docs-only и не изменяет production code, tests, OpenAPI или architecture documents.
