@@ -1,7 +1,7 @@
 ---
 artifact_id: project.decision-log
 status: active
-version: 15
+version: 16
 owner: project
 updated: 2026-08-06
 ---
@@ -39,3 +39,4 @@ updated: 2026-08-06
 | D-025 | 2026-07-27 | Закрепить Gate 2.2 за `UC-002` / `ReleaseWorkCards` и до реализации уточнить canonical request identity, response/receipt, ordering, audit payloads, concurrency/replay/race и Problem Details | принято | Gate 2.2B/C используют фактический versioned route, canonical `operationPlanId` как `operation_plan_key`, атомарный результат `112 → 250` с `254` correlated events и существующую схему без новой migration; реализация не придумывает дополнительные поля или error identifiers |
 | D-026 | 2026-07-31 | Восстановить [[project-state]] и [[gate-2-2c-remediation|TASK-001 rev 1]] по каноническим personal/repository templates; синхронизировать минимальные living-docs отдельным governance commit | принято | Gate 2.2B фиксируется как implemented baseline `a4bcc72f...`, Gate 2.2C остаётся в remediation/re-review, PostgreSQL 18.1 current-review verification остаётся GAP; Gate 2.2C и Stage 6 не закрываются |
 | D-027 | 2026-08-06 | Вручную принять Gate 2.2C после независимого финального re-review `ACCEPTED`, закрытия F-002–F-004 и доказательства REQ-201–REQ-206; зафиксировать scope commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0` | принято | `TASK-001 rev 2 / LIN-002` переводится в `SYNCED`; Gate 2 остаётся открыт без acceptance Gate 2.1/2.2A/B, Stage 6 — без закрытого Gate 1, PostgreSQL 18.1 и Docker build/smoke; push/PR не выполняются, Stage 7 не начинается |
+| D-028 | 2026-08-06 | Назначить `TASK-002 rev 1 / LIN-003` исключительно controlled post-acceptance remediation Gate 2.1C по `BLOCK-G21C-001`: исправить precedence `session → permission → Origin → CSRF → body` на `session → CSRF → permission → Origin → body` только после отдельного implementation-разрешения | принято | [[gate-2-1c-remediation]] фиксируется в `READY / READY FOR REMEDIATION`; historical evidence не переписывается, Gate 2.2C/TASK-001/LIN-001/LIN-002 защищены, Gate 2 и Stage 6 остаются открыты, Stage 7 не начинается, implementation commit/push/PR не разрешены |

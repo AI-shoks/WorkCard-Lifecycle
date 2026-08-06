@@ -1,7 +1,7 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 11
+version: 12
 owner: project
 updated: 2026-08-06
 ---
@@ -42,7 +42,8 @@ docs/
 ## Активное операционное состояние
 
 - [[project-state]] — единственный compact router принятого прогресса, gaps и следующего шага;
-- [[gate-2-2c-remediation]] — закрытая task-card `TASK-001 rev 2 / LIN-002`, состояние `SYNCED`; активной task-card нет;
+- [[gate-2-1c-remediation]] — активная task-card `TASK-002 rev 1 / LIN-003`, состояние `READY`, точка передачи `READY FOR REMEDIATION` только по `BLOCK-G21C-001`;
+- [[gate-2-2c-remediation]] — закрытая историческая task-card `TASK-001 rev 2 / LIN-002`, состояние `SYNCED`; Gate 2.2C остаётся `CLOSED / ACCEPTED`;
 - [[project-plan]], [[backlog]] и [[decision-log]] остаются living trackers и не заменяют task Contract или Evidence.
 
 ## Правило готовности
@@ -67,4 +68,4 @@ docs/
 - [[mock-integrations]] и [[security-baseline]] задают честную local mock boundary и demo authorization;
 - [[adr-index]] хранит семь ADR: шесть исходных решений этапа 5 и ADR-0007, которое исторически заменяет stack-часть ADR-0001.
 
-Stage 6 остаётся в работе. Gate 2.2C независимо проверен с verdict `ACCEPTED`, вручную принят пользователем и зафиксирован implementation commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; `TASK-001 rev 2 / LIN-002` синхронизирован. Gate 2 не закрыт: отдельные acceptance-записи Gate 2.1 и Gate 2.2A/B отсутствуют. Gate 1 сохраняет статус `publication CI pending`; GitHub Actions на PostgreSQL 18.1, Docker image build и container readiness smoke не подтверждены. Поэтому Stage 6 не закрыт, Stage 7 не начат.
+Stage 6 остаётся в работе. Gate 2.2C независимо проверен с verdict `ACCEPTED`, вручную принят пользователем и зафиксирован implementation commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; `TASK-001 rev 2 / LIN-002` синхронизирован и не переоткрывается. Прямым решением пользователя `TASK-002 rev 1 / LIN-003` назначен исключительно controlled post-acceptance remediation Gate 2.1C по `BLOCK-G21C-001`; governance-контур готов, implementation не начата. Gate 2 не закрыт: новая remediation не заменяет отсутствующую отдельную acceptance-запись Gate 2.1 в целом и acceptance Gate 2.2A/B. Gate 1 сохраняет статус `publication CI pending`; GitHub Actions на PostgreSQL 18.1, Docker image build и container readiness smoke не подтверждены. Поэтому Stage 6 не закрыт, Stage 7 не начат.

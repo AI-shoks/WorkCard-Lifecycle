@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 16
+version: 17
 owner: project
 updated: 2026-08-06
 ---
@@ -114,6 +114,12 @@ Server correlation query закрывает отложенное решение 
 
 Эти implementation-факты не означают `ACCEPTED`: отдельные acceptance-записи Gate 2.1 и Gate 2.2A/B не найдены. Поэтому Gate 2 и Stage 6 не закрыты.
 
+## Подготовлено — controlled Gate 2.1C remediation
+
+- [x] Прямым решением пользователя назначить `TASK-002 rev 1 / LIN-003` исключительно finding `BLOCK-G21C-001`, не используя lineage Gate 2.2C и не создавая обходной ID.
+- [x] Создать [[gate-2-1c-remediation]] с parent baseline `7542044f87ea4dc1a1453321a86e1000814f34b0`, frozen manifest, exact трехфайловым future scope, collision matrix, acceptance/checks и stop conditions.
+- [x] Остановить governance-запуск в `READY FOR REMEDIATION` без изменений production, tests, OpenAPI и `api-contracts.md`.
+
 ## Завершено — Gate 2.2C
 
 - [x] Восстановить [[project-state]] и [[gate-2-2c-remediation|TASK-001 rev 1]], не меняя существующий Gate 2.2C diff.
@@ -125,6 +131,7 @@ Server correlation query закрывает отложенное решение 
 
 ## Осталось в этапе 6
 
+- [ ] Только после отдельного разрешения выполнить `TASK-002 rev 1 / LIN-003` по [[gate-2-1c-remediation]], затем провести specialized independent re-review; implementation commit/push заранее не разрешены.
 - [ ] Выполнить опубликованный GitHub Actions run на PostgreSQL 18.1.
 - [ ] Подтвердить Docker image build и container readiness smoke.
 - [ ] После успешного publication CI отдельно решить вопрос окончательного закрытия Gate 1.
