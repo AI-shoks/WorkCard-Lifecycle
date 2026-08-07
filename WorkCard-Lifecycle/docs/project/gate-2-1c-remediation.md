@@ -1,18 +1,19 @@
 ---
 artifact_id: project.gate-2-1c-remediation
 status: active
-version: 1
+version: 2
 owner: engineering
-updated: 2026-08-06
+updated: 2026-08-07
 ---
 
 # Gate 2.1C controlled post-acceptance remediation
 
-Состояние: `READY`
+Состояние: `SYNCED`
+Статус closure: `CLOSED / ACCEPTED`
 Текущая revision: `1`
-Точка передачи: `READY FOR REMEDIATION`
+Точка передачи: `CLOSED / ACCEPTED`
 
-Эта task-card создаёт отдельный governance-контур только для finding `BLOCK-G21C-001`. Текущий запуск не исправляет runtime, tests, OpenAPI или architecture contracts и не переносит сюда scope, lineage либо evidence Gate 2.2C.
+Эта task-card создаёт отдельный governance-контур только для finding `BLOCK-G21C-001`. Первоначальный governance-запуск не исправлял runtime, tests, OpenAPI или architecture contracts; последующий явно разрешённый controlled closure выполнил тот же frozen scope без переноса сюда scope, lineage либо evidence Gate 2.2C.
 
 ## A. Contract — заморожен при READY
 
@@ -261,21 +262,60 @@ Stop immediately without implementation commit if baseline/overlay differs, anot
 | Root-cause ID | `RC-G21C-001`: checks ordered incorrectly in one route dependency and mirrored by its test oracle |
 | Classification | confirmed / unique / post-acceptance defect |
 | Disposition | fix; user; only `TASK-002 rev 1 / LIN-003` |
-| Closure | OPEN; future remediation evidence plus `CHK-RV-301` required |
+| Closure | `CLOSED / ACCEPTED`; exact remediation commit `7acc58c3eaaa84de3a637a94202f5f7e34a04612`, independent review и closure evidence `EV-360`–`EV-370` |
 
 ## D. Metrics
 
 | Metric | Value |
 |---|---|
 | First READY | `2026-08-06; EV-306` |
-| ACCEPTED / SYNCED | `N/A / N/A` |
+| ACCEPTED / SYNCED | `2026-08-07 / 2026-08-07` |
 | Lineage | `TASK-002 rev 1 / LIN-003 / parent 7542044... / SNAP-G21C-R1-PRE-001` |
 | Findings / root causes | `medium=1: BLOCK-G21C-001 / RC-G21C-001` |
-| Remediation cycles | `0`; implementation not authorized or started |
-| Requirement coverage | `0/8 completed`; frozen acceptance contract only |
-| Mandatory checks | future remediation pending; governance overlay checks recorded separately before commit |
+| Remediation cycles | `1`; exact three-file remediation reviewed and committed |
+| Requirement coverage | `8/8 completed`; `REQ-301`–`REQ-308` accepted |
+| Mandatory checks | requested focused/collision/security/full pytest, Ruff, mypy, OpenAPI `--check`, documentation audit, semantic and Git/scope checks passed; PostgreSQL integration skips are non-blocking for this HTTP-only remediation |
 | Gate/Stage | Gate 2.2C closed/accepted; Gate 2 open; Stage 6 open; Stage 7 not started |
 
-## Stop condition
+## Historical stop condition before implementation authorization
 
-Текущий запуск заканчивается после отдельного governance commit в состоянии `READY FOR REMEDIATION`. Не исправлять `BLOCK-G21C-001`, не stage/commit/push implementation, не создавать PR, не переоткрывать Gate 2.2C и не начинать Stage 7.
+Первоначальный governance-запуск закончился после отдельного governance commit в состоянии `READY FOR REMEDIATION`. До нового прямого решения пользователя было запрещено исправлять `BLOCK-G21C-001`, stage/commit/push implementation, создавать PR, переоткрывать Gate 2.2C или начинать Stage 7. Прямое решение пользователя 2026-08-07 отдельно разрешило independent review, implementation commit и controlled governance closure в этой же revision/lineage; push/PR и дальнейшие lifecycle-переходы остались запрещены.
+
+## E. Controlled closure — append-only
+
+### E1. Review и verification evidence
+
+| Evidence ID | Revision / lineage | Проверка | Результат |
+|---|---|---|---|
+| `EV-360` | rev 1 / LIN-003 | current user authorization и baseline | exact worktree/branch/HEAD `3dcaa1e3cbd56904575eac22e40c253ff4853582`; index empty; untracked absent; exact three-file `106+/36-` scope |
+| `EV-361` | rev 1 / LIN-003 | full diff и runtime review | exact order `session → CSRF → permission → Origin → body`; runtime delta — одна перестановка; production parser вызывается в handler после trusted actor dependency; gateway вызывается только после parser |
+| `EV-362` | rev 1 / LIN-003 | focused create API и отдельная collision matrix | `31 passed`; отдельно `7 passed`; все simultaneous conflicts, status/code/challenge, parser counter и empty gateway доказаны |
+| `EV-363` | rev 1 / LIN-003 | security regression | `63 passed`: auth, Problem Details и protected release API tests |
+| `EV-364` | rev 1 / LIN-003 | полный pytest | `217 passed, 55 skipped`; coverage `88.51%` при threshold `85%`; skips требуют отдельные PostgreSQL DSN и не являются acceptance requirement этой HTTP-only remediation |
+| `EV-365` | rev 1 / LIN-003 | quality | Ruff format: `34 files already formatted`; Ruff lint: pass; mypy: no issues in 16 source files |
+| `EV-366` | rev 1 / LIN-003 | OpenAPI `--check` only | exporter check exit `0`; SHA-256 до/после `453b715a6ab4677399bd38d9c73d12a6d1d423c80811163becf89794e7b8a93d`; diff отсутствует |
+| `EV-367` | rev 1 / LIN-003 | documentation audit и semantic pass | 60 documents, 0 errors, 0 warnings; `api-contracts.md` version 11; один canonical exact order, competing architecture order отсутствует |
+| `EV-368` | rev 1 / LIN-003 | scope/preservation/Git | все verify-only/protected hashes совпали с A2; Gate 2.2C card и release test byte-identical; index/untracked empty; `git diff --check` exit `0` |
+| `EV-369` | rev 1 / LIN-003 | implementation commit | `7acc58c3eaaa84de3a637a94202f5f7e34a04612`; subject `fix: enforce create batch security precedence`; ровно три mutable remediation paths |
+| `EV-370` | rev 1 / LIN-003 | independent verdict и manual acceptance | specialized security/API review: `ACCEPTED`, findings отсутствуют; прямое решение пользователя условно разрешило closure при успешном review, условие выполнено |
+
+### E2. Requirement closure
+
+| Requirements | Closure evidence | Статус |
+|---|---|---|
+| `REQ-301`–`REQ-303` | `EV-361`–`EV-363` | ACCEPTED |
+| `REQ-304`–`REQ-305` | `EV-366`–`EV-367` | ACCEPTED |
+| `REQ-306`–`REQ-308` | `EV-363`–`EV-369` | ACCEPTED |
+
+### E3. Lifecycle synchronization
+
+| Объект | Финальное состояние |
+|---|---|
+| `BLOCK-G21C-001` | `CLOSED / ACCEPTED` |
+| `TASK-002 rev 1` | `CLOSED / ACCEPTED`; lifecycle `SYNCED` |
+| `LIN-003` | синхронизирован; новая task или lineage не создавалась |
+| Gate 2.1C remediation | `CLOSED / ACCEPTED` |
+| Gate 2.2C | `CLOSED / ACCEPTED`; `TASK-001 rev 2 / LIN-002` и historical evidence не изменены |
+| Gate 2 / Stage 6 | `OPEN / OPEN` |
+| Stage 7 | `NOT STARTED` |
+| Push / PR / merge / deploy / publication | `NOT PERFORMED` |

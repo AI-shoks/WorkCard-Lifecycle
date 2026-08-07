@@ -1,9 +1,9 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 17
+version: 18
 owner: project
-updated: 2026-08-06
+updated: 2026-08-07
 ---
 
 # Backlog
@@ -114,11 +114,14 @@ Server correlation query закрывает отложенное решение 
 
 Эти implementation-факты не означают `ACCEPTED`: отдельные acceptance-записи Gate 2.1 и Gate 2.2A/B не найдены. Поэтому Gate 2 и Stage 6 не закрыты.
 
-## Подготовлено — controlled Gate 2.1C remediation
+## Завершено — controlled Gate 2.1C remediation
 
 - [x] Прямым решением пользователя назначить `TASK-002 rev 1 / LIN-003` исключительно finding `BLOCK-G21C-001`, не используя lineage Gate 2.2C и не создавая обходной ID.
 - [x] Создать [[gate-2-1c-remediation]] с parent baseline `7542044f87ea4dc1a1453321a86e1000814f34b0`, frozen manifest, exact трехфайловым future scope, collision matrix, acceptance/checks и stop conditions.
 - [x] Остановить governance-запуск в `READY FOR REMEDIATION` без изменений production, tests, OpenAPI и `api-contracts.md`.
+- [x] Выполнить exact three-file remediation, отдельную семисценарную collision matrix и полный набор review/checks без OpenAPI diff.
+- [x] Получить independent security/API verdict `ACCEPTED`, закрыть `BLOCK-G21C-001` и зафиксировать implementation commit `7acc58c3eaaa84de3a637a94202f5f7e34a04612`.
+- [x] Закрыть `TASK-002 rev 1` как `CLOSED / ACCEPTED`, синхронизировать `LIN-003`/lifecycle до `SYNCED` и Gate 2.1C remediation до `CLOSED / ACCEPTED` без push/PR и без изменения Gate 2/Stage 6.
 
 ## Завершено — Gate 2.2C
 
@@ -131,7 +134,6 @@ Server correlation query закрывает отложенное решение 
 
 ## Осталось в этапе 6
 
-- [ ] Только после отдельного разрешения выполнить `TASK-002 rev 1 / LIN-003` по [[gate-2-1c-remediation]], затем провести specialized independent re-review; implementation commit/push заранее не разрешены.
 - [ ] Выполнить опубликованный GitHub Actions run на PostgreSQL 18.1.
 - [ ] Подтвердить Docker image build и container readiness smoke.
 - [ ] После успешного publication CI отдельно решить вопрос окончательного закрытия Gate 1.
