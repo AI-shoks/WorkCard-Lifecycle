@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 18
+version: 19
 owner: project
 updated: 2026-08-07
 ---
@@ -133,6 +133,14 @@ Server correlation query закрывает отложенное решение 
 - [x] Зафиксировать принятый scope commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0` и синхронизировать task-card до `SYNCED` без push/PR.
 
 ## Осталось в этапе 6
+
+### В работе — canonical CI documentation audit remediation
+
+- [x] Назначить [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]] для `BLOCK-S6-003` и заморозить exact scope/baseline/checks.
+- [ ] Добавить repository-owned `scripts/audit_docs.py` без новых dependencies.
+- [ ] Обновить canonical [[quality-gates]] и CI на `python scripts/audit_docs.py --root . --fail-on-warning`.
+- [ ] Выполнить local strict audit/static/regression checks и передать exact commit в independent review/hosted CI.
+- [ ] Не закрывать remediation, Gate 2 или Stage 6 без independent review, exact hosted CI PASS и остальных closure criteria.
 
 - [ ] Выполнить опубликованный GitHub Actions run на PostgreSQL 18.1.
 - [ ] Подтвердить Docker image build и container readiness smoke.
