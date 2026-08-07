@@ -982,10 +982,10 @@ def create_app(
             if error.problem.status != 401:
                 raise
             raise ProblemError(authentication_required_problem()) from error
+        sessions.verify_csrf(current, request.headers.get(CSRF_HEADER))
         if identity.role != "PLANNER" or not has_permission(identity.role, BATCH_CREATE_PERMISSION):
             raise ProblemError(permission_denied_problem())
         validate_origin(request, app_settings)
-        sessions.verify_csrf(current, request.headers.get(CSRF_HEADER))
         return TrustedActor(actor_id=identity.id, role=identity.role)
 
     @api.post(

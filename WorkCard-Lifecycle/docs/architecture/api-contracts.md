@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 10
+version: 11
 owner: architecture
-updated: 2026-08-01
+updated: 2026-08-07
 ---
 
 # API Contracts
@@ -482,11 +482,11 @@ Runtime handlers для request validation, application errors, `401`, `403`, `4
 
 ## Порядок обработки
 
-Для реализованного `POST /production-batches/{batchId}/actions/release-work-cards` exact security-to-body precedence фиксирован отдельно и не объединяет соседние проверки:
+Для реализованных `POST /production-batches` и `POST /production-batches/{batchId}/actions/release-work-cards` действует единый exact security-to-body precedence, который не объединяет соседние проверки:
 
 1. проверить session;
 2. проверить CSRF;
-3. проверить permission `ReleaseWorkCards` для текущей роли;
+3. проверить permission текущей команды (`CreateProductionBatch` или `ReleaseWorkCards`) для текущей роли;
 4. проверить trusted `Origin` и `Sec-Fetch-Site`;
 5. проверить body schema, включая JSON media type и форму payload;
 6. canonicalize type/path/body и найти receipt по `commandId`; другой type/path/hash отклонить, а разрешённый точный replay вернуть **до** текущих target state/version checks;
@@ -496,7 +496,7 @@ Runtime handlers для request validation, application errors, `401`, `403`, `4
 10. сохранить state, receipt и audit в одной транзакции;
 11. вернуть authoritative read-back.
 
-Таким образом, при одновременных ошибках release endpoint возвращает результат первой применимой ступени строго в порядке `session → CSRF → permission → Origin → body schema`; malformed body не обходит security checks. Для других commands их отдельный route contract остаётся каноничным, а receipt lookup во всех случаях не обходит текущую authorization.
+Таким образом, при одновременных ошибках оба endpoint возвращают результат первой применимой ступени строго в порядке `session → CSRF → permission → Origin → body schema`; malformed body не обходит security checks. Для других commands их отдельный route contract остаётся каноничным, а receipt lookup во всех случаях не обходит текущую authorization.
 
 Receipt lookup не обходит текущую authorization: replay result выдаётся только роли, которая сейчас имеет право на command class. Для `RecordFinalBatchAcceptance` точный replay старого body с прежней `expectedVersion` возвращает исходную acceptance до проверки уже терминального batch; новый `commandId` проходит обычный flow и получает `BATCH_FINAL_ACCEPTED`.
 

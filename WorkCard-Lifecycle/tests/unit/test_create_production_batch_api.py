@@ -6,12 +6,13 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from httpx import Response
 
+import workcard_api.app as app_module
 from conftest import MASTER_ID, PLANNER_ID, FakeDatabase
-from workcard_api.app import create_app
+from workcard_api.app import CreateProductionBatchRequest, create_app
 from workcard_api.auth import COOKIE_NAME
 from workcard_api.config import Settings
 from workcard_api.production_batches import (
@@ -101,6 +102,25 @@ def batch_application(
 def batch_client(batch_application: FastAPI) -> Iterator[TestClient]:
     with TestClient(batch_application) as client:
         yield client
+
+
+@pytest.fixture
+def create_body_parser_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[Request]:
+    calls: list[Request] = []
+    original = app_module.validated_create_production_batch_request
+
+    async def observed_body_parser(request: Request) -> CreateProductionBatchRequest:
+        calls.append(request)
+        return await original(request)
+
+    monkeypatch.setattr(
+        app_module,
+        "validated_create_production_batch_request",
+        observed_body_parser,
+    )
+    return calls
 
 
 def select_identity(client: TestClient, identity_id: UUID = PLANNER_ID) -> str:
@@ -236,66 +256,111 @@ def test_forbidden_role_is_denied_before_request_schema(
 
 
 @pytest.mark.parametrize(
-    ("identity_id", "origin", "csrf_mode", "expected_status", "expected_code"),
+    (
+        "session_case",
+        "csrf_mode",
+        "origin",
+        "expected_status",
+        "expected_code",
+        "expected_body_parser_calls",
+    ),
     [
         pytest.param(
-            None,
-            None,
-            None,
+            "missing",
+            "missing",
+            "https://attacker.example",
             401,
             "AUTHENTICATION_REQUIRED",
-            id="authentication-before-origin-csrf-body",
+            0,
+            id="missing-session-before-csrf-permission-origin-body",
         ),
         pytest.param(
-            MASTER_ID,
-            None,
-            None,
-            403,
-            "PERMISSION_DENIED",
-            id="authorization-before-origin-csrf-body",
-        ),
-        pytest.param(
-            PLANNER_ID,
+            "revoked-master",
+            "invalid",
             "https://attacker.example",
-            "invalid",
-            403,
-            "ORIGIN_NOT_ALLOWED",
-            id="origin-before-csrf-body",
+            401,
+            "AUTHENTICATION_REQUIRED",
+            0,
+            id="revoked-session-before-csrf-permission-origin-body",
         ),
         pytest.param(
-            PLANNER_ID,
-            "http://testserver",
-            "invalid",
+            "master",
+            "missing",
+            "https://attacker.example",
             403,
             "CSRF_VALIDATION_FAILED",
-            id="csrf-before-body",
+            0,
+            id="missing-csrf-before-permission-origin-body",
         ),
         pytest.param(
-            PLANNER_ID,
-            "http://testserver",
+            "master",
+            "invalid",
+            "https://attacker.example",
+            403,
+            "CSRF_VALIDATION_FAILED",
+            0,
+            id="invalid-csrf-before-permission-origin-body",
+        ),
+        pytest.param(
+            "master",
             "valid",
+            "https://attacker.example",
+            403,
+            "PERMISSION_DENIED",
+            0,
+            id="permission-before-origin-body",
+        ),
+        pytest.param(
+            "planner",
+            "valid",
+            "https://attacker.example",
+            403,
+            "ORIGIN_NOT_ALLOWED",
+            0,
+            id="origin-before-body",
+        ),
+        pytest.param(
+            "planner",
+            "valid",
+            "http://testserver",
             400,
             "REQUEST_VALIDATION_FAILED",
-            id="body-validation-after-security",
+            1,
+            id="body-validation-only-after-all-security",
         ),
     ],
 )
-def test_security_precedence_before_malformed_body_validation(
+def test_create_batch_security_collision_matrix(
     batch_client: TestClient,
     create_batch_gateway: FakeCreateProductionBatchGateway,
-    identity_id: UUID | None,
-    origin: str | None,
-    csrf_mode: str | None,
+    create_body_parser_calls: list[Request],
+    session_case: str,
+    csrf_mode: str,
+    origin: str,
     expected_status: int,
     expected_code: str,
+    expected_body_parser_calls: int,
 ) -> None:
-    csrf = select_identity(batch_client, identity_id) if identity_id is not None else None
+    csrf: str | None = None
+    if session_case != "missing":
+        identity_id = MASTER_ID if session_case in {"master", "revoked-master"} else PLANNER_ID
+        csrf = select_identity(batch_client, identity_id)
+    if session_case == "revoked-master":
+        revoked_cookie = batch_client.cookies.get(COOKIE_NAME)
+        selected = batch_client.put(
+            "/api/v1/session/demo",
+            headers=ORIGIN_HEADERS | {"X-CSRF-Token": csrf},
+            json={"demoIdentityId": str(PLANNER_ID)},
+        )
+        assert selected.status_code == 200
+        batch_client.cookies.set(COOKIE_NAME, revoked_cookie, path="/api/v1")
+
     headers = {
         "Content-Type": "application/json",
+        "Origin": origin,
+        "Sec-Fetch-Site": "same-origin",
         "X-Command-Id": str(COMMAND_ID),
     }
-    if origin is not None:
-        headers |= {"Origin": origin, "Sec-Fetch-Site": "same-origin"}
     if csrf_mode == "invalid":
         headers["X-CSRF-Token"] = "invalid"
     elif csrf_mode == "valid":
@@ -309,8 +374,13 @@ def test_security_precedence_before_malformed_body_validation(
     )
 
     assert_problem(response, expected_status, expected_code)
+    if expected_status == 401:
+        assert response.headers["www-authenticate"] == 'WorkcardSession realm="workcard-api"'
+    else:
+        assert "www-authenticate" not in response.headers
     if expected_code == "REQUEST_VALIDATION_FAILED":
         assert response.json()["errors"][0]["path"] == "body"
+    assert len(create_body_parser_calls) == expected_body_parser_calls
     assert create_batch_gateway.calls == []
 
 
