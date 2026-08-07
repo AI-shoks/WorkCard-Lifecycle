@@ -1,7 +1,7 @@
 ---
 artifact_id: project.state
 status: active
-version: 6
+version: 7
 owner: project
 updated: 2026-08-07
 ---
@@ -22,7 +22,7 @@ updated: 2026-08-07
 
 ## Текущий прогресс
 
-- `TASK-003 rev 1 / LIN-004` локально реализована только для `BLOCK-S6-003`: repository-owned auditor, canonical command и обязательный CI step добавлены; strict audit/static/unit checks прошли. Hosted CI exact commit, independent R1 review и acceptance ещё не доказаны.
+- `TASK-003 rev 1 / LIN-004` локально реализована только для `BLOCK-S6-003`: repository-owned auditor, canonical command и обязательный CI step добавлены в implementation commit `bce60e08bba117399e40b2ee0c095b9456049a4d`; strict audit/static/unit checks прошли. Hosted CI exact current HEAD, independent R1 review и acceptance ещё не доказаны.
 - Controlled Gate 2.1C remediation закрыта: `TASK-002 rev 1 / LIN-003` выполнил exact frozen scope только по `BLOCK-G21C-001`; independent review — `ACCEPTED`; task — `CLOSED / ACCEPTED`, lifecycle/lineage — `SYNCED`; finding и remediation — `CLOSED / ACCEPTED`.
 - Gate 2.2C закрыт: независимый финальный re-review имеет verdict `ACCEPTED`, подтверждённых findings нет, F-002–F-004 закрыты, REQ-201–REQ-206 доказаны; пользователь вручную принял gate.
 - Принятый Gate 2.1C remediation scope зафиксирован commit `7acc58c3eaaa84de3a637a94202f5f7e34a04612`; Gate 2.2C scope остаётся в `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; push и PR не выполнялись.

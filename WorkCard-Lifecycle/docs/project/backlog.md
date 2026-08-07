@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 20
+version: 21
 owner: project
 updated: 2026-08-07
 ---
@@ -140,7 +140,8 @@ Server correlation query закрывает отложенное решение 
 - [x] Добавить repository-owned `scripts/audit_docs.py` без новых dependencies.
 - [x] Обновить canonical [[quality-gates]] и CI на `python scripts/audit_docs.py --root . --fail-on-warning`.
 - [x] Выполнить local strict audit/static/regression checks.
-- [ ] Зафиксировать remediation commit и передать exact SHA в independent review/hosted CI.
+- [x] Зафиксировать remediation/CI implementation commit `bce60e08bba117399e40b2ee0c095b9456049a4d`.
+- [ ] Передать exact current HEAD в independent review/hosted CI и записать run evidence.
 - [ ] Не закрывать remediation, Gate 2 или Stage 6 без independent review, exact hosted CI PASS и остальных closure criteria.
 
 - [ ] Выполнить опубликованный GitHub Actions run на PostgreSQL 18.1.

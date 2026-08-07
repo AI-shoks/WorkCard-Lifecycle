@@ -1,7 +1,7 @@
 ---
 artifact_id: project.stage-6-ci-documentation-audit-remediation
 status: active
-version: 2
+version: 3
 owner: engineering
 updated: 2026-08-07
 ---
@@ -181,6 +181,7 @@ Implementation разрешена только от чистого потомк�
 | `EV-414` | full `tests/unit` with repository pytest/coverage config | `0`; 217 passed; branch coverage 88.51%, required 85% reached |
 | `EV-415` | `git diff --check`; exact path/ref checks before evidence append | `0`; implementation paths limited to workflow, quality-gate docs and new auditor; canonical path refs exact; no personal path |
 | `EV-416` | semantic pass по active living trackers | stale routing-time statements found in documentation index/project plan/backlog and synchronized to `implemented locally / hosted CI pending`; no Gate/Stage closure |
+| `EV-417` | remediation/CI implementation commit | `bce60e08bba117399e40b2ee0c095b9456049a4d`; subject `ci: make documentation audit repository-owned`; 8 exact technical/evidence/living-doc paths; `499+/23-` |
 
 ### E3. Verification gaps and harness diagnostics
 
@@ -199,4 +200,4 @@ Implementation разрешена только от чистого потомк�
 | `REQ-407` | proven | Gate 2 and Stage 6 remain OPEN; Stage 7 remains NOT STARTED |
 | `CHK-RV-401` | OPEN | independent R1 review not performed in implementation context |
 | `BLOCK-S6-003` | `REMEDIATED LOCALLY / OPEN` | implementation and local evidence exist; hosted CI, independent review and acceptance pending |
-| Task handoff | `READY FOR CI VERIFICATION` | remediation commit pending; no push/PR/publication performed |
+| Task handoff | `READY FOR CI VERIFICATION` | implementation commit `bce60e08bba117399e40b2ee0c095b9456049a4d`; no push/PR/publication performed; hosted CI and independent review pending |
