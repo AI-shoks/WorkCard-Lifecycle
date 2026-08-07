@@ -1,17 +1,17 @@
 ---
 artifact_id: project.stage-6-ci-documentation-audit-remediation
 status: active
-version: 1
+version: 2
 owner: engineering
 updated: 2026-08-07
 ---
 
 # Stage 6 canonical CI documentation-audit remediation
 
-Состояние: `READY`
+Состояние: `IMPLEMENTED`
 Статус closure: `OPEN`
 Текущая revision: `1`
-Точка передачи: `READY FOR IMPLEMENTATION`
+Точка передачи: `READY FOR CI VERIFICATION`
 
 Эта task-card маршрутизирует только воспроизводимость обязательного documentation audit в чистом repository checkout. Gate 2 и Stage 6 остаются `OPEN`; Stage 7 остаётся `NOT STARTED`.
 
@@ -157,4 +157,46 @@ Implementation разрешена только от чистого потомк�
 | Task / revision / lineage | `TASK-003 rev 1 / LIN-004` |
 | Risk / review | `R1 / independent review required` |
 | Findings / root causes | `high=1: BLOCK-S6-003 / RC-S6DOC-001` |
-| Lifecycle | `READY`; Gate 2 `OPEN`; Stage 6 `OPEN`; Stage 7 `NOT STARTED` |
+| Lifecycle | `IMPLEMENTED`; Gate 2 `OPEN`; Stage 6 `OPEN`; Stage 7 `NOT STARTED` |
+
+## E. Implementation and local verification — append-only
+
+### E1. Реализация
+
+| Evidence ID | Событие / изменение | Результат |
+|---|---|---|
+| `EV-406` | governance routing commit | `854a47d464d7334bf348cc3542ff7e0e0969c432`; ровно шесть A3 governance files; parent `0e7c60f...` является ancestor; post-commit worktree/index clean |
+| `EV-407` | repository-owned auditor | external source SHA-256 `224a9943...f63c3` скопирован в `scripts/audit_docs.py`; обязательные repository Ruff format/import/line-length изменения дали SHA-256 `1f8d48fb...4457a`; external и repository `--format json` reports identical |
+| `EV-408` | canonical docs и CI | `quality-gates.md` v2 и workflow используют exact `python scripts/audit_docs.py --root . --fail-on-warning`; personal/machine paths отсутствуют |
+| `EV-409` | CI preservation | parsed workflow содержит 22 steps; 16 обязательных exact commands, branch trigger, PostgreSQL 18.1, три distinct DSN, unfiltered pytest, branch coverage 85%, Docker/readiness invariants сохранены |
+
+### E2. Verification results
+
+| Evidence ID | Exact command / method | Exit / material result |
+|---|---|---|
+| `EV-410` | `python scripts/audit_docs.py --root . --fail-on-warning` после session-local добавления installed Python 3.12.8 в `PATH` | `0`; 61 document, 0 errors, 0 warnings |
+| `EV-411` | `python -m py_compile scripts/audit_docs.py`; Ruff target/full format+lint | `0 / 0 / 0`; 35 files formatted, all lint checks passed |
+| `EV-412` | PyYAML parse + semantic CI/`pyproject.toml` invariant assertions | `0 / 0`; workflow syntax/shape PASS; exact commands and all required CI invariants PASS |
+| `EV-413` | mypy; Bandit `-c pyproject.toml -r src scripts`; secret scan; OpenAPI `--check` | `0 / 0 / 0 / 0`; 16 source files clean; Bandit 0 issues over 3635 LOC; secret/OpenAPI gates PASS |
+| `EV-414` | full `tests/unit` with repository pytest/coverage config | `0`; 217 passed; branch coverage 88.51%, required 85% reached |
+| `EV-415` | `git diff --check`; exact path/ref checks before evidence append | `0`; implementation paths limited to workflow, quality-gate docs and new auditor; canonical path refs exact; no personal path |
+| `EV-416` | semantic pass по active living trackers | stale routing-time statements found in documentation index/project plan/backlog and synchronized to `implemented locally / hosted CI pending`; no Gate/Stage closure |
+
+### E3. Verification gaps and harness diagnostics
+
+- Initial bare `python` and `py -3.12` invocations were unavailable locally; installed Python `3.12.8` was used without dependency installation. The exact CI command itself was then executed after a session-local `PATH` addition and passed (`EV-410`).
+- Two inline YAML attempts failed before reading the workflow because of Windows quoting/import-path harness issues; the corrected PyYAML parse and independent invariant pass both exited `0` (`EV-412`).
+- Direct installed `mypy.exe` launcher could not import its package; the equivalent installed module with explicit `.local-packages` path passed (`EV-413`).
+- Canonical PostgreSQL bootstrap with CI synthetic credentials exited `1` before migrations/tests because the unrelated local PostgreSQL 15 instance rejects `workcard_admin`; Docker engine is not running. No secret or `.env` was read, credentials were not changed, and full PostgreSQL pytest was not claimed. Hosted CI remains mandatory.
+- Local dependency audits were not rerun; both exact dependency-audit steps remain present in CI and require hosted CI evidence for this task.
+
+### E4. Handoff and current disposition
+
+| Item | Current status | Основание |
+|---|---|---|
+| `REQ-401`–`REQ-405` | locally proven | `EV-407`–`EV-415` |
+| `REQ-406` | OPEN | exact remediation commit hosted CI not available; repository policy forbids push |
+| `REQ-407` | proven | Gate 2 and Stage 6 remain OPEN; Stage 7 remains NOT STARTED |
+| `CHK-RV-401` | OPEN | independent R1 review not performed in implementation context |
+| `BLOCK-S6-003` | `REMEDIATED LOCALLY / OPEN` | implementation and local evidence exist; hosted CI, independent review and acceptance pending |
+| Task handoff | `READY FOR CI VERIFICATION` | remediation commit pending; no push/PR/publication performed |

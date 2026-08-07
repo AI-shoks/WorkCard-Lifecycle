@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 1
+version: 2
 owner: engineering
 updated: 2026-07-19
 ---
@@ -31,7 +31,9 @@ Pytest включает branch coverage и требует не менее `85%`.
 Strict documentation gate:
 
 ```powershell
-python <project-docs-auditor>/scripts/audit_docs.py --root . --fail-on-warning
+python scripts/audit_docs.py --root . --fail-on-warning
 ```
+
+Auditor принадлежит репозиторию и доступен после обычного checkout; canonical gate и CI не зависят от personal Codex skills или machine-specific paths.
 
 Локальная remediation прошла на Python `3.12.13` и PostgreSQL `15.10`. Starlette TestClient/httpx2 deprecation warning является informational. Docker runtime, PostgreSQL `18.1` и GitHub Actions требуют publication verification и не считаются локально пройденными.

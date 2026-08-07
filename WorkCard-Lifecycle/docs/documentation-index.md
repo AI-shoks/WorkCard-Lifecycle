@@ -1,7 +1,7 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 14
+version: 15
 owner: project
 updated: 2026-08-07
 ---
@@ -69,4 +69,4 @@ docs/
 - [[mock-integrations]] и [[security-baseline]] задают честную local mock boundary и demo authorization;
 - [[adr-index]] хранит семь ADR: шесть исходных решений этапа 5 и ADR-0007, которое исторически заменяет stack-часть ADR-0001.
 
-Stage 6 остаётся в работе. Активная `TASK-003 rev 1 / LIN-004` устраняет `BLOCK-S6-003`: canonical strict documentation audit пока зависит от personal external skill и не запускается GitHub CI из clean checkout. Gate 2.1C remediation независимо проверена и принята: `TASK-002 rev 1 / LIN-003` синхронизирован, `BLOCK-G21C-001` закрыт, exact implementation commit — `7acc58c3eaaa84de3a637a94202f5f7e34a04612`. Gate 2.2C остаётся независимо принят и закрыт в `TASK-001 rev 2 / LIN-002` с implementation commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; эта lineage не переоткрывалась. Gate 2 не закрыт: remediation не заменяет отсутствующую отдельную acceptance-запись Gate 2.1 в целом и acceptance Gate 2.2A/B. Gate 1 сохраняет статус `publication CI pending`; GitHub Actions на PostgreSQL 18.1, Docker image build и container readiness smoke не подтверждены. Поэтому Stage 6 не закрыт, Stage 7 не начат.
+Stage 6 остаётся в работе. `TASK-003 rev 1 / LIN-004` локально реализовала repository-owned strict documentation audit и обязательный CI step по `BLOCK-S6-003`; exact hosted CI и independent review ещё не доказаны, поэтому task остаётся `READY FOR CI VERIFICATION`, а finding — `OPEN`. Gate 2.1C remediation независимо проверена и принята: `TASK-002 rev 1 / LIN-003` синхронизирован, `BLOCK-G21C-001` закрыт, exact implementation commit — `7acc58c3eaaa84de3a637a94202f5f7e34a04612`. Gate 2.2C остаётся независимо принят и закрыт в `TASK-001 rev 2 / LIN-002` с implementation commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; эта lineage не переоткрывалась. Gate 2 не закрыт: remediation не заменяет отсутствующую отдельную acceptance-запись Gate 2.1 в целом и acceptance Gate 2.2A/B. Gate 1 сохраняет статус `publication CI pending`; GitHub Actions на PostgreSQL 18.1, Docker image build и container readiness smoke не подтверждены. Поэтому Stage 6 не закрыт, Stage 7 не начат.

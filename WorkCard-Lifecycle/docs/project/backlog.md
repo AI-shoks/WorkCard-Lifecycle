@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 19
+version: 20
 owner: project
 updated: 2026-08-07
 ---
@@ -137,9 +137,10 @@ Server correlation query закрывает отложенное решение 
 ### В работе — canonical CI documentation audit remediation
 
 - [x] Назначить [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]] для `BLOCK-S6-003` и заморозить exact scope/baseline/checks.
-- [ ] Добавить repository-owned `scripts/audit_docs.py` без новых dependencies.
-- [ ] Обновить canonical [[quality-gates]] и CI на `python scripts/audit_docs.py --root . --fail-on-warning`.
-- [ ] Выполнить local strict audit/static/regression checks и передать exact commit в independent review/hosted CI.
+- [x] Добавить repository-owned `scripts/audit_docs.py` без новых dependencies.
+- [x] Обновить canonical [[quality-gates]] и CI на `python scripts/audit_docs.py --root . --fail-on-warning`.
+- [x] Выполнить local strict audit/static/regression checks.
+- [ ] Зафиксировать remediation commit и передать exact SHA в independent review/hosted CI.
 - [ ] Не закрывать remediation, Gate 2 или Stage 6 без independent review, exact hosted CI PASS и остальных closure criteria.
 
 - [ ] Выполнить опубликованный GitHub Actions run на PostgreSQL 18.1.

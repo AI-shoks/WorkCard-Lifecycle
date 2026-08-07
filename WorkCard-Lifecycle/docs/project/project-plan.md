@@ -1,7 +1,7 @@
 ---
 artifact_id: project.plan
 status: active
-version: 17
+version: 18
 owner: project
 updated: 2026-08-07
 ---
@@ -27,7 +27,7 @@ updated: 2026-08-07
 | 3 | Требования и acceptance criteria | `[x]` скорректировано | Новая модель покрыта объективными критериями |
 | 4 | UX-проектирование | `[x]` скорректировано | UX-спецификация и отдельный 14-шаговый прототип соответствуют новой модели |
 | 5 | Техническая архитектура | `[x]` выполнено | Приняты stack, system/data/API boundaries, транзакции, audit, security и ADR |
-| 6 | Инженерный фундамент и backend slices | `[-]` TASK-003 CI documentation-audit remediation READY; Gate 1/Gate 2 closure pending | Gate 2.1C remediation и Gate 2.2C закрыты; Gate 2 и Stage 6 не закрыты |
+| 6 | Инженерный фундамент и backend slices | `[-]` TASK-003 implemented locally / hosted CI pending; Gate 1/Gate 2 closure pending | Gate 2.1C remediation и Gate 2.2C закрыты; Gate 2 и Stage 6 не закрыты |
 | 7 | Backend vertical slice | `[ ]` не начато | Основной сценарий работает через API и БД |
 | 8 | Frontend vertical slice | `[ ]` не начато | Основной сценарий выполняется в браузере |
 | 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
@@ -121,9 +121,9 @@ updated: 2026-08-07
 
 **Gate 2.2C:** `TASK-001 rev 2 / LIN-002` прошёл независимый финальный re-review с verdict `ACCEPTED`; подтверждённых findings нет, F-002–F-004 закрыты, REQ-201–REQ-206 доказаны. Пользователь вручную принял Gate 2.2C 2026-08-06. Принятый scope находится в commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; task-card синхронизирована. Gate 2.2C закрыт.
 
-**Canonical CI documentation audit remediation:** [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]] находится в `READY`. `BLOCK-S6-003` фиксирует, что strict audit требуется канонически, но его implementation существует только в personal external skill и отсутствует в clean CI checkout. Gate 2 и Stage 6 остаются открыты во время remediation.
+**Canonical CI documentation audit remediation:** [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]] находится в `IMPLEMENTED / READY FOR CI VERIFICATION`. Repository-owned auditor, canonical command и обязательный CI step реализованы; local strict audit/static/unit checks прошли. `BLOCK-S6-003` остаётся `OPEN` до exact hosted CI, independent review и acceptance. Gate 2 и Stage 6 остаются открыты.
 
-**Не закрыто:** Gate 2 не принят целиком без acceptance обязательных Gate 2.1 и Gate 2.2A/B. Canonical documentation audit пока не repository-owned и не выполняется CI. GitHub Actions, Docker image/container smoke и PostgreSQL 18.1 verification не подтверждены; Gate 1 сохраняет `publication CI pending`. Поэтому Stage 6 остаётся открытым. Stage 7 не начат.
+**Не закрыто:** Gate 2 не принят целиком без acceptance обязательных Gate 2.1 и Gate 2.2A/B. Exact hosted GitHub Actions для новой documentation-audit remediation, Docker image/container smoke и PostgreSQL 18.1 verification не подтверждены; Gate 1 сохраняет `publication CI pending`. Поэтому Stage 6 остаётся открытым. Stage 7 не начат.
 
 **Lifecycle-решение:** `2026-08-07`; Gate 2.1C remediation — `CLOSED / ACCEPTED`, Gate 2.2C — `CLOSED / ACCEPTED`, Gate 2 — `OPEN`, Stage 6 — `OPEN`, Stage 7 — `NOT STARTED`. Push и PR не выполнялись.
 

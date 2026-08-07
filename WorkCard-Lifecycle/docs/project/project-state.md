@@ -1,7 +1,7 @@
 ---
 artifact_id: project.state
 status: active
-version: 5
+version: 6
 owner: project
 updated: 2026-08-07
 ---
@@ -14,15 +14,15 @@ updated: 2026-08-07
 
 | Поле | Значение |
 |---|---|
-| Обновлено | `2026-08-07; TASK-003 rev 1 / LIN-004 canonical CI documentation-audit remediation routed` |
-| Текущий гейт проекта | `Stage 6 / Gate 2 — BLOCK-S6-003 remediation READY; Gate 2.1C remediation CLOSED / ACCEPTED; Gate 2.2C CLOSED / ACCEPTED; Gate 2 и Stage 6 OPEN` |
+| Обновлено | `2026-08-07; TASK-003 rev 1 / LIN-004 implemented locally, hosted CI/review pending` |
+| Текущий гейт проекта | `Stage 6 / Gate 2 — BLOCK-S6-003 REMEDIATED LOCALLY / OPEN; Gate 2.1C remediation CLOSED / ACCEPTED; Gate 2.2C CLOSED / ACCEPTED; Gate 2 и Stage 6 OPEN` |
 | Последний принятый Git-идентификатор | `7acc58c3eaaa84de3a637a94202f5f7e34a04612` |
 | Контекст принятого идентификатора | `Gate 2.1C remediation; independent review ACCEPTED; manual conditional acceptance satisfied 2026-08-07` |
-| Активная task-card | [[stage-6-ci-documentation-audit-remediation]] — `TASK-003 rev 1 / LIN-004 / READY`; закрытые [[gate-2-1c-remediation]] и [[gate-2-2c-remediation]] остаются `SYNCED` |
+| Активная task-card | [[stage-6-ci-documentation-audit-remediation]] — `TASK-003 rev 1 / LIN-004 / IMPLEMENTED / READY FOR CI VERIFICATION`; закрытые [[gate-2-1c-remediation]] и [[gate-2-2c-remediation]] остаются `SYNCED` |
 
 ## Текущий прогресс
 
-- `TASK-003 rev 1 / LIN-004` маршрутизирована только для `BLOCK-S6-003`: strict documentation audit должен стать repository-owned и обязательным в GitHub CI без personal path; implementation ещё не начата.
+- `TASK-003 rev 1 / LIN-004` локально реализована только для `BLOCK-S6-003`: repository-owned auditor, canonical command и обязательный CI step добавлены; strict audit/static/unit checks прошли. Hosted CI exact commit, independent R1 review и acceptance ещё не доказаны.
 - Controlled Gate 2.1C remediation закрыта: `TASK-002 rev 1 / LIN-003` выполнил exact frozen scope только по `BLOCK-G21C-001`; independent review — `ACCEPTED`; task — `CLOSED / ACCEPTED`, lifecycle/lineage — `SYNCED`; finding и remediation — `CLOSED / ACCEPTED`.
 - Gate 2.2C закрыт: независимый финальный re-review имеет verdict `ACCEPTED`, подтверждённых findings нет, F-002–F-004 закрыты, REQ-201–REQ-206 доказаны; пользователь вручную принял gate.
 - Принятый Gate 2.1C remediation scope зафиксирован commit `7acc58c3eaaa84de3a637a94202f5f7e34a04612`; Gate 2.2C scope остаётся в `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; push и PR не выполнялись.
@@ -61,7 +61,7 @@ Task-specific priority определяется только Contract task-card;
 
 - `BLOCK-S6-001`: Gate 1 не закрыт — publication GitHub Actions на PostgreSQL 18.1, Docker image build и container readiness smoke не подтверждены.
 - `BLOCK-S6-002`: Gate 2 не закрыт — для Gate 2.1 и Gate 2.2A/B отсутствуют отдельные manual acceptance-записи.
-- `BLOCK-S6-003`: canonical strict documentation audit не воспроизводим в GitHub CI из clean checkout, потому что implementation существует только в personal external skill; remediation `TASK-003 rev 1 / LIN-004` — `READY`.
+- `BLOCK-S6-003`: repository-owned remediation реализована локально, но finding остаётся `OPEN` до exact hosted CI PASS, independent R1 review и acceptance; `TASK-003 rev 1 / LIN-004` — `READY FOR CI VERIFICATION`.
 - Для закрытых `TASK-001 rev 2` и `TASK-002 rev 1` открытых blockers и findings нет.
 
 ## Gaps
@@ -73,7 +73,7 @@ Task-specific priority определяется только Contract task-card;
 
 ## Следующий шаг
 
-Выполнить только [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]], затем получить independent review и canonical hosted CI exact-commit evidence. Не начинать Stage 7. Отдельно остаются publication criteria Gate 1 и factual acceptance Gate 2.1/2.2A/B; лишь после закрытия всех blockers можно отдельным решением повторно оценить Gate 2 и Stage 6.
+Получить independent R1 review и canonical hosted CI evidence для exact remediation commit [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]]; push из этого worktree запрещён. Не начинать Stage 7. Отдельно остаются publication criteria Gate 1 и factual acceptance Gate 2.1/2.2A/B; лишь после закрытия всех blockers можно отдельным решением повторно оценить Gate 2 и Stage 6.
 
 ## Синхронизация документации
 
