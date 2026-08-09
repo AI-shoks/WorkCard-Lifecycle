@@ -1,9 +1,9 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 21
+version: 22
 owner: project
-updated: 2026-08-07
+updated: 2026-08-09
 ---
 
 # Backlog
@@ -134,21 +134,19 @@ Server correlation query закрывает отложенное решение 
 
 ## Осталось в этапе 6
 
-### В работе — canonical CI documentation audit remediation
+### Выполнено — canonical CI documentation audit remediation
 
 - [x] Назначить [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]] для `BLOCK-S6-003` и заморозить exact scope/baseline/checks.
 - [x] Добавить repository-owned `scripts/audit_docs.py` без новых dependencies.
 - [x] Обновить canonical [[quality-gates]] и CI на `python scripts/audit_docs.py --root . --fail-on-warning`.
 - [x] Выполнить local strict audit/static/regression checks.
 - [x] Зафиксировать remediation/CI implementation commit `bce60e08bba117399e40b2ee0c095b9456049a4d`.
-- [ ] Передать exact current HEAD в independent review/hosted CI и записать run evidence.
-- [ ] Не закрывать remediation, Gate 2 или Stage 6 без independent review, exact hosted CI PASS и остальных closure criteria.
+- [x] Подтвердить exact current HEAD `2439f9aaecd912258206258bb73b71a54c855ab3` в hosted workflow `quality`, run `31303490227`, и independent R1 review.
+- [x] Закрыть только `TASK-003 rev 1 / LIN-004` и `BLOCK-S6-003` как `CLOSED / ACCEPTED`, lifecycle `SYNCED`; Gate 2 и Stage 6 не закрывать.
 
-- [ ] Выполнить опубликованный GitHub Actions run на PostgreSQL 18.1.
-- [ ] Подтвердить Docker image build и container readiness smoke.
-- [ ] После успешного publication CI отдельно решить вопрос окончательного закрытия Gate 1.
+- [x] Подтвердить в run `31303490227` PostgreSQL 18.1, migrations, full pytest, Docker image build и container readiness smoke как техническое evidence без автоматического Gate 1 closure.
+- [ ] Отдельно рассмотреть `BLOCK-S6-001` и окончательное acceptance/закрытие Gate 1; TASK-003 review этого решения не заменяет.
 - [ ] Получить и записать отдельную manual acceptance обязательных Gate 2.1 и Gate 2.2A/B, затем отдельно решить закрытие Gate 2.
-- [ ] Сохранить PostgreSQL 18.1 independent verification Stage 6 как `GAP`, пока она фактически не выполнена.
 - [ ] Не закрывать Stage 6 до закрытия Gate 1 и Gate 2 и выполнения publication runtime criteria.
 - [ ] Не начинать Stage 7 в рамках controlled closure Stage 6.
 

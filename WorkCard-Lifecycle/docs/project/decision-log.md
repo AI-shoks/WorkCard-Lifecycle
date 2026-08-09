@@ -1,9 +1,9 @@
 ---
 artifact_id: project.decision-log
 status: active
-version: 18
+version: 19
 owner: project
-updated: 2026-08-07
+updated: 2026-08-09
 ---
 
 # Decision Log
@@ -42,3 +42,4 @@ updated: 2026-08-07
 | D-028 | 2026-08-06 | Назначить `TASK-002 rev 1 / LIN-003` исключительно controlled post-acceptance remediation Gate 2.1C по `BLOCK-G21C-001`: исправить precedence `session → permission → Origin → CSRF → body` на `session → CSRF → permission → Origin → body` только после отдельного implementation-разрешения | принято | [[gate-2-1c-remediation]] фиксируется в `READY / READY FOR REMEDIATION`; historical evidence не переписывается, Gate 2.2C/TASK-001/LIN-001/LIN-002 защищены, Gate 2 и Stage 6 остаются открыты, Stage 7 не начинается, implementation commit/push/PR не разрешены |
 | D-029 | 2026-08-07 | Принять controlled Gate 2.1C remediation после independent security/API verdict `ACCEPTED`, закрыть `BLOCK-G21C-001` и `TASK-002 rev 1` как `CLOSED / ACCEPTED`, синхронизировать `LIN-003`/lifecycle без новой task/lineage | принято | Exact three-file scope зафиксирован commit `7acc58c3eaaa84de3a637a94202f5f7e34a04612`; Gate 2.1C remediation — `CLOSED / ACCEPTED`, Gate 2.2C остаётся `CLOSED / ACCEPTED`, Gate 2 и Stage 6 — `OPEN`, Stage 7 — `NOT STARTED`; push/PR не выполняются |
 | D-030 | 2026-08-07 | Назначить [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]] только для `BLOCK-S6-003`: перенести strict documentation auditor под ownership репозитория и вызвать его в GitHub CI из clean checkout | принято | Governance routing выполняется отдельно; implementation ограничена auditor/workflow/quality-gate docs и evidence; Gate 2 и Stage 6 остаются `OPEN`, Stage 7 — `NOT STARTED`; push/PR запрещены |
+| D-031 | 2026-08-09 | Принять `TASK-003 rev 1 / LIN-004` после exact hosted workflow `quality` run `31303490227` на SHA `2439f9aaecd912258206258bb73b71a54c855ab3` и independent R1 verdict без findings; закрыть `BLOCK-S6-003` | принято | TASK-003 и BLOCK-S6-003 — `CLOSED / ACCEPTED`, lifecycle `SYNCED`; technical evidence PostgreSQL 18.1/Docker/readiness не заменяет отдельное решение по `BLOCK-S6-001`/Gate 1; `BLOCK-S6-001`, `BLOCK-S6-002`, Gate 2 и Stage 6 остаются `OPEN`, Stage 7 — `NOT STARTED`; push/PR не выполняются |

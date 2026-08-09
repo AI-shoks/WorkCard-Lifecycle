@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 15
+version: 16
 owner: project
-updated: 2026-08-07
+updated: 2026-08-09
 ---
 
 # Documentation Index
@@ -42,7 +42,7 @@ docs/
 ## Активное операционное состояние
 
 - [[project-state]] — единственный compact router принятого прогресса, gaps и следующего шага;
-- [[stage-6-ci-documentation-audit-remediation]] — активная `TASK-003 rev 1 / LIN-004`: repository-owned canonical CI documentation-audit remediation по `BLOCK-S6-003`;
+- [[stage-6-ci-documentation-audit-remediation]] — закрытая `TASK-003 rev 1 / LIN-004`: repository-owned canonical CI documentation-audit remediation и `BLOCK-S6-003` — `CLOSED / ACCEPTED`, lifecycle `SYNCED`;
 - [[gate-2-1c-remediation]] — `TASK-002 rev 1` закрыта как `CLOSED / ACCEPTED`, lifecycle `SYNCED`; `LIN-003` синхронизирован; `BLOCK-G21C-001` и Gate 2.1C remediation — `CLOSED / ACCEPTED`;
 - [[gate-2-2c-remediation]] — закрытая историческая task-card `TASK-001 rev 2 / LIN-002`, состояние `SYNCED`; Gate 2.2C остаётся `CLOSED / ACCEPTED`;
 - [[project-plan]], [[backlog]] и [[decision-log]] остаются living trackers и не заменяют task Contract или Evidence.
@@ -69,4 +69,4 @@ docs/
 - [[mock-integrations]] и [[security-baseline]] задают честную local mock boundary и demo authorization;
 - [[adr-index]] хранит семь ADR: шесть исходных решений этапа 5 и ADR-0007, которое исторически заменяет stack-часть ADR-0001.
 
-Stage 6 остаётся в работе. `TASK-003 rev 1 / LIN-004` локально реализовала repository-owned strict documentation audit и обязательный CI step по `BLOCK-S6-003`; exact hosted CI и independent review ещё не доказаны, поэтому task остаётся `READY FOR CI VERIFICATION`, а finding — `OPEN`. Gate 2.1C remediation независимо проверена и принята: `TASK-002 rev 1 / LIN-003` синхронизирован, `BLOCK-G21C-001` закрыт, exact implementation commit — `7acc58c3eaaa84de3a637a94202f5f7e34a04612`. Gate 2.2C остаётся независимо принят и закрыт в `TASK-001 rev 2 / LIN-002` с implementation commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; эта lineage не переоткрывалась. Gate 2 не закрыт: remediation не заменяет отсутствующую отдельную acceptance-запись Gate 2.1 в целом и acceptance Gate 2.2A/B. Gate 1 сохраняет статус `publication CI pending`; GitHub Actions на PostgreSQL 18.1, Docker image build и container readiness smoke не подтверждены. Поэтому Stage 6 не закрыт, Stage 7 не начат.
+Stage 6 остаётся в работе. `TASK-003 rev 1 / LIN-004` и `BLOCK-S6-003` закрыты как `CLOSED / ACCEPTED`: exact hosted workflow `quality`, run `31303490227`, успешно выполнил repository-owned strict audit на SHA `2439f9aaecd912258206258bb73b71a54c855ab3`, после чего independent R1 review не нашёл findings. Этот review также подтвердил PostgreSQL 18.1, migrations, full pytest, Docker build и readiness в том же run, но не выполнял отдельное acceptance-решение по `BLOCK-S6-001`/Gate 1. Gate 2.1C remediation и Gate 2.2C остаются `CLOSED / ACCEPTED`; `BLOCK-S6-001` и `BLOCK-S6-002`, Gate 2 и Stage 6 остаются `OPEN`. Stage 7 не начат.

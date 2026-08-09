@@ -1,17 +1,17 @@
 ---
 artifact_id: project.stage-6-ci-documentation-audit-remediation
 status: active
-version: 3
+version: 4
 owner: engineering
-updated: 2026-08-07
+updated: 2026-08-09
 ---
 
 # Stage 6 canonical CI documentation-audit remediation
 
-Состояние: `IMPLEMENTED`
-Статус closure: `OPEN`
+Состояние: `CLOSED / ACCEPTED`
+Статус closure: `CLOSED / ACCEPTED`
 Текущая revision: `1`
-Точка передачи: `READY FOR CI VERIFICATION`
+Точка передачи: `SYNCED`
 
 Эта task-card маршрутизирует только воспроизводимость обязательного documentation audit в чистом repository checkout. Gate 2 и Stage 6 остаются `OPEN`; Stage 7 остаётся `NOT STARTED`.
 
@@ -146,11 +146,11 @@ Implementation разрешена только от чистого потомк�
 | `EV-404` | external source-control run with installed Python 3.12.8 and `--fail-on-warning` | exit 0; 60 documents, 0 errors, 0 warnings; proves source behavior only, not clean-checkout CI reproducibility |
 | `EV-405` | pre-work fingerprint | empty Git-layer manifest; SHA-256 `e3b0c442...b855` |
 
-## C. Finding status
+## C. Finding status at assignment
 
-`BLOCK-S6-003` is `OPEN / FIX AUTHORIZED`. No implementation evidence or hosted CI evidence exists yet.
+At assignment, `BLOCK-S6-003` was `OPEN / FIX AUTHORIZED`; implementation and hosted-CI evidence did not exist yet.
 
-## D. Metrics
+## D. Metrics at implementation handoff
 
 | Метрика | Значение |
 |---|---|
@@ -191,7 +191,7 @@ Implementation разрешена только от чистого потомк�
 - Canonical PostgreSQL bootstrap with CI synthetic credentials exited `1` before migrations/tests because the unrelated local PostgreSQL 15 instance rejects `workcard_admin`; Docker engine is not running. No secret or `.env` was read, credentials were not changed, and full PostgreSQL pytest was not claimed. Hosted CI remains mandatory.
 - Local dependency audits were not rerun; both exact dependency-audit steps remain present in CI and require hosted CI evidence for this task.
 
-### E4. Handoff and current disposition
+### E4. Implementation handoff disposition
 
 | Item | Current status | Основание |
 |---|---|---|
@@ -201,3 +201,42 @@ Implementation разрешена только от чистого потомк�
 | `CHK-RV-401` | OPEN | independent R1 review not performed in implementation context |
 | `BLOCK-S6-003` | `REMEDIATED LOCALLY / OPEN` | implementation and local evidence exist; hosted CI, independent review and acceptance pending |
 | Task handoff | `READY FOR CI VERIFICATION` | implementation commit `bce60e08bba117399e40b2ee0c095b9456049a4d`; no push/PR/publication performed; hosted CI and independent review pending |
+
+## F. Independent R1 closure — append-only
+
+### F1. Review and hosted-CI evidence
+
+| Evidence ID | Проверка | Результат |
+|---|---|---|
+| `EV-418` | independent baseline verification | exact repository/application roots, branch `codex/stage-6-mvp-implementation` и HEAD `2439f9aaecd912258206258bb73b71a54c855ab3`; worktree clean; index empty; untracked files отсутствуют |
+| `EV-419` | parent-baseline-to-HEAD lineage and scope review | parent `0e7c60fc9f5a6f07a0c3b5ab83febc31a15ae66e` является ancestor; commits `854a47d... → bce60e0... → 2439f9a...`; все 9 changed paths входят в A3 governance/implementation scope; workflow delta добавляет только exact documentation-audit step |
+| `EV-420` | upstream auditor preservation | external source SHA-256 `224a9943...f63c3`, repository SHA-256 `1f8d48fb...4457a`; diff ограничен Ruff formatting и переносом `Iterable` из `typing` в `collections.abc`; отчёты обоих auditor для текущих docs идентичны: 61/0/0 |
+| `EV-421` | independent local strict verification | session-local `PATH` к уже установленному Python 3.12.8; exact `python scripts/audit_docs.py --root . --fail-on-warning` exit `0`, 61 documents, 0 errors, 0 warnings; synthetic one-warning report дал exit `0` без strict flag и exit `1` с `--fail-on-warning` |
+| `EV-422` | GitHub Actions run metadata | workflow `quality`, run `31303490227`, attempt 1, event `push`, branch `codex/stage-6-mvp-implementation`, exact head SHA `2439f9aaecd912258206258bb73b71a54c855ab3`; run и единственный `foundation` job завершились `success` |
+| `EV-423` | hosted repository-owned documentation audit | checkout log показывает exact SHA; step `Audit project documentation` выполнил `python scripts/audit_docs.py --root . --fail-on-warning`; exit success, 61 documents, 0 errors, 0 warnings, structural PASS |
+| `EV-424` | preserved hosted CI gates | PostgreSQL `18.1-bookworm` health/bootstrap, оба dependency audits, Ruff format/lint, mypy, Bandit, secret scan, migrations `0001`–`0003`, full pytest `272 passed` with branch coverage `93.22%` against `85%`, OpenAPI check, `git diff --check`, Docker build/start и readiness — success; ожидаемые negative PostgreSQL statements не являются job failures |
+| `EV-425` | independent R1 verdict and conditional manual acceptance | `ACCEPTED — BLOCK-S6-003 CLOSED`; blocking findings отсутствуют; прямой запрос пользователя условно разрешил acceptance/closure и narrow governance-only synchronization при успешном review, условие выполнено |
+
+### F2. Requirement and finding closure
+
+| Item | Closure evidence | Финальный статус |
+|---|---|---|
+| `REQ-401`–`REQ-405` | `EV-407`–`EV-415`, independently replayed by `EV-418`–`EV-421` | `ACCEPTED` |
+| `REQ-406` | `EV-422`–`EV-424` | `ACCEPTED` |
+| `REQ-407` | `EV-418`, `EV-425`; lifecycle boundaries preserved | `ACCEPTED` |
+| `CHK-RV-401` | independent exact-baseline/diff/CI review `EV-418`–`EV-425` | `PASS` |
+| `BLOCK-S6-003` | root cause removed and exact hosted CI/review proven | `CLOSED / ACCEPTED` |
+| Review findings | none | `0 open` |
+
+### F3. Lifecycle synchronization
+
+| Объект | Финальное состояние |
+|---|---|
+| `TASK-003 rev 1` | `CLOSED / ACCEPTED`; lifecycle `SYNCED` |
+| `LIN-004` | synchronized; новая revision/lineage не создавалась |
+| `BLOCK-S6-003` | `CLOSED / ACCEPTED` |
+| `BLOCK-S6-001` / `BLOCK-S6-002` | `OPEN`; отдельный scope и отдельное acceptance-решение обязательны |
+| Gate 2 / Stage 6 | `OPEN / OPEN` |
+| Stage 7 | `NOT STARTED` |
+| Implementation changes during acceptance sync | `NOT PERFORMED` |
+| Push / PR / merge / deploy / publication | `NOT PERFORMED` |

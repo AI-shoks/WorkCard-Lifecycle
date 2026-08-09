@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 18
+version: 19
 owner: project
-updated: 2026-08-07
+updated: 2026-08-09
 ---
 
 # Project Plan
@@ -27,7 +27,7 @@ updated: 2026-08-07
 | 3 | Требования и acceptance criteria | `[x]` скорректировано | Новая модель покрыта объективными критериями |
 | 4 | UX-проектирование | `[x]` скорректировано | UX-спецификация и отдельный 14-шаговый прототип соответствуют новой модели |
 | 5 | Техническая архитектура | `[x]` выполнено | Приняты stack, system/data/API boundaries, транзакции, audit, security и ADR |
-| 6 | Инженерный фундамент и backend slices | `[-]` TASK-003 implemented locally / hosted CI pending; Gate 1/Gate 2 closure pending | Gate 2.1C remediation и Gate 2.2C закрыты; Gate 2 и Stage 6 не закрыты |
+| 6 | Инженерный фундамент и backend slices | `[-]` TASK-003/BLOCK-S6-003 accepted; Gate 1/Gate 2 closure pending | Gate 2.1C remediation, Gate 2.2C и TASK-003 закрыты; Gate 2 и Stage 6 не закрыты |
 | 7 | Backend vertical slice | `[ ]` не начато | Основной сценарий работает через API и БД |
 | 8 | Frontend vertical slice | `[ ]` не начато | Основной сценарий выполняется в браузере |
 | 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
@@ -111,7 +111,7 @@ updated: 2026-08-07
 - [x] [[quality-gates|Lint, format и typecheck]]
 - [x] [[ci-pipeline|CI]]
 
-**Gate 1 Foundation:** application factory, configuration, PostgreSQL pool/migrations, health/observability, prepared demo-session, server-side PostgreSQL revocation registry, Problem Details/OpenAPI, least-privilege roles, dependency/secret gates и CI configuration реализованы. Local remediation на Python 3.12/PostgreSQL 15.10 прошла; статус — `Gate 1 remediation validated; publication CI pending`.
+**Gate 1 Foundation:** application factory, configuration, PostgreSQL pool/migrations, health/observability, prepared demo-session, server-side PostgreSQL revocation registry, Problem Details/OpenAPI, least-privilege roles, dependency/secret gates и CI configuration реализованы. Local remediation на Python 3.12/PostgreSQL 15.10 прошла. Hosted run `31303490227` на exact SHA `2439f9aaecd912258206258bb73b71a54c855ab3` подтвердил PostgreSQL 18.1, migrations, full pytest, Docker build и readiness, но отдельное acceptance-решение по `BLOCK-S6-001`/Gate 1 в scope TASK-003 не выполнялось; blocker и Gate 1 closure остаются открыты.
 
 **Gate 2.1:** contracts, domain/PostgreSQL implementation и versioned production-batch API находятся в commits `cc370a7ce4cec971edfdac412fd1d804efd93dbe`, `194c19210ea7e9ad9b106219c76880c22bd9a141` и `2852e3c3b3c24f0533b6cbc9106c5bd8cc1be081`; отдельная manual acceptance-запись не найдена.
 
@@ -121,11 +121,11 @@ updated: 2026-08-07
 
 **Gate 2.2C:** `TASK-001 rev 2 / LIN-002` прошёл независимый финальный re-review с verdict `ACCEPTED`; подтверждённых findings нет, F-002–F-004 закрыты, REQ-201–REQ-206 доказаны. Пользователь вручную принял Gate 2.2C 2026-08-06. Принятый scope находится в commit `2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0`; task-card синхронизирована. Gate 2.2C закрыт.
 
-**Canonical CI documentation audit remediation:** [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]] находится в `IMPLEMENTED / READY FOR CI VERIFICATION`. Repository-owned auditor, canonical command и обязательный CI step реализованы; local strict audit/static/unit checks прошли. `BLOCK-S6-003` остаётся `OPEN` до exact hosted CI, independent review и acceptance. Gate 2 и Stage 6 остаются открыты.
+**Canonical CI documentation audit remediation:** [[stage-6-ci-documentation-audit-remediation|TASK-003 rev 1 / LIN-004]] и `BLOCK-S6-003` — `CLOSED / ACCEPTED`, lifecycle `SYNCED`. Exact hosted workflow `quality`, run `31303490227`, прошёл на SHA `2439f9aaecd912258206258bb73b71a54c855ab3`; repository-owned strict audit вернул 61 documents, 0 errors, 0 warnings; independent R1 review findings не обнаружил. Gate 2 и Stage 6 остаются открыты.
 
-**Не закрыто:** Gate 2 не принят целиком без acceptance обязательных Gate 2.1 и Gate 2.2A/B. Exact hosted GitHub Actions для новой documentation-audit remediation, Docker image/container smoke и PostgreSQL 18.1 verification не подтверждены; Gate 1 сохраняет `publication CI pending`. Поэтому Stage 6 остаётся открытым. Stage 7 не начат.
+**Не закрыто:** `BLOCK-S6-001` остаётся отдельным blocker до scoped acceptance Gate 1, несмотря на доступное hosted-run technical evidence. `BLOCK-S6-002` и Gate 2 остаются открыты без отдельных acceptance-записей обязательных Gate 2.1 и Gate 2.2A/B. Поэтому Stage 6 остаётся открытым. Stage 7 не начат.
 
-**Lifecycle-решение:** `2026-08-07`; Gate 2.1C remediation — `CLOSED / ACCEPTED`, Gate 2.2C — `CLOSED / ACCEPTED`, Gate 2 — `OPEN`, Stage 6 — `OPEN`, Stage 7 — `NOT STARTED`. Push и PR не выполнялись.
+**Lifecycle-решение:** `2026-08-09`; TASK-003/BLOCK-S6-003, Gate 2.1C remediation и Gate 2.2C — `CLOSED / ACCEPTED`; `BLOCK-S6-001`, `BLOCK-S6-002`, Gate 2 и Stage 6 — `OPEN`; Stage 7 — `NOT STARTED`. Push и PR не выполнялись.
 
 ## Этап 7. Backend vertical slice
 
