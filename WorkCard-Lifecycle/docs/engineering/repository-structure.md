@@ -1,32 +1,33 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 1
+version: 2
 owner: engineering
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Repository Structure
 
-Репозиторий организован как `pnpm` workspace. Структура отделяет deployable-приложения, общие runtime-контракты, инфраструктуру и проектную документацию.
+Git checkout содержит каталог приложения `WorkCard-Lifecycle/`, организованный как `pnpm` workspace. Структура отделяет deployable-приложения, общие runtime-контракты, инфраструктуру и проектную документацию. GitHub Actions workflow находится на уровне checkout root, потому что GitHub обнаруживает workflows только в корневой `.github/workflows/`.
 
 ## Дерево исходного кода
 
 ```text
 .
-├── apps/
-│   ├── api/                 Fastify API, мигратор, seed и проверки БД
-│   │   ├── migrations/      неизменяемые SQL-миграции
-│   │   └── src/             HTTP runtime и инженерные команды
-│   └── web/                 React SPA и frontend-тесты
-├── packages/
-│   └── contracts/           общие TypeBox-схемы и TypeScript-типы
-├── docs/                    управляемые проектные артефакты
-├── scripts/                 проверки документационного прототипа
-├── .github/workflows/       CI
-├── compose.yaml             локальный воспроизводимый контур
-├── Dockerfile               единый production-образ API + SPA
-└── package.json             корневые команды quality gate
+├── .github/workflows/ci.yml         GitHub Actions workflow
+└── WorkCard-Lifecycle/
+    ├── apps/
+    │   ├── api/                     Fastify API, мигратор, seed и проверки БД
+    │   │   ├── migrations/          неизменяемые SQL-миграции
+    │   │   └── src/                 HTTP runtime и инженерные команды
+    │   └── web/                     React SPA и frontend-тесты
+    ├── packages/
+    │   └── contracts/               общие TypeBox-схемы и TypeScript-типы
+    ├── docs/                        управляемые проектные артефакты
+    ├── scripts/                     проверки документационного прототипа
+    ├── compose.yaml                 локальный воспроизводимый контур
+    ├── Dockerfile                   единый production-образ API + SPA
+    └── package.json                 корневые команды quality gate
 ```
 
 `node_modules`, `dist`, coverage, локальные `.env` и кэши являются производными данными и не входят в Git. `pnpm-lock.yaml`, SQL-миграции и `.env.example` входят в Git как воспроизводимая спецификация.
@@ -49,4 +50,4 @@ updated: 2026-09-01
 
 ## Критерий принятия
 
-Структура принята после успешных workspace typecheck/tests/build и сборки multi-stage образа из чистого Docker build context.
+Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflow запускает команды из `WorkCard-Lifecycle/`.

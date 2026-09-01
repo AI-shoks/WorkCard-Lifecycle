@@ -1,20 +1,20 @@
 ---
 artifact_id: engineering.ci-pipeline
 status: accepted
-version: 1
+version: 2
 owner: engineering
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # CI Pipeline
 
-GitHub Actions workflow `.github/workflows/ci.yml` воспроизводит локальные quality gates и отдельно доказывает запуск из чистого контейнерного окружения.
+GitHub Actions workflow находится в `.github/workflows/ci.yml` относительно Git checkout root. Исходный workspace расположен в `WorkCard-Lifecycle/`, поэтому общий `defaults.run.working-directory` направляет все shell steps в корень приложения. Такое размещение позволяет GitHub обнаружить workflow и сохраняет код проекта в существующей директории репозитория.
 
 ## Триггеры и безопасность
 
 Pipeline запускается для pull request и push в `main`/`codex/**`. Concurrency отменяет устаревший run той же ветки. Workflow имеет только `contents: read`; deployment, публикация образа и запись в репозиторий отсутствуют.
 
-Dependency install использует Node из `.node-version`, фиксированный `pnpm` и `pnpm install --frozen-lockfile`. Lockfile проходит включённую minimum-release-age policy; build-script разрешён только пакету `esbuild`.
+Dependency install использует Node из `WorkCard-Lifecycle/.node-version`, фиксированный `pnpm` и `pnpm install --frozen-lockfile`. Cache key явно строится по `WorkCard-Lifecycle/pnpm-lock.yaml`. Lockfile проходит включённую minimum-release-age policy; build-script разрешён только пакету `esbuild`.
 
 ## Job `quality`
 
@@ -38,4 +38,4 @@ Job зависит от `quality`, строит multi-stage образ чере�
 
 ## Критерий принятия
 
-YAML и Compose model валидны, все команды обоих jobs воспроизведены локально на чистом PostgreSQL volume и production-образе. Первый remote run ожидается после отдельно авторизованного commit/push; отсутствие push не меняет принятую конфигурацию pipeline.
+Workflow обнаруживается GitHub из корневой `.github/workflows/`, а shell steps выполняются в `WorkCard-Lifecycle/`. Оба jobs должны пройти на первом remote run после исправления размещения; локальные code gates остаются отдельным обязательным доказательством.
