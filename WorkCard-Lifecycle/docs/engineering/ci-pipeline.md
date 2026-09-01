@@ -1,11 +1,41 @@
 ---
 artifact_id: engineering.ci-pipeline
-status: planned
-version: 0
+status: accepted
+version: 1
 owner: engineering
-updated: 2026-07-17
+updated: 2026-09-01
 ---
 
 # CI Pipeline
 
-Артефакт этапа 6: триггеры, jobs, кэширование, тесты и правила прохождения CI.
+GitHub Actions workflow `.github/workflows/ci.yml` воспроизводит локальные quality gates и отдельно доказывает запуск из чистого контейнерного окружения.
+
+## Триггеры и безопасность
+
+Pipeline запускается для pull request и push в `main`/`codex/**`. Concurrency отменяет устаревший run той же ветки. Workflow имеет только `contents: read`; deployment, публикация образа и запись в репозиторий отсутствуют.
+
+Dependency install использует Node из `.node-version`, фиксированный `pnpm` и `pnpm install --frozen-lockfile`. Lockfile проходит включённую minimum-release-age policy; build-script разрешён только пакету `esbuild`.
+
+## Job `quality`
+
+1. поднимает чистую PostgreSQL 18.6 service;
+2. устанавливает зависимости с pnpm cache;
+3. выполняет `pnpm check`;
+4. применяет миграцию;
+5. выполняет seed дважды;
+6. запускает runtime DB verification;
+7. валидирует Compose model.
+
+Owner и runtime credentials существуют только в job environment и являются синтетическими.
+
+## Job `container`
+
+Job зависит от `quality`, строит multi-stage образ через `docker compose up --build --wait`, проверяет liveness, readiness и SPA. При ошибке печатает container logs; cleanup с удалением ephemeral volumes выполняется всегда.
+
+## Кэширование и артефакты
+
+Кэшируется только pnpm store по lockfile. `node_modules`, собранный образ, БД и секреты не публикуются. Container build остаётся clean-room доказательством, а не использует host `node_modules` благодаря `.dockerignore`.
+
+## Критерий принятия
+
+YAML и Compose model валидны, все команды обоих jobs воспроизведены локально на чистом PostgreSQL volume и production-образе. Первый remote run ожидается после отдельно авторизованного commit/push; отсутствие push не меняет принятую конфигурацию pipeline.

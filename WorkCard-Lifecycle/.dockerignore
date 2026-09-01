@@ -1,0 +1,14 @@
+.git
+.github
+.obsidian
+.trash
+node_modules
+**/node_modules
+**/dist
+coverage
+.env
+.env.*
+!.env.example
+docs
+README.md
+00 Home.md

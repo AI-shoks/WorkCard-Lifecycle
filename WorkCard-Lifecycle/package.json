@@ -1,0 +1,40 @@
+{
+  "name": "work-card-lifecycle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.19.0 <25",
+    "pnpm": "11.19.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "compose:config": "docker compose config --quiet",
+    "compose:down": "docker compose down",
+    "compose:logs": "docker compose logs --follow app database",
+    "compose:up": "docker compose up --build",
+    "db:migrate": "pnpm --filter @work-card/api db:migrate",
+    "db:seed": "pnpm --filter @work-card/api db:seed",
+    "db:verify": "pnpm --filter @work-card/api db:verify",
+    "dev": "pnpm --filter @work-card/contracts build && pnpm --parallel --filter @work-card/api --filter @work-card/web dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "pnpm --filter @work-card/contracts build && pnpm -r --if-present test",
+    "typecheck": "pnpm --filter @work-card/contracts build && pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "eslint": "10.9.1",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.5",
+    "globals": "17.11.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0",
+    "vitest": "4.1.11"
+  }
+}

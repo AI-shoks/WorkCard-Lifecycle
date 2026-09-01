@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Code and database quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+        env:
+          POSTGRES_DB: workcard
+          POSTGRES_USER: workcard_owner
+          POSTGRES_PASSWORD: workcard_owner_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workcard_owner -d workcard"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      APP_DATABASE_PASSWORD: workcard_app_ci
+      APP_DATABASE_USER: workcard_app
+      DATABASE_URL: postgresql://workcard_app:workcard_app_ci@localhost:5432/workcard
+      MIGRATION_DATABASE_URL: postgresql://workcard_owner:workcard_owner_ci@localhost:5432/workcard
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run code quality gates
+        run: pnpm check
+
+      - name: Validate database bootstrap
+        run: |
+          pnpm db:migrate
+          pnpm db:seed
+          pnpm db:seed
+          pnpm db:verify
+
+      - name: Validate Compose model
+        run: docker compose config --quiet
+
+  container:
+    name: Clean container startup
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build and start the clean environment
+        run: docker compose up --build --wait --wait-timeout 180
+
+      - name: Check runtime endpoints
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:3000/health/live
+          curl --fail --silent --show-error http://127.0.0.1:3000/health/ready
+          curl --fail --silent --show-error http://127.0.0.1:3000/
+
+      - name: Show container logs after failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop the environment
+        if: always()
+        run: docker compose down --volumes --remove-orphans
