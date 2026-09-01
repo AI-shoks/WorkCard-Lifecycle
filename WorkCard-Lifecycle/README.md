@@ -4,12 +4,21 @@
 
 ## Текущий статус
 
-- Этапы 1–3 скорректированы после семантического review и снова имеют канонические принятые артефакты.
-- Этап 4 скорректирован: UX-спецификация дополнена отдельным [14-шаговым кликабельным прототипом](docs/ux/prototype.html).
-- Этап 5 «Техническая архитектура» не начат; он остаётся следующей контрольной точкой после review коррекции.
-- Draft PR #1 остаётся draft и не должен сливаться без отдельного review/PR workflow.
-- Свежая проверка: structural audit — `48` документов, `0` errors, `0` warnings; semantic gate, ID/metadata validation, JS syntax и headless interactive checks — PASS.
-- План: [[project-plan]], scope: [[mvp-scope]], происхождение решений: [[decision-provenance]], индекс: [[documentation-index]].
+- Этапы 1–4 завершены: product scope, доменная модель, требования и 14-шаговый UX-прототип согласованы.
+- Этап 5 завершён: приняты архитектурные артефакты и ADR-0001–ADR-0006.
+- Этап 6 завершён: создан воспроизводимый инженерный фундамент с pnpm workspace, Fastify, React, PostgreSQL bootstrap, Docker Compose и CI.
+- Следующий этап — backend vertical slice. Производственный API и бизнес-сценарий ещё не реализованы.
+- На 2026-09-01 локально проходят format, lint, typecheck, 5 тестов и production build; structural audit проверяет 55 документов без ошибок и предупреждений.
+
+## Репозиторий и навигация
+
+- [Repository](https://github.com/AI-shoks/WorkCard-Lifecycle)
+- [Roadmap](docs/project/project-plan.md)
+- [Backlog](docs/project/backlog.md)
+- [Decision log](docs/project/decision-log.md)
+- [Architecture](docs/architecture/technology-stack.md)
+- [Local development](docs/engineering/local-development.md)
+- [[00 Home|Vault index]], [[mvp-scope|scope]], [[decision-provenance|происхождение решений]], [[documentation-index|индекс материалов]]
 
 ## Исправленная предметная модель
 

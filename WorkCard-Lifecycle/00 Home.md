@@ -6,9 +6,9 @@ tags:
   - case-study
   - workcard
 status: active
-version: 7
+version: 8
 owner: navigation
-updated: 2026-07-17
+updated: 2026-09-01
 ---
 
 # Production Work Card Workflow
@@ -17,11 +17,17 @@ updated: 2026-07-17
 
 ## Сейчас
 
-**Этапы 1–3 семантически скорректированы:** модель соответствует подтверждённому AS-IS и явным TO-BE решениям.
+**Этапы 1–6 выполнены.** Приняты product/domain/requirements/UX, техническая архитектура и инженерный фундамент. Следующая контрольная точка — **этап 7, backend vertical slice**; производственный API пока не реализован.
 
-**Этап 4 скорректирован:** UX-документы, [[ux-copy-guidelines|канонические правила UX-текста]] и отдельный [14-шаговый кликабельный прототип](docs/ux/prototype.html) включают цифровую финальную приёмку партии. Технические сведения отделены от производственного интерфейса. Этап 5 не начат и остаётся следующей контрольной точкой после review.
+**Последняя локальная проверка:** format, lint, typecheck, 5 тестов и production build — PASS; structural audit — 55 документов, 0 errors, 0 warnings. Docker-проверки выполняет CI после push.
 
-**Последняя проверка:** 48 документов, 0 errors, 0 warnings; semantic, ID, metadata и prototype gates — PASS.
+## Репозиторий
+
+- [Repository](https://github.com/AI-shoks/WorkCard-Lifecycle)
+- [README](README.md)
+- [[project-plan|Канонический roadmap]]
+- [[backlog|Backlog]]
+- [[decision-log|Журнал решений]]
 
 ## Управление проектом
 
