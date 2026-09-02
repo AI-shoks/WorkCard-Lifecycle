@@ -89,11 +89,16 @@ async function ensureRuntimeRole(
 async function applyRuntimeGrants(client: Client, roleIdentifier: string): Promise<void> {
   await client.query('REVOKE CREATE ON SCHEMA public FROM PUBLIC');
   await client.query(`GRANT USAGE ON SCHEMA public TO ${roleIdentifier}`);
-  await client.query(
-    `REVOKE ALL ON schema_migrations, demo_users, production_passports, operation_plans FROM ${roleIdentifier}`,
-  );
+  await client.query(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${roleIdentifier}`);
   await client.query(
     `GRANT SELECT ON schema_migrations, demo_users, production_passports, operation_plans TO ${roleIdentifier}`,
+  );
+  await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON demo_sessions TO ${roleIdentifier}`);
+  await client.query(
+    `GRANT SELECT, INSERT, UPDATE ON production_batches, work_card_sets, work_cards, command_receipts TO ${roleIdentifier}`,
+  );
+  await client.query(
+    `GRANT SELECT, INSERT ON batch_operation_plan_snapshots, final_batch_acceptances, payroll_records, audit_events TO ${roleIdentifier}`,
   );
 }
 

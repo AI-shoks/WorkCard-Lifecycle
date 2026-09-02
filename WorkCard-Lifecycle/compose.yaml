@@ -68,11 +68,13 @@ services:
       APP_DATABASE_USER: ${APP_DATABASE_USER:-workcard_app}
       APP_ENV: production
       APP_VERSION: ${APP_VERSION:-0.1.0}
+      APP_ORIGIN: ${COMPOSE_APP_ORIGIN:-http://localhost:3000}
       DATABASE_URL: postgresql://${APP_DATABASE_USER:-workcard_app}:${APP_DATABASE_PASSWORD:-workcard_app_local}@database:5432/${POSTGRES_DB:-workcard}
       HOST: 0.0.0.0
       LOG_LEVEL: ${LOG_LEVEL:-info}
       NODE_ENV: production
       PORT: 3000
+      SESSION_SIGNING_SECRET: ${SESSION_SIGNING_SECRET:-local-compose-session-secret-change-me}
       WEB_DIST_PATH: /opt/work-card/public
     ports:
       - 127.0.0.1:${PORT:-3000}:3000

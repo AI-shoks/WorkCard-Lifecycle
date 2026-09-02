@@ -71,6 +71,12 @@ jobs:
           pnpm db:seed
           pnpm db:verify
 
+      - name: Run backend integration tests
+        env:
+          INTEGRATION_DATABASE_URL: ${{ env.DATABASE_URL }}
+          INTEGRATION_MIGRATION_DATABASE_URL: ${{ env.MIGRATION_DATABASE_URL }}
+        run: pnpm --filter @work-card/api test:integration
+
       - name: Validate Compose model
         run: docker compose config --quiet
 

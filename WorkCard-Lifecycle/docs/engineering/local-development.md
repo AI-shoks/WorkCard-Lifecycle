@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.local-development
 status: accepted
-version: 1
+version: 2
 owner: engineering
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Local Development
@@ -33,10 +33,10 @@ docker compose up --build --wait --wait-timeout 180
 
 После готовности:
 
-- приложение: `http://127.0.0.1:3000/`;
-- liveness: `http://127.0.0.1:3000/health/live`;
-- readiness: `http://127.0.0.1:3000/health/ready`;
-- OpenAPI: `http://127.0.0.1:3000/api/openapi.json`;
+- приложение: `http://localhost:3000/`;
+- liveness: `http://localhost:3000/health/live`;
+- readiness: `http://localhost:3000/health/ready`;
+- OpenAPI: `http://localhost:3000/api/openapi.json`;
 - PostgreSQL для host-команд: `127.0.0.1:55439`.
 
 Контейнеры `migrate` и `seed` должны завершиться с кодом `0`; `database` и `app` — перейти в `healthy`.
@@ -50,6 +50,16 @@ pnpm dev
 
 Vite обслуживает frontend с hot reload и проксирует `/api` и `/health` на API. Для работы с контейнерной БД host-процессы используют URL из `.env`.
 
+`APP_ORIGIN=http://localhost:5173` разрешает mutation через Vite proxy. Compose передаёт отдельный `COMPOSE_APP_ORIGIN=http://localhost:3000`, поскольку production-сборка SPA и API работает под одним origin. `SESSION_SIGNING_SECRET` в `.env.example` допустим только для локального синтетического контура.
+
+DB integration tests запускаются после migrate/seed против отдельной disposable БД или CI service:
+
+```powershell
+$env:INTEGRATION_DATABASE_URL = $env:DATABASE_URL
+$env:INTEGRATION_MIGRATION_DATABASE_URL = $env:MIGRATION_DATABASE_URL
+pnpm --filter @work-card/api test:integration
+```
+
 ## Диагностика и остановка
 
 ```powershell
@@ -62,4 +72,4 @@ docker compose down
 
 ## Проверенный baseline
 
-1 сентября 2026 года clean build создал образ, PostgreSQL 18.6 применил миграцию `0001`, повторные migration/seed завершились без изменений, а UI и оба health endpoint ответили успешно. Особенность рабочей станции — занятые локальными PostgreSQL порты `5432` и `55432`, поэтому проект использует `55439` по умолчанию.
+1 сентября 2026 года foundation clean build создал образ и подтвердил UI/health. 2 сентября текущий backend checkout прошёл local clean-container startup; отдельная чистая БД применила `0001`–`0003`, повторный seed/verify и 5 backend integration tests. Основной Compose-стек также пересобран из текущего checkout с сохранением существующего volume. Удалённый CI этого незакоммиченного diff ещё не запускался; проектный PostgreSQL использует `55439` по умолчанию.

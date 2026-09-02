@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.system-context
 status: accepted
-version: 1
+version: 2
 owner: architecture
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # System Context
@@ -53,7 +53,7 @@ C4Container
 ## Границы доверия
 
 1. **Браузер недоверенный.** `role`, `actorId`, `assigneeId`, versions и hidden controls из клиента не дают полномочий.
-2. **API — граница авторизации.** Он восстанавливает actor/role из подписанной demo-session, валидирует схему, permission, state, gate и версии.
+2. **API — граница авторизации.** Он восстанавливает actor/role из подписанной demo-session, проверяет route permission и mutation Origin/CSRF до schema, затем валидирует разрешённые caller state, gate и версии.
 3. **PostgreSQL — граница атомарности.** Предметные изменения, command receipt и audit events коммитятся одной транзакцией.
 4. **Reference data синтетические и read-only.** UI не редактирует паспорта, operation plans или нормы.
 5. **Mock payroll не является реальной интеграцией.** Нет исходящего HTTP, денег, персональных начислений или фоновой доставки.
@@ -83,7 +83,7 @@ sequenceDiagram
 
     User->>Web: Подтверждает действие
     Web->>API: POST commandId + expectedVersion(s)
-    API->>API: session, CSRF, permission, schema
+    API->>API: session, permission, Origin/CSRF, schema
     API->>DB: BEGIN; receipt; deterministic locks
     API->>DB: validate state/gate/version
     API->>DB: state changes + audit events + receipt
@@ -115,4 +115,4 @@ sequenceDiagram
 
 ## Граница готовности
 
-Этот документ определяет целевую архитектуру. Реализация контейнеров, health checks и local runtime относится к этапу 6; наличие схемы на диаграмме не является заявлением о работающем backend/frontend.
+Backend-контейнеры, health checks и серверные модули реализованы локально на этапах 6–7; frontend пока остаётся health-оболочкой. Hosted TLS/network/operations относятся к этапу 10, поэтому схема hosted demo не является заявлением о production deployment.

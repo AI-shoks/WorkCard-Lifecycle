@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 7
+version: 8
 owner: project
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Documentation Index
@@ -45,7 +45,7 @@ docs/
 
 ## Текущая контрольная точка
 
-Этапы 1–6 завершены. Архитектурные артефакты и ADR-0001–ADR-0006 приняты; инженерный фундамент реализован и задокументирован. Следующий этап — backend vertical slice из [[project-plan]]. Наличие foundation не считается доказательством реализации производственного сценария.
+Этапы 1–6 завершены. Backend vertical slice этапа 7 реализован и прошёл локальные code/DB integration и clean-container gates, но остаётся на проверке до зелёных jobs для нового commit SHA. Machine-readable API, транзакции и тесты теперь являются доказательством backend-сценария; frontend flow ещё не подключён к нему. Наглядный, неканонический обзор состояния доступен в [project-dashboard.html](project-dashboard.html).
 
 ## Происхождение и семантическая проверка
 

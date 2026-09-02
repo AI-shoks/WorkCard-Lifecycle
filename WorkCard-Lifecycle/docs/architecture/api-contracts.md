@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 1
+version: 2
 owner: architecture
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # API Contracts
@@ -221,7 +221,7 @@ Errors используют `application/problem+json` (RFC 9457):
 | `404` | разрешённый caller не видит resource | `RESOURCE_NOT_FOUND` |
 | `409` | version/state/gate/idempotency conflict | `VERSION_CONFLICT`, `STATE_CONFLICT`, `GATE_CLOSED`, `COMMAND_ID_REUSED` |
 | `422` | schema валидна, business input недопустим | `INVALID_QUANTITY`, `MIXED_WORK_CARD_SET`, `INVALID_ASSIGNEE` |
-| `429` | rate limit | `TOO_MANY_REQUESTS` |
+| `429` | зарезервировано для rate limit этапа 9; текущий backend ещё не выдаёт этот ответ | `TOO_MANY_REQUESTS` |
 | `500` | непредвиденная ошибка | `INTERNAL_ERROR`, без stack/SQL detail |
 | `503` | DB/readiness недоступны | `SERVICE_UNAVAILABLE` |
 
@@ -232,12 +232,12 @@ Errors используют `application/problem+json` (RFC 9457):
 - `GET /health/live` — процесс отвечает, без DB dependency.
 - `GET /health/ready` — короткий `SELECT 1` и migration version; `503`, если БД не готова.
 - `GET /api/openapi.json` — contract для разработки; в public demo read-only.
-- Swagger UI включается только локально или за admin/developer feature flag.
+- Swagger UI не подключён; доступен только generated OpenAPI JSON для разработки.
 
 ## Contract gates
 
 - TypeBox schema компилируется и генерирует OpenAPI без ошибок;
 - response serialization включена для всех маршрутов;
-- negative contract tests покрывают unknown fields, UUID/decimal/date formats, body limits и role tampering;
-- OpenAPI snapshot diff рассматривается как public contract change;
+- текущие negative tests покрывают unknown fields, invalid UUID/schema, role tampering и ранний security order; body-limit/decimal/date matrix относится к этапу 9;
+- automated OpenAPI snapshot diff относится к этапу 9; до него contract review выполняется по TypeBox schemas и generated document;
 - API tests доказывают отсутствие `sequenceNumber`, batch-level `normHours` и неявной final acceptance.

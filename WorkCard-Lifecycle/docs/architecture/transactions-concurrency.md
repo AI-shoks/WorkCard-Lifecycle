@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.transactions-concurrency
 status: accepted
-version: 1
+version: 2
 owner: architecture
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Transactions and Concurrency
@@ -25,14 +25,14 @@ updated: 2026-09-01
 
 Порядок каждой mutation:
 
-1. Проверить trusted session, CSRF, route permission и JSON schema вне транзакции.
+1. Проверить trusted session, route permission, mutation Origin/CSRF и затем JSON schema вне транзакции.
 2. Начать transaction и вставить `command_receipt(state = IN_PROGRESS)` с уникальным `commandId`.
 3. Если insert проиграл unique race, дождаться winner transaction и прочитать receipt:
    - тот же type/actor и `SUCCEEDED` → вернуть сохранённый result как replay;
    - другой type/actor → `COMMAND_ID_REUSED`;
    - отсутствие row после rollback winner → повторить insert один раз в той же новой transaction.
 4. Заблокировать aggregate rows в каноническом порядке.
-5. Проверить существование, trusted role, state, purpose, gate, business input и все versions.
+5. Проверить существование разрешённых caller ресурсов, state, purpose, gate, resource-dependent business input и все versions.
 6. Применить changes; каждый изменённый root увеличивает version ровно на один.
 7. Вставить по одному audit event на resulting aggregate version.
 8. Завершить receipt: result, HTTP status, `event_count`, `correlation_id`, `SUCCEEDED`.

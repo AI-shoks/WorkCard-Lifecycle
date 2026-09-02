@@ -25,7 +25,13 @@ async function main(): Promise<void> {
         censor: '[REDACTED]',
       },
     },
+    pool,
     readiness: createDatabaseReadiness(pool),
+    security: {
+      allowedOrigin: config.allowedOrigin,
+      cookieSecure: config.cookieSecure,
+      signingSecret: config.sessionSigningSecret,
+    },
     ...(config.webDistPath ? { webDistPath: resolve(config.webDistPath) } : {}),
   });
 

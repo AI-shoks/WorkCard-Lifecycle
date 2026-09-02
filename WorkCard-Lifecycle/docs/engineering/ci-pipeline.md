@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.ci-pipeline
 status: accepted
-version: 2
+version: 3
 owner: engineering
 updated: 2026-09-02
 ---
@@ -24,9 +24,12 @@ Dependency install использует Node из `WorkCard-Lifecycle/.node-vers
 4. применяет миграцию;
 5. выполняет seed дважды;
 6. запускает runtime DB verification;
-7. валидирует Compose model.
+7. запускает backend integration suite с runtime и owner URL;
+8. валидирует Compose model.
 
 Owner и runtime credentials существуют только в job environment и являются синтетическими.
+
+Dependency audit, secret scan и image vulnerability scan в текущий workflow не входят; это явный security/quality gap этапа 9, а не уже реализованный gate.
 
 ## Job `container`
 
@@ -38,4 +41,4 @@ Job зависит от `quality`, строит multi-stage образ чере�
 
 ## Критерий принятия
 
-Workflow обнаруживается GitHub из корневой `.github/workflows/`, а shell steps выполняются в `WorkCard-Lifecycle/`. Оба jobs должны пройти на первом remote run после исправления размещения; локальные code gates остаются отдельным обязательным доказательством.
+Workflow обнаруживается GitHub из корневой `.github/workflows/`, а shell steps выполняются в `WorkCard-Lifecycle/`. Последний известный зелёный run обоих jobs относится к commit `d0ecc812`. Backend diff этапа 7 пока не имеет нового commit SHA и удалённо не проверялся; локальные code/database/container gates не заменяют обязательный зелёный run будущего SHA.

@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.database-bootstrap
 status: accepted
-version: 1
+version: 2
 owner: engineering
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Database Bootstrap
@@ -27,7 +27,7 @@ PostgreSQL healthy
 4. создаёт `schema_migrations`;
 5. сверяет SHA-256 checksum уже применённых файлов;
 6. применяет каждый новый SQL-файл в отдельной транзакции;
-7. отзывает лишние права и выдаёт runtime-роли только нужный `SELECT`.
+7. отзывает лишние права и выдаёт runtime-роли минимальные table-specific `SELECT`/`INSERT`/`UPDATE`/session `DELETE`; immutable/reference tables остаются без mutation-прав.
 
 Изменение имени или содержимого применённой миграции приводит к ошибке. Следующее изменение схемы создаётся новым файлом.
 
@@ -40,7 +40,22 @@ PostgreSQL healthy
 - `operation_plans` с положительными количествами и нормами;
 - FK, unique и check constraints на уровне PostgreSQL.
 
-Таблицы жизненного цикла карточек принадлежат backend vertical slice этапа 7.
+## Вторая миграция
+
+`0002_backend-vertical-slice.sql` совместимо расширяет foundation:
+
+- добавляет revision/scope к read-only reference data;
+- создаёт server-backed demo sessions;
+- создаёт партии, immutable plan snapshots, комплекты и UUID-карточки без sequence/part identity;
+- создаёт immutable `FinalBatchAcceptance` и `PayrollRecord`;
+- создаёт command receipts, correlation IDs и append-only audit events;
+- закрепляет lifecycle, cross-row links, uniqueness и immutable rows PostgreSQL constraints/triggers.
+
+Применённый `0001` не редактировался; существующая БД получает изменения только через последовательную `0002`.
+
+## Третья миграция
+
+`0003_align-operation-plan-norm-precision.sql` приводит foundation-колонку `operation_plans.norm_hours` к принятому `numeric(8,2)`. Перед `ALTER TYPE` она явно отказывается продолжать, если существующее значение потребовало бы округления или не помещается в целевой диапазон. Уже применённые `0001` и `0002` не переписываются.
 
 ## Seed
 
@@ -62,7 +77,9 @@ pnpm db:verify
 - наличие шести пользователей и пяти ролей;
 - состав трёх операций и сумму `250`;
 - успешное чтение;
-- отказ PostgreSQL `42501` при попытке `UPDATE` справочника.
+- отказ PostgreSQL `42501` при попытке `UPDATE` справочника;
+- отсутствие batch-level `norm_hours`, `sequence_number` и `part_number`;
+- наличие runtime mutation-прав только у изменяемых таблиц и отсутствие `UPDATE/DELETE` у audit/final/payroll.
 
 ## Откат
 
@@ -70,4 +87,4 @@ pnpm db:verify
 
 ## Критерий принятия
 
-Миграция применена к чистой PostgreSQL 18.6, повторный migrate подтвердил checksum, seed успешно выполнен дважды, runtime verification прошёл.
+Миграции `0001`–`0003` применены к чистой PostgreSQL, повторный migrate подтвердил checksum, seed повторяем, runtime verification и DB integration suite прошли. PostgreSQL 18.6 дополнительно проверяется CI service/container job.

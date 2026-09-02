@@ -11,21 +11,38 @@ import {
   type ProblemDetails,
   type ReadinessResponse,
 } from '@work-card/contracts';
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import Fastify, {
+  type FastifyError,
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+  type FastifyServerOptions,
+} from 'fastify';
+import type { Pool } from 'pg';
 
+import { registerApiRoutes } from './api-routes.js';
+import { DomainError } from './domain-error.js';
 import type { ReadinessService } from './readiness.js';
+import type { SessionManagerOptions } from './session-manager.js';
 
-const expectedMigrationVersion = 1;
+const expectedMigrationVersion = 3;
 
 export type BuildAppOptions = {
   appVersion: string;
   logger?: FastifyServerOptions['logger'];
+  pool?: Pool;
   readiness: ReadinessService;
+  security?: SessionManagerOptions;
   webDistPath?: string;
 };
 
 export async function buildApp(options: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
+    ajv: {
+      customOptions: {
+        removeAdditional: false,
+      },
+    },
     bodyLimit: 1_048_576,
     logger: options.logger ?? false,
     trustProxy: false,
@@ -35,6 +52,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
+        frameAncestors: ["'none'"],
         imgSrc: ["'self'", 'data:'],
         objectSrc: ["'none'"],
         scriptSrc: ["'self'"],
@@ -52,6 +70,16 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       openapi: '3.1.0',
     },
   });
+
+  app.addHook('onRequest', async (request, reply) => {
+    reply.header(
+      'Permissions-Policy',
+      'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
+    );
+    reply.header('X-Request-Id', request.id);
+  });
+
+  app.setErrorHandler(problemDetailsErrorHandler);
 
   app.get(
     '/health/live',
@@ -102,9 +130,102 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.get('/api/openapi.json', { schema: { hide: true } }, async () => app.swagger());
 
+  if (options.pool || options.security) {
+    if (!options.pool || !options.security) {
+      throw new Error('Для производственных API routes нужны pool и security options.');
+    }
+    await registerApiRoutes(app, options.pool, options.security);
+  }
+
   const webRoot = options.webDistPath ? resolve(options.webDistPath) : null;
   if (webRoot && existsSync(webRoot)) {
     await app.register(fastifyStatic, { root: webRoot, wildcard: false });
+  }
+
+  async function problemDetailsErrorHandler(
+    error: FastifyError,
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ) {
+    let status = 500;
+    let code = 'INTERNAL_ERROR';
+    let title = 'Внутренняя ошибка';
+    let detail = 'Не удалось обработать запрос. Повторите попытку позднее.';
+    let conflicts: ProblemDetails['conflicts'];
+
+    if (error instanceof DomainError) {
+      status = error.status;
+      code = error.code;
+      title = error.title;
+      detail = error.detail;
+      conflicts = error.conflicts;
+    } else if (typeof error === 'object' && error !== null && 'validation' in error) {
+      status = 400;
+      code = 'INVALID_REQUEST';
+      title = 'Некорректный запрос';
+      detail = 'Проверьте формат и обязательные поля запроса.';
+    } else if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'FST_ERR_CTP_BODY_TOO_LARGE'
+    ) {
+      status = 413;
+      code = 'PAYLOAD_TOO_LARGE';
+      title = 'Запрос слишком большой';
+      detail = 'Уменьшите объём запроса и повторите действие.';
+    } else if (
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      error.statusCode === 400
+    ) {
+      status = 400;
+      code = 'INVALID_REQUEST';
+      title = 'Некорректный запрос';
+      detail = 'Проверьте формат запроса.';
+    } else if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof error.code === 'string' &&
+      (error.code.startsWith('08') ||
+        ['57P01', '57P02', '57P03', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(error.code))
+    ) {
+      status = 503;
+      code = 'SERVICE_UNAVAILABLE';
+      title = 'Сервис временно недоступен';
+      detail = 'Повторите попытку позднее.';
+    } else if (
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      typeof error.statusCode === 'number' &&
+      error.statusCode >= 400 &&
+      error.statusCode < 500
+    ) {
+      status = error.statusCode;
+      code = status === 415 ? 'UNSUPPORTED_MEDIA_TYPE' : 'INVALID_REQUEST';
+      title = status === 415 ? 'Неподдерживаемый формат' : 'Некорректный запрос';
+      detail =
+        status === 415
+          ? 'Отправьте JSON с Content-Type application/json.'
+          : 'Проверьте формат запроса.';
+    } else {
+      request.log.error({ err: error }, 'request failed');
+    }
+
+    const problem: ProblemDetails = {
+      type: `https://work-card.example/problems/${code.toLowerCase().replaceAll('_', '-')}`,
+      title,
+      status,
+      detail,
+      instance: request.url.split('?')[0] ?? request.url,
+      code,
+      requestId: request.id,
+      ...(conflicts ? { conflicts } : {}),
+    };
+    return reply.code(status).type('application/problem+json').send(problem);
   }
 
   app.setNotFoundHandler(async (request, reply) => {

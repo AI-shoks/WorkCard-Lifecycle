@@ -1,18 +1,18 @@
 ---
 artifact_id: testing.strategy
-status: planned
-version: 0
+status: active
+version: 2
 owner: quality
-updated: 2026-07-17
+updated: 2026-09-02
 ---
 
 # Test Strategy
 
 Артефакт этапа 9: уровни тестов, критические инварианты, permissions, state machine, миграции, безопасность и производительность.
 
-## Предварительно зафиксированные future tests
+## Покрытие backend vertical slice
 
-До начала реализации этапа 9 матрица [[requirements-traceability]] уже объявляет обязательное покрытие отдельной финальной приёмки партии:
+До полного этапа 9 backend integration suite уже автоматизирует критический vertical slice отдельной финальной приёмки партии:
 
 | Test ID | Уровень | Цель |
 |---|---|---|
@@ -23,6 +23,10 @@ updated: 2026-07-17
 | `T-API-FINAL-BATCH-TXN-001` | integration | Acceptance, партия и audit event фиксируются атомарно. |
 | `T-API-FINAL-BATCH-PERMISSION-001` | integration | Команда разрешена только `QUALITY_CONTROLLER`. |
 | `T-API-FINAL-BATCH-READ-001` | integration | Read-back неизменяем и не имеет побочного эффекта. |
+| `T-API-SECURITY-ORDER` | integration | Session, role и Origin/CSRF выполняются до schema validation; rejected commands не оставляют state/event/receipt. |
+| `T-API-E2E-SMALL` | integration | Компактная fixture проходит создание, выпуск, first article, serial lifecycle/quality, final acceptance, payroll и audit/read-back только HTTP-командами. |
 | `T-E2E-FINAL-BATCH-001` | browser | Happy path показывает отдельное действие и actor/time/ID после all-closed state. |
 
-Это цели будущей автоматизации, а не утверждение о наличии backend/frontend тестов в текущем checkout.
+Текущий `workflow.integration.test.ts` содержит 5 тестов. Масштабный сценарий проверяет `3 sets / 250 cards / 254 release events`, `60 + 52`, concurrent assignment, replay и полноту audit; перед финальной приёмкой оставшееся массовое CLOSED-состояние в нём готовится owner-SQL и поэтому не объявляется API-only доказательством всех 250 lifecycle-переходов. Отдельный компактный сценарий из двух карточек выполняет каждый заявленный переход через HTTP API, включая final acceptance, payroll и read-back. Остальные проверки покрывают permission/order, CSRF/Origin без side effect, competing final commands, concurrent payroll export и runtime immutable grants.
+
+Этап 9 расширит это покрытие отдельными fault-injection migration/rollback tests, включая доказательство отката при принудительной ошибке audit insert, а также security/performance checks и browser E2E. Наличие backend suite не считается завершением общего quality-этапа.

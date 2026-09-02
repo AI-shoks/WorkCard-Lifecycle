@@ -25,12 +25,13 @@ async function main(): Promise<void> {
     }
 
     await client.query(
-      `INSERT INTO production_passports(id, product_code, product_name, planned_quantity)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO production_passports(id, product_code, revision, product_name, planned_quantity)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (id) DO NOTHING`,
       [
         demoPassport.id,
         demoPassport.productCode,
+        demoPassport.revision,
         demoPassport.productName,
         demoPassport.plannedQuantity,
       ],
@@ -39,8 +40,9 @@ async function main(): Promise<void> {
     for (const operation of demoOperations) {
       await client.query(
         `INSERT INTO operation_plans(
-           id, passport_id, operation_number, operation_name, planned_card_count, norm_hours
-         ) VALUES ($1, $2, $3, $4, $5, $6)
+           id, passport_id, operation_number, operation_name, planned_card_count, norm_hours,
+           scope_code
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id) DO NOTHING`,
         [
           operation.id,
@@ -49,6 +51,7 @@ async function main(): Promise<void> {
           operation.operationName,
           operation.plannedCardCount,
           operation.normHours,
+          operation.scopeCode,
         ],
       );
     }
@@ -81,8 +84,9 @@ async function main(): Promise<void> {
       planned_quantity: number;
       product_code: string;
       product_name: string;
+      revision: string;
     }>(
-      `SELECT id, product_code, product_name, planned_quantity
+      `SELECT id, product_code, revision, product_name, planned_quantity
        FROM production_passports WHERE id = $1`,
       [demoPassport.id],
     );
@@ -91,6 +95,7 @@ async function main(): Promise<void> {
       {
         id: demoPassport.id,
         product_code: demoPassport.productCode,
+        revision: demoPassport.revision,
         product_name: demoPassport.productName,
         planned_quantity: demoPassport.plannedQuantity,
       },
@@ -103,8 +108,9 @@ async function main(): Promise<void> {
       operation_name: string;
       operation_number: number;
       planned_card_count: number;
+      scope_code: string;
     }>(
-      `SELECT id, operation_number, operation_name, planned_card_count,
+      `SELECT id, operation_number, operation_name, planned_card_count, scope_code,
               trim(trailing '0' FROM norm_hours::text) AS norm_hours
        FROM operation_plans
        WHERE passport_id = $1
@@ -119,6 +125,7 @@ async function main(): Promise<void> {
         operation_name: operation.operationName,
         planned_card_count: operation.plannedCardCount,
         norm_hours: operation.normHours.replace(/0+$/, '').replace(/\.$/, ''),
+        scope_code: operation.scopeCode,
       })),
       'Существующий состав операций отличается от канонического seed.',
     );

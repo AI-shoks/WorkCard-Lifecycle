@@ -19,7 +19,7 @@ async function verifyReadModel(client: Client, expectedRole: string): Promise<vo
             (SELECT COALESCE(MAX(version), 0)::integer FROM schema_migrations) AS migration_version`,
   );
   assert.equal(context.rows[0]?.role_name, expectedRole, 'Подключение использует не runtime-роль.');
-  assert.equal(context.rows[0]?.migration_version, 1, 'Ожидается первая версия схемы.');
+  assert.equal(context.rows[0]?.migration_version, 3, 'Ожидается третья версия схемы.');
 
   const users = await client.query<{ fixture_count: number; role_count: number }>(
     `SELECT COUNT(*)::integer AS fixture_count,
@@ -72,6 +72,57 @@ async function verifyReadOnlyRole(client: Client): Promise<void> {
   throw new Error('Runtime-роль неожиданно получила право изменять справочные данные.');
 }
 
+async function verifyBackendSchema(client: Client): Promise<void> {
+  const forbiddenColumns = await client.query<{ count: number }>(
+    `SELECT COUNT(*)::integer AS count
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND (
+         (table_name = 'production_batches' AND column_name = 'norm_hours')
+         OR column_name IN ('sequence_number', 'part_number')
+       )`,
+  );
+  assert.equal(
+    forbiddenColumns.rows[0]?.count,
+    0,
+    'Схема не должна моделировать норматив партии или идентичность физической детали.',
+  );
+
+  const normPrecision = await client.query<{
+    numeric_precision: number;
+    numeric_scale: number;
+  }>(
+    `SELECT numeric_precision, numeric_scale
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'operation_plans'
+       AND column_name = 'norm_hours'`,
+  );
+  assert.deepEqual(normPrecision.rows[0], { numeric_precision: 8, numeric_scale: 2 });
+
+  const privileges = await client.query<{
+    audit_insert: boolean;
+    audit_update: boolean;
+    batch_update: boolean;
+    final_delete: boolean;
+    payroll_update: boolean;
+  }>(
+    `SELECT
+       has_table_privilege(current_user, 'audit_events', 'INSERT') AS audit_insert,
+       has_table_privilege(current_user, 'audit_events', 'UPDATE') AS audit_update,
+       has_table_privilege(current_user, 'production_batches', 'UPDATE') AS batch_update,
+       has_table_privilege(current_user, 'final_batch_acceptances', 'DELETE') AS final_delete,
+       has_table_privilege(current_user, 'payroll_records', 'UPDATE') AS payroll_update`,
+  );
+  assert.deepEqual(privileges.rows[0], {
+    audit_insert: true,
+    audit_update: false,
+    batch_update: true,
+    final_delete: false,
+    payroll_update: false,
+  });
+}
+
 async function main(): Promise<void> {
   const config = loadVerificationConfig();
   const client = new Client({ connectionString: config.databaseUrl });
@@ -80,7 +131,8 @@ async function main(): Promise<void> {
   try {
     await verifyReadModel(client, config.appDatabaseUser);
     await verifyReadOnlyRole(client);
-    console.info('Схема, синтетические данные и права runtime-роли проверены.');
+    await verifyBackendSchema(client);
+    console.info('Схема backend slice, синтетические данные и права runtime-роли проверены.');
   } finally {
     await client.end();
   }

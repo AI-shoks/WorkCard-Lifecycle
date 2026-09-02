@@ -7,12 +7,14 @@
 - Этапы 1–4 завершены: product scope, доменная модель, требования и 14-шаговый UX-прототип согласованы.
 - Этап 5 завершён: приняты архитектурные артефакты и ADR-0001–ADR-0006.
 - Этап 6 завершён: создан воспроизводимый инженерный фундамент с pnpm workspace, Fastify, React, PostgreSQL bootstrap, Docker Compose и CI.
-- Следующий этап — backend vertical slice. Производственный API и бизнес-сценарий ещё не реализованы.
-- На 2026-09-01 локально проходят format, lint, typecheck, 5 тестов и production build; structural audit проверяет 55 документов без ошибок и предупреждений.
+- Backend vertical slice этапа 7 реализован локально: trusted demo-session, read projections, все девять команд, optimistic concurrency, транзакционный audit, отдельная финальная приёмка и mock payroll.
+- Локальный clean-container текущего checkout проходит; следующая контрольная точка — зелёные `quality` и `container` jobs для нового commit SHA. До них этап 7 остаётся на проверке, а frontend vertical slice не объявляется начатым.
+- На 2026-09-02 локально проходят format, lint, typecheck, 11 обычных тестов, 5 PostgreSQL integration tests и production build; чистая БД применяет миграции `0001`–`0003`, повторный seed и runtime verification. Последний удалённый зелёный run относится только к `d0ecc812`, не к текущему незакоммиченному diff.
 
 ## Репозиторий и навигация
 
 - [Repository](https://github.com/AI-shoks/WorkCard-Lifecycle)
+- [Наглядная карта проекта](docs/project-dashboard.html)
 - [Roadmap](docs/project/project-plan.md)
 - [Backlog](docs/project/backlog.md)
 - [Decision log](docs/project/decision-log.md)

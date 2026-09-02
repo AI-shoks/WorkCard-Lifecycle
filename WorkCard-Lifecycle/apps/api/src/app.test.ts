@@ -27,14 +27,31 @@ describe('health routes', () => {
     expect(response.json()).toEqual({ status: 'ok', service: 'work-card-api', version: 'test' });
   });
 
+  it('отправляет принятые browser security headers', async () => {
+    const app = await buildApp({
+      appVersion: 'test',
+      readiness: readiness('down', null),
+    });
+    apps.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/health/live' });
+
+    expect(response.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+    expect(response.headers['permissions-policy']).toBe(
+      'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
+    );
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+  });
+
   it('подтверждает readiness только для доступной и мигрированной БД', async () => {
-    const app = await buildApp({ appVersion: 'test', readiness: readiness('up', 1) });
+    const app = await buildApp({ appVersion: 'test', readiness: readiness('up', 3) });
     apps.push(app);
 
     const response = await app.inject({ method: 'GET', url: '/health/ready' });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ status: 'ok', database: 'up', migrationVersion: 1 });
+    expect(response.json()).toMatchObject({ status: 'ok', database: 'up', migrationVersion: 3 });
   });
 
   it('возвращает 503 до готовности БД', async () => {

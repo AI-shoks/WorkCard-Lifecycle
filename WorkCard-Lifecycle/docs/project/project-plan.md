@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 11
+version: 12
 owner: project
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Project Plan
@@ -28,7 +28,7 @@ updated: 2026-09-01
 | 4 | UX-проектирование | `[x]` выполнено | 14-шаговый прототип и UX-спецификация согласованы с моделью |
 | 5 | Техническая архитектура | `[x]` выполнено | Приняты данные, API, транзакции, безопасность и шесть ADR |
 | 6 | Инженерный фундамент | `[x]` выполнено | Созданы monorepo, БД bootstrap, контейнерный runtime и CI |
-| 7 | Backend vertical slice | `[ ]` не начато | Следующая контрольная точка |
+| 7 | Backend vertical slice | `[-]` на проверке | Код, DB integration и local clean-container готовы; ожидается CI нового SHA |
 | 8 | Frontend vertical slice | `[ ]` не начато | Основной сценарий выполняется в браузере |
 | 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
 | 10 | Релиз | `[ ]` не начато | Проект воспроизводимо разворачивается |
@@ -67,19 +67,23 @@ updated: 2026-09-01
 - [x] [[quality-gates|Format, lint, typecheck, tests и build]].
 - [x] [[ci-pipeline|CI и clean-container smoke test]].
 
-**Закрыт:** 2026-09-01. Foundation содержит Fastify API с health endpoints, React shell, общие контракты, PostgreSQL bootstrap, multi-stage Docker image, Compose и GitHub Actions. Он не реализует производственный backend-сценарий этапа 7.
+**Закрыт:** 2026-09-01. Foundation содержит Fastify API с health endpoints, React shell, общие контракты, PostgreSQL bootstrap, multi-stage Docker image, Compose и GitHub Actions. На момент закрытия этапа 6 он ещё не реализовывал производственный backend-сценарий этапа 7.
 
-## Этап 7. Backend vertical slice — следующий
+## Этап 7. Backend vertical slice — на проверке
 
-- [ ] Read-only паспорт, operation plans и нормы технолога/БТБ.
-- [ ] Партия и несколько operation-scoped `WorkCardSet`.
-- [ ] Генерация UUID-карточек без sequence labels, со snapshots.
-- [ ] First-article gate и serial boundary.
-- [ ] Массовое назначение.
-- [ ] Lifecycle-команды мастера и positive-only БТК.
-- [ ] Финальная приёмка партии и audit log.
-- [ ] Mock payroll export и защита от повтора.
-- [ ] API/integration tests критических разрешений, инвариантов и конфликтов.
+- [x] Read-only паспорт, operation plans и нормы технолога/БТБ.
+- [x] Партия и несколько operation-scoped `WorkCardSet`.
+- [x] Генерация UUID-карточек без sequence labels, со snapshots.
+- [x] First-article gate и serial boundary.
+- [x] Массовое назначение, включая fixture `1 + 59 + 52`.
+- [x] Lifecycle-команды мастера и positive-only БТК.
+- [x] Финальная приёмка партии и audit log.
+- [x] Mock payroll export и защита от повтора.
+- [x] API/integration tests критических разрешений, инвариантов и конфликтов.
+- [x] Подтвердить обновлённый образ и clean-container startup локально на текущем checkout.
+- [ ] Подтвердить этот же diff удалёнными `quality`/`container` jobs после создания нового commit SHA.
+
+**Локальный результат 2026-09-02:** 11 обычных тестов и 5 PostgreSQL integration tests проходят; большой сценарий подтверждает `3 sets / 250 cards / 254 release events`, а компактная fixture из двух карточек проходит все lifecycle-переходы, финальную приёмку, payroll и audit/read-back только через HTTP API. Чистый контейнер текущего checkout применяет `0001`–`0003`, повторный seed и runtime grants verification. Этап не переводится в `[x]`, потому что последний удалённый зелёный run относится к `d0ecc812`, а новый commit SHA ещё не создан и не проверен CI.
 
 ## Этапы 8–12
 

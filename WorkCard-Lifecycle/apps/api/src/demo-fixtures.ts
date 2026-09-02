@@ -42,6 +42,7 @@ export const demoPassport = {
   productCode: 'DEMO-250',
   productName: 'Учебное изделие',
   plannedQuantity: 250,
+  revision: 'A',
 } as const;
 
 export const demoOperations = [
@@ -51,6 +52,7 @@ export const demoOperations = [
     operationName: 'Подготовительная операция',
     plannedCardCount: 112,
     normHours: '0.25',
+    scopeCode: 'OP-010',
   },
   {
     id: '30000000-0000-4000-8000-000000000002',
@@ -58,6 +60,7 @@ export const demoOperations = [
     operationName: 'Основная операция',
     plannedCardCount: 112,
     normHours: '0.50',
+    scopeCode: 'OP-020',
   },
   {
     id: '30000000-0000-4000-8000-000000000003',
@@ -65,5 +68,6 @@ export const demoOperations = [
     operationName: 'Контрольная операция',
     plannedCardCount: 26,
     normHours: '0.15',
+    scopeCode: 'OP-030',
   },
 ] as const;

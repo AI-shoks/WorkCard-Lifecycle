@@ -1,0 +1,3 @@
+# GitHub workflows live above WorkCard-Lifecycle/.gitattributes.
+.github/**/*.yml text eol=lf
+.github/**/*.yaml text eol=lf

@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.environments
 status: accepted
-version: 1
+version: 2
 owner: engineering
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Environments and Secrets
@@ -31,6 +31,9 @@ updated: 2026-09-01
 | `LOG_LEVEL` | API | разрешённый уровень Pino |
 | `DATABASE_URL` | API/verify | только runtime-роль |
 | `WEB_DIST_PATH` | API | каталог собранного SPA |
+| `APP_ORIGIN` | API | один точный browser origin для Origin/CSRF boundary |
+| `SESSION_SIGNING_SECRET` | API | минимум 32 символа; вне development/test обязателен явно |
+| `COMPOSE_APP_ORIGIN` | Compose | local same-origin URL собранного приложения; преобразуется в `APP_ORIGIN` контейнера |
 
 ## Переменные bootstrap
 
@@ -47,9 +50,10 @@ Compose формирует внутренние URL с hostname `database`; host
 
 - `.env` и логи исключены из Git; `.env.example` не содержит настоящих секретов.
 - owner URL отсутствует в environment runtime-контейнера `app`.
-- логи редактируют `authorization`, cookie и CSRF header.
+- logger настроен на redaction `authorization`, cookie и CSRF header; automated redaction proof относится к этапу 9.
+- session cookie подписана, имеет `HttpOnly`/`SameSite=Lax`, а `Secure` включается для HTTPS origin; frontend-этап 8 обязан не хранить CSRF token в browser storage.
 - секреты не передаются в browser bundle, health response или OpenAPI.
-- staging/production credentials уникальны для контура и ротируются платформой.
+- уникальные staging/production credentials и platform rotation являются требованиями release-этапа 10, а не текущего локального runtime.
 - утечка секрета требует ротации; удаление строки из Git не считается устранением утечки.
 
 ## Критерий принятия

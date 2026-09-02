@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 2
+version: 3
 owner: engineering
 updated: 2026-09-02
 ---
@@ -38,7 +38,7 @@ Git checkout содержит каталог приложения `WorkCard-Life
 - `apps/api` владеет подключениями к БД, транзакциями и серверной конфигурацией.
 - `packages/contracts` не содержит I/O и предметных обработчиков; пакет экспортирует только общие runtime-схемы и типы.
 - SQL-миграции выполняются отдельной owner-ролью. Runtime API получает минимальные права.
-- Предметные модули этапа 7 добавляются внутри `apps/api/src/modules`, не создавая преждевременных сетевых сервисов согласно [[technology-stack]].
+- Backend slice остаётся одним deployable: route composition, session boundary, workflow service, problem details и pagination находятся в `apps/api/src`; сетевые сервисы и broker не добавлены согласно [[technology-stack]].
 
 ## Правила расширения
 

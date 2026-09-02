@@ -1,9 +1,9 @@
 ---
 artifact_id: project.case-study-positioning
 status: accepted
-version: 5
+version: 6
 owner: project
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Case Study Positioning
@@ -15,9 +15,9 @@ updated: 2026-09-01
 - подтверждённые выводы `CONFIRMED_AS_IS` отделены от синтетических `TO_BE_DECISION` в [[decision-provenance]];
 - физические карточки, роли ПДБ/технолога/БТБ, первая и финальная приёмки, самоконтроль и мастерское ведение заданий описываются только в обезличенном виде;
 - данные, партия, нормы, пользователи и payroll являются синтетическими;
-- текущий checkout демонстрирует product analysis, AS-IS/TO-BE analysis, domain modeling, requirements engineering, UX design, traceability, принятую техническую архитектуру и воспроизводимый инженерный фундамент;
+- текущий checkout демонстрирует product analysis, AS-IS/TO-BE analysis, domain modeling, requirements engineering, UX design, traceability, принятую техническую архитектуру, воспроизводимый инженерный фундамент и локально проверенный backend vertical slice;
 - отдельная цифровая `FinalBatchAcceptance` является синтетическим TO-BE-решением уровня партии, а не утверждением о существующей заводской ИС;
-- производственный backend vertical slice, связанный frontend flow и deployment являются целями следующих этапов, а не текущим результатом;
+- связанный frontend flow и deployment являются целями следующих этапов; backend vertical slice и clean-container текущего checkout проверены локально, но CI будущего commit SHA ещё не запускался;
 - ограничения и допущения документируются явно.
 
 ## Чего не утверждаем
@@ -27,7 +27,7 @@ updated: 2026-09-01
 - что метрики получены от реального предприятия;
 - что mock payroll рассчитывает настоящую зарплату;
 - что система соответствует всем требованиям промышленной MES;
-- что уже реализованы производственный backend/frontend-сценарий, полный набор бизнес-тестов, deployment или production runtime.
+- что уже реализованы связанный frontend-сценарий, полный quality-этап, deployment или production runtime.
 
 ## Публичная доказательность
 
@@ -38,4 +38,4 @@ updated: 2026-09-01
 - цифровая финальная приёмка показывается отдельной неизменяемой записью actor/time/ID и не называется копией подписи на физической карточке;
 - утверждения о бизнес-функциях появятся только после их кода, тестов и воспроизводимой демонстрации.
 
-Текущий код доказывает только готовность foundation: health endpoints, frontend shell, общие контракты, database bootstrap и delivery pipeline. Он не доказывает выполнение производственного процесса этапа 7.
+Текущий код и DB integration tests дают два раздельных доказательства: масштабный выпуск `3 → 250` с `254` release events и компактный API-only процесс от создания партии до final acceptance, payroll и audit/read-back. Они также проверяют trusted roles, ранний auth/CSRF order, concurrency, replay и immutable boundaries. Это не доказывает browser E2E, production deployment или прохождение ещё не запущенных remote jobs для нового commit SHA.

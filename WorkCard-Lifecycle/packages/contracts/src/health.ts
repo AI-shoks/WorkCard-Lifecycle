@@ -32,6 +32,19 @@ export const ProblemDetailsSchema = Type.Object(
     instance: Type.String({ minLength: 1 }),
     code: Type.String({ pattern: '^[A-Z][A-Z0-9_]+$' }),
     requestId: Type.String({ minLength: 1 }),
+    conflicts: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            resourceType: Type.String({ minLength: 1 }),
+            resourceId: Type.String({ minLength: 1 }),
+            expectedVersion: Type.Integer({ minimum: 1 }),
+            actualVersion: Type.Integer({ minimum: 1 }),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    ),
   },
   { additionalProperties: false },
 );

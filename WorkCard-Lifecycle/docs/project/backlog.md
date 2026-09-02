@@ -1,9 +1,9 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 13
+version: 14
 owner: project
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Backlog
@@ -34,17 +34,19 @@ updated: 2026-09-01
 - [x] Добавить GitHub Actions для code/database quality и clean-container startup.
 - [x] Документировать структуру, окружения, локальный запуск и CI.
 
-## Далее — этап 7 (не начато)
+## На проверке — этап 7
 
-- [ ] Реализовать read-only паспорт, operation plans и нормы.
-- [ ] Реализовать создание партии и нескольких operation-scoped комплектов.
-- [ ] Реализовать атомарный выпуск UUID-карточек со snapshots.
-- [ ] Реализовать first-article gate и serial boundary.
-- [ ] Реализовать массовое назначение и lifecycle-команды мастера.
-- [ ] Реализовать positive-only подтверждение БТК и финальную приёмку партии.
-- [ ] Реализовать audit query по `correlationId`.
-- [ ] Реализовать идемпотентный mock payroll export.
-- [ ] Покрыть happy path, permissions, инварианты, replay и concurrency интеграционными тестами.
+- [x] Реализовать read-only паспорт, operation plans и нормы.
+- [x] Реализовать создание партии и нескольких operation-scoped комплектов.
+- [x] Реализовать атомарный выпуск UUID-карточек со snapshots.
+- [x] Реализовать first-article gate и serial boundary.
+- [x] Реализовать массовое назначение и lifecycle-команды мастера.
+- [x] Реализовать positive-only подтверждение БТК и финальную приёмку партии.
+- [x] Реализовать audit query по `correlationId`.
+- [x] Реализовать идемпотентный mock payroll export.
+- [x] Покрыть happy path, permissions, инварианты, replay и concurrency интеграционными тестами.
+- [x] Подтвердить текущий checkout локальным clean-container startup без переиспользования старого образа.
+- [ ] После отдельного разрешения создать commit и получить зелёные `quality`/`container` jobs именно для его SHA; текущий diff удалённо не запускался.
 
 ## Сохранённые выводы
 

@@ -1,9 +1,9 @@
 ---
 artifact_id: requirements.acceptance-criteria
 status: accepted
-version: 5
+version: 6
 owner: requirements
-updated: 2026-07-17
+updated: 2026-09-02
 ---
 
 # Acceptance Criteria
@@ -196,7 +196,7 @@ updated: 2026-07-17
 **And** каждая карточка показывает `batchQuantitySnapshot = 112` и технический UUID как secondary metadata
 **And** sequence, `#01`, `3 из 112` и утверждение о физической детали отсутствуют
 **And** первый полный комплект показывает assignment summary `60 + 52 = 112`
-**And** provenance явно показывает: `FirstPieceAcceptance` — подтверждённая первая приёмка, `FinalBatchAcceptance` — подтверждённая приёмка всей партии с физическими подписями БТК, а `WorkCardQualityConfirmation` — синтетическое per-card закрытие
+**And** provenance явно показывает: первая и финальная приёмки с физическими подписями — подтверждённые AS-IS факты, а digital `FinalBatchAcceptance` и `WorkCardQualityConfirmation` — отдельные синтетические TO-BE-записи без оцифровки подписи
 **And** ни одна или все `CLOSED` WorkCard не выдаются за записанную финальную приёмку партии.
 
 ### AC-READ-003. Чтение payroll без export

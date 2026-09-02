@@ -1,0 +1,1901 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Наглядная карта проекта Production Work Card Workflow: смысл, текущий этап, дорожная карта, архитектура, структура и критерии готовности."
+    />
+    <title>Карта проекта — Production Work Card Workflow</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #09100f;
+        --bg-raised: #0d1614;
+        --surface: #111d1a;
+        --surface-2: #162521;
+        --surface-3: #1c2d28;
+        --text: #f0f5f2;
+        --text-soft: #aabbb4;
+        --text-faint: #74857e;
+        --line: #284039;
+        --line-strong: #3a564e;
+        --accent: #b7f36b;
+        --accent-strong: #8fd43e;
+        --accent-ink: #13200e;
+        --cyan: #72d9cf;
+        --blue: #79a9ff;
+        --amber: #f4bf63;
+        --red: #ff8b78;
+        --violet: #b9a0ff;
+        --shadow: 0 28px 80px rgb(0 0 0 / 30%);
+        --radius-lg: 24px;
+        --radius-md: 16px;
+        --radius-sm: 10px;
+        --sidebar: 264px;
+      }
+
+      html[data-theme='light'] {
+        color-scheme: light;
+        --bg: #f2f5f1;
+        --bg-raised: #e9efea;
+        --surface: #ffffff;
+        --surface-2: #f4f7f3;
+        --surface-3: #e8eee8;
+        --text: #16201c;
+        --text-soft: #4f625a;
+        --text-faint: #718078;
+        --line: #d8e1da;
+        --line-strong: #bdcbc1;
+        --accent: #79b72f;
+        --accent-strong: #5f9720;
+        --accent-ink: #ffffff;
+        --cyan: #168f88;
+        --blue: #3974d7;
+        --amber: #ba7722;
+        --red: #ce5746;
+        --violet: #7759cd;
+        --shadow: 0 24px 64px rgb(29 54 42 / 12%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 28px;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 78% -10%, color-mix(in srgb, var(--cyan) 12%, transparent), transparent 26rem),
+          radial-gradient(circle at 28% 20%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 30rem),
+          var(--bg);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .skip-link {
+        position: fixed;
+        z-index: 100;
+        top: 12px;
+        left: 12px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        color: var(--accent-ink);
+        background: var(--accent);
+        font-weight: 800;
+        transform: translateY(-150%);
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: var(--sidebar) minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding: 26px 20px 20px;
+        border-right: 1px solid var(--line);
+        background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
+        backdrop-filter: blur(20px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+      }
+
+      .brand-mark {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+        border-radius: 12px;
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+        box-shadow: inset 0 0 24px color-mix(in srgb, var(--accent) 7%, transparent);
+      }
+
+      .brand-copy strong,
+      .brand-copy span {
+        display: block;
+      }
+
+      .brand-copy strong {
+        font-size: 0.9rem;
+        line-height: 1.15;
+      }
+
+      .brand-copy span {
+        margin-top: 4px;
+        color: var(--text-faint);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .nav-label {
+        margin: 34px 10px 10px;
+        color: var(--text-faint);
+        font-size: 0.67rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .side-nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      .side-nav a {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 10px 12px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--text-soft);
+        font-size: 0.86rem;
+        font-weight: 650;
+        text-decoration: none;
+        transition: 160ms ease;
+      }
+
+      .side-nav a::before {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--line-strong);
+        content: '';
+        transition: 160ms ease;
+      }
+
+      .side-nav a:hover,
+      .side-nav a[aria-current='true'] {
+        border-color: var(--line);
+        color: var(--text);
+        background: var(--surface-2);
+      }
+
+      .side-nav a[aria-current='true']::before {
+        background: var(--accent);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent);
+      }
+
+      .sidebar-note {
+        margin-top: auto;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+      }
+
+      .sidebar-note .label {
+        color: var(--text-faint);
+        font-size: 0.7rem;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .sidebar-note strong {
+        display: block;
+        margin-top: 7px;
+        font-size: 0.86rem;
+      }
+
+      .sidebar-note p {
+        margin: 6px 0 0;
+        color: var(--text-soft);
+        font-size: 0.74rem;
+        line-height: 1.45;
+      }
+
+      main {
+        min-width: 0;
+        padding: 24px clamp(20px, 4vw, 64px) 72px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        max-width: 1440px;
+        margin: 0 auto 32px;
+      }
+
+      .live-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--text-soft);
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      .live-state::before {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--amber);
+        box-shadow: 0 0 0 5px color-mix(in srgb, var(--amber) 12%, transparent);
+        content: '';
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 8px;
+      }
+
+      .icon-button,
+      .button,
+      .filter-button {
+        border: 1px solid var(--line);
+        color: var(--text);
+        background: var(--surface);
+        cursor: pointer;
+        transition:
+          transform 160ms ease,
+          border-color 160ms ease,
+          background 160ms ease;
+      }
+
+      .icon-button:hover,
+      .button:hover,
+      .filter-button:hover {
+        border-color: var(--line-strong);
+        background: var(--surface-2);
+        transform: translateY(-1px);
+      }
+
+      .icon-button:focus-visible,
+      .button:focus-visible,
+      .filter-button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+        outline-offset: 2px;
+      }
+
+      .icon-button {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+      }
+
+      .content {
+        max-width: 1440px;
+        margin: 0 auto;
+      }
+
+      section {
+        scroll-margin-top: 24px;
+      }
+
+      section + section {
+        margin-top: 86px;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 850;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 1020px;
+        margin-bottom: 22px;
+        font-size: clamp(2.45rem, 5.8vw, 6.2rem);
+        line-height: 0.96;
+        letter-spacing: -0.065em;
+      }
+
+      h1 .muted {
+        color: var(--text-faint);
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        font-size: clamp(1.75rem, 3.2vw, 3rem);
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+        font-size: 1rem;
+        line-height: 1.3;
+      }
+
+      .lead {
+        max-width: 860px;
+        margin-bottom: 0;
+        color: var(--text-soft);
+        font-size: clamp(1rem, 1.55vw, 1.22rem);
+        line-height: 1.65;
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(280px, 0.55fr);
+        gap: 44px;
+        align-items: end;
+        margin-bottom: 28px;
+      }
+
+      .section-head p {
+        margin-bottom: 0;
+        color: var(--text-soft);
+        line-height: 1.65;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.65fr);
+        gap: 18px;
+        margin-top: 42px;
+      }
+
+      .current-stage,
+      .next-gate,
+      .panel,
+      .metric-card,
+      .roadmap-card,
+      .architecture-card,
+      .result-card,
+      .evidence-card,
+      .risk-card {
+        border: 1px solid var(--line);
+        background: linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--surface-2) 62%, var(--surface)));
+        box-shadow: var(--shadow);
+      }
+
+      .current-stage {
+        padding: clamp(24px, 4vw, 42px);
+        border-radius: var(--radius-lg);
+      }
+
+      .stage-topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+      }
+
+      .stage-kicker,
+      .chip,
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        width: fit-content;
+        border-radius: 999px;
+        font-size: 0.71rem;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+      }
+
+      .stage-kicker {
+        padding: 7px 10px;
+        color: var(--amber);
+        background: color-mix(in srgb, var(--amber) 10%, transparent);
+      }
+
+      .stage-number {
+        color: var(--text-faint);
+        font-size: 0.76rem;
+        font-weight: 750;
+      }
+
+      .current-stage h2 {
+        max-width: 720px;
+        margin: 22px 0 14px;
+        font-size: clamp(1.9rem, 4vw, 3.7rem);
+      }
+
+      .current-stage > p {
+        max-width: 740px;
+        margin-bottom: 28px;
+        color: var(--text-soft);
+        line-height: 1.65;
+      }
+
+      .progress-labels {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 10px;
+        color: var(--text-soft);
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+
+      .segmented-progress {
+        display: grid;
+        grid-template-columns: repeat(13, 1fr);
+        gap: 5px;
+      }
+
+      .segment {
+        height: 11px;
+        border-radius: 999px;
+        background: var(--surface-3);
+      }
+
+      .segment.done {
+        background: var(--accent);
+      }
+
+      .segment.current {
+        background: var(--amber);
+        animation: breathe 2.6s ease-in-out infinite;
+      }
+
+      @keyframes breathe {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
+
+      .next-gate {
+        display: flex;
+        flex-direction: column;
+        padding: 24px;
+        border-radius: var(--radius-lg);
+      }
+
+      .next-gate .gate-icon {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        color: var(--accent-ink);
+        background: var(--accent);
+        font-size: 1.35rem;
+        font-weight: 900;
+      }
+
+      .next-gate h3 {
+        margin-top: 22px;
+        font-size: 1.2rem;
+      }
+
+      .next-gate p {
+        color: var(--text-soft);
+        font-size: 0.88rem;
+        line-height: 1.6;
+      }
+
+      .next-gate .small-note {
+        margin-top: auto;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        color: var(--text-faint);
+        font-size: 0.73rem;
+      }
+
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .metric-card {
+        padding: 18px;
+        border-radius: var(--radius-md);
+        box-shadow: none;
+      }
+
+      .metric-card strong {
+        display: block;
+        font-size: clamp(1.55rem, 3vw, 2.35rem);
+        letter-spacing: -0.04em;
+      }
+
+      .metric-card span {
+        display: block;
+        margin-top: 7px;
+        color: var(--text-soft);
+        font-size: 0.78rem;
+        line-height: 1.45;
+      }
+
+      .metric-card strong.accent { color: var(--accent); }
+      .metric-card strong.amber { color: var(--amber); }
+      .metric-card strong.cyan { color: var(--cyan); }
+      .metric-card strong.blue { color: var(--blue); }
+
+      .panel {
+        border-radius: var(--radius-lg);
+        box-shadow: none;
+      }
+
+      .explain-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .explain-card {
+        min-height: 250px;
+        padding: 26px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+      }
+
+      .explain-card .card-index {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        margin-bottom: 44px;
+        border-radius: 10px;
+        color: var(--accent-ink);
+        background: var(--accent);
+        font-size: 0.75rem;
+        font-weight: 900;
+      }
+
+      .explain-card:nth-child(2) .card-index { background: var(--cyan); }
+      .explain-card:nth-child(3) .card-index { background: var(--blue); }
+
+      .explain-card h3 {
+        font-size: 1.18rem;
+      }
+
+      .explain-card p {
+        margin-bottom: 0;
+        color: var(--text-soft);
+        font-size: 0.9rem;
+        line-height: 1.65;
+      }
+
+      .plain-language {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+        gap: 24px;
+        margin-top: 18px;
+        padding: 28px;
+      }
+
+      .plain-language h3 {
+        font-size: 1.25rem;
+      }
+
+      .plain-language > p {
+        margin: 0;
+        color: var(--text-soft);
+        line-height: 1.7;
+      }
+
+      .result-flow {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 9px;
+        margin-top: 18px;
+      }
+
+      .result-step {
+        position: relative;
+        min-height: 154px;
+        padding: 17px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+      }
+
+      .result-step::after {
+        position: absolute;
+        z-index: 2;
+        top: 50%;
+        right: -11px;
+        width: 18px;
+        height: 18px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        color: var(--text-faint);
+        background: var(--bg);
+        content: '›';
+        transform: translateY(-50%);
+      }
+
+      .result-step:nth-child(4n)::after,
+      .result-step:last-child::after {
+        display: none;
+      }
+
+      .result-step .step-no {
+        color: var(--accent);
+        font-size: 0.68rem;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .result-step h3 {
+        margin-top: 18px;
+        font-size: 0.93rem;
+      }
+
+      .result-step p {
+        margin: 0;
+        color: var(--text-soft);
+        font-size: 0.77rem;
+        line-height: 1.5;
+      }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .filter-button {
+        padding: 8px 12px;
+        border-radius: 999px;
+        color: var(--text-soft);
+        font-size: 0.76rem;
+        font-weight: 750;
+      }
+
+      .filter-button[aria-pressed='true'] {
+        border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+        color: var(--accent-ink);
+        background: var(--accent);
+      }
+
+      .roadmap-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .roadmap-card {
+        display: grid;
+        grid-template-columns: 54px minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: start;
+        padding: 20px;
+        border-radius: var(--radius-md);
+        box-shadow: none;
+      }
+
+      .roadmap-card[hidden] {
+        display: none;
+      }
+
+      .roadmap-card.current {
+        border-color: color-mix(in srgb, var(--amber) 48%, var(--line));
+        background: linear-gradient(145deg, color-mix(in srgb, var(--amber) 8%, var(--surface)), var(--surface));
+      }
+
+      .roadmap-no {
+        width: 54px;
+        height: 54px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        color: var(--text-faint);
+        background: var(--surface-2);
+        font-size: 1.05rem;
+        font-weight: 900;
+      }
+
+      .roadmap-card[data-status='done'] .roadmap-no {
+        border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+      }
+
+      .roadmap-card[data-status='current'] .roadmap-no {
+        color: var(--amber);
+        background: color-mix(in srgb, var(--amber) 8%, var(--surface-2));
+      }
+
+      .roadmap-body h3 {
+        margin: 2px 0 8px;
+      }
+
+      .roadmap-question {
+        margin-bottom: 12px;
+        color: var(--text-soft);
+        font-size: 0.82rem;
+        line-height: 1.5;
+      }
+
+      .roadmap-result {
+        margin: 0;
+        font-size: 0.78rem;
+        line-height: 1.55;
+      }
+
+      .roadmap-result strong {
+        color: var(--text-soft);
+      }
+
+      .chip {
+        padding: 6px 9px;
+        white-space: nowrap;
+      }
+
+      .chip.done {
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+      }
+
+      .chip.current {
+        color: var(--amber);
+        background: color-mix(in srgb, var(--amber) 10%, transparent);
+      }
+
+      .chip.planned {
+        color: var(--text-faint);
+        background: var(--surface-2);
+      }
+
+      .checkpoint {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .checkpoint-card {
+        padding: 24px;
+      }
+
+      .checkpoint-card h3 {
+        font-size: 1.12rem;
+      }
+
+      .check-list,
+      .next-list {
+        display: grid;
+        gap: 12px;
+        margin: 18px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .check-list li,
+      .next-list li {
+        position: relative;
+        padding-left: 28px;
+        color: var(--text-soft);
+        font-size: 0.86rem;
+        line-height: 1.5;
+      }
+
+      .check-list li::before,
+      .next-list li::before {
+        position: absolute;
+        top: 1px;
+        left: 0;
+        width: 19px;
+        height: 19px;
+        display: grid;
+        place-items: center;
+        border-radius: 6px;
+        color: var(--accent-ink);
+        background: var(--accent);
+        content: '✓';
+        font-size: 0.7rem;
+        font-weight: 900;
+      }
+
+      .next-list {
+        counter-reset: next;
+      }
+
+      .next-list li {
+        counter-increment: next;
+      }
+
+      .next-list li::before {
+        color: var(--amber);
+        background: color-mix(in srgb, var(--amber) 10%, transparent);
+        content: counter(next);
+      }
+
+      .architecture-flow {
+        display: grid;
+        grid-template-columns: 0.8fr 28px 1fr 28px 1.2fr 28px 1fr;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .architecture-card {
+        min-height: 230px;
+        padding: 22px;
+        border-radius: var(--radius-lg);
+        box-shadow: none;
+      }
+
+      .architecture-card .tag {
+        padding: 6px 9px;
+        color: var(--text-soft);
+        background: var(--surface-3);
+      }
+
+      .architecture-card .tag.actual {
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 9%, transparent);
+      }
+
+      .architecture-card .tag.partial {
+        color: var(--amber);
+        background: color-mix(in srgb, var(--amber) 9%, transparent);
+      }
+
+      .architecture-card h3 {
+        margin-top: 32px;
+        font-size: 1.12rem;
+      }
+
+      .architecture-card p {
+        color: var(--text-soft);
+        font-size: 0.8rem;
+        line-height: 1.55;
+      }
+
+      .architecture-card ul {
+        display: grid;
+        gap: 7px;
+        margin: 16px 0 0;
+        padding-left: 18px;
+        color: var(--text-soft);
+        font-size: 0.76rem;
+        line-height: 1.4;
+      }
+
+      .flow-arrow {
+        display: grid;
+        place-items: center;
+        color: var(--text-faint);
+        font-size: 1.5rem;
+      }
+
+      .architecture-notes {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .architecture-note {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+      }
+
+      .architecture-note strong {
+        display: block;
+        font-size: 0.82rem;
+      }
+
+      .architecture-note span {
+        display: block;
+        margin-top: 7px;
+        color: var(--text-soft);
+        font-size: 0.74rem;
+        line-height: 1.45;
+      }
+
+      .architecture-explainer {
+        margin-top: 16px;
+        padding: 22px;
+        border-left: 3px solid var(--cyan);
+        border-radius: 0 var(--radius-md) var(--radius-md) 0;
+        background: color-mix(in srgb, var(--cyan) 6%, var(--surface));
+      }
+
+      .architecture-explainer strong {
+        color: var(--cyan);
+      }
+
+      .architecture-explainer p {
+        margin: 7px 0 0;
+        color: var(--text-soft);
+        font-size: 0.86rem;
+        line-height: 1.6;
+      }
+
+      .structure-grid {
+        display: grid;
+        grid-template-columns: minmax(310px, 0.8fr) minmax(0, 1.2fr);
+        gap: 14px;
+      }
+
+      .tree-panel,
+      .structure-notes {
+        padding: 24px;
+      }
+
+      .tree {
+        margin: 20px 0 0;
+        overflow-x: auto;
+        color: var(--text-soft);
+        font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.79rem;
+        line-height: 1.85;
+        white-space: pre;
+      }
+
+      .tree .folder { color: var(--blue); }
+      .tree .file { color: var(--text); }
+      .tree .done { color: var(--accent); }
+      .tree .partial { color: var(--amber); }
+
+      .structure-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .structure-item {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        gap: 13px;
+        align-items: center;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--surface-2);
+      }
+
+      .structure-icon {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+        color: var(--blue);
+        background: color-mix(in srgb, var(--blue) 9%, transparent);
+        font-size: 0.72rem;
+        font-weight: 900;
+      }
+
+      .structure-item strong,
+      .structure-item span {
+        display: block;
+      }
+
+      .structure-item strong {
+        font-size: 0.84rem;
+      }
+
+      .structure-item span {
+        margin-top: 5px;
+        color: var(--text-soft);
+        font-size: 0.73rem;
+        line-height: 1.4;
+      }
+
+      .scenario {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(140px, 1fr));
+        gap: 9px;
+        overflow-x: auto;
+        padding: 4px 2px 18px;
+        scrollbar-color: var(--line-strong) transparent;
+      }
+
+      .scenario-step {
+        position: relative;
+        min-height: 216px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+      }
+
+      .scenario-step::after {
+        position: absolute;
+        top: 42px;
+        right: -9px;
+        color: var(--text-faint);
+        content: '→';
+      }
+
+      .scenario-step:last-child::after {
+        display: none;
+      }
+
+      .scenario-role {
+        color: var(--cyan);
+        font-size: 0.65rem;
+        font-weight: 850;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .scenario-step h3 {
+        margin-top: 30px;
+        font-size: 0.9rem;
+      }
+
+      .scenario-step p {
+        margin: 0;
+        color: var(--text-soft);
+        font-size: 0.74rem;
+        line-height: 1.5;
+      }
+
+      .scenario-step .scenario-result {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        left: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        color: var(--text-faint);
+        font-size: 0.67rem;
+      }
+
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .evidence-card {
+        padding: 22px;
+        border-radius: var(--radius-md);
+        box-shadow: none;
+      }
+
+      .evidence-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .evidence-card h3 {
+        margin: 22px 0 9px;
+      }
+
+      .evidence-card p {
+        margin-bottom: 0;
+        color: var(--text-soft);
+        font-size: 0.8rem;
+        line-height: 1.55;
+      }
+
+      .evidence-value {
+        color: var(--accent);
+        font-size: 1.25rem;
+        font-weight: 900;
+      }
+
+      .evidence-card.pending .evidence-value { color: var(--amber); }
+      .evidence-card.future .evidence-value { color: var(--text-faint); }
+
+      .analysis-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .risk-card {
+        padding: 24px;
+        border-radius: var(--radius-lg);
+        box-shadow: none;
+      }
+
+      .risk-card h3 {
+        font-size: 1.08rem;
+      }
+
+      .risk-card ul {
+        display: grid;
+        gap: 13px;
+        margin: 18px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .risk-card li {
+        padding: 13px 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        color: var(--text-soft);
+        background: var(--surface-2);
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+
+      .risk-card li strong {
+        color: var(--text);
+      }
+
+      .risk-card.strengths {
+        border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+      }
+
+      .risk-card.gaps {
+        border-color: color-mix(in srgb, var(--amber) 30%, var(--line));
+      }
+
+      .next-actions {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .result-card {
+        min-height: 220px;
+        padding: 22px;
+        border-radius: var(--radius-lg);
+        box-shadow: none;
+      }
+
+      .result-card .action-no {
+        color: var(--amber);
+        font-size: 0.7rem;
+        font-weight: 900;
+        letter-spacing: 0.1em;
+      }
+
+      .result-card h3 {
+        margin-top: 38px;
+        font-size: 1.02rem;
+      }
+
+      .result-card p {
+        color: var(--text-soft);
+        font-size: 0.79rem;
+        line-height: 1.55;
+      }
+
+      .result-card .definition {
+        margin-top: 18px;
+        padding-top: 13px;
+        border-top: 1px solid var(--line);
+        color: var(--text-faint);
+        font-size: 0.7rem;
+      }
+
+      .boundary-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 28px;
+        margin-top: 18px;
+        padding: 25px;
+        border: 1px solid color-mix(in srgb, var(--violet) 26%, var(--line));
+        border-radius: var(--radius-lg);
+        background: color-mix(in srgb, var(--violet) 5%, var(--surface));
+      }
+
+      .boundary-box h3 {
+        margin-bottom: 6px;
+      }
+
+      .boundary-box p {
+        max-width: 860px;
+        margin: 0;
+        color: var(--text-soft);
+        font-size: 0.82rem;
+        line-height: 1.55;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 40px;
+        padding: 9px 14px;
+        border-radius: 11px;
+        font-size: 0.77rem;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .button.primary {
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        background: var(--accent);
+      }
+
+      .source-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .source-list a {
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        color: var(--text-soft);
+        background: var(--surface);
+        font-size: 0.72rem;
+        text-decoration: none;
+      }
+
+      .source-list a:hover {
+        color: var(--text);
+        border-color: var(--line-strong);
+      }
+
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        margin-top: 64px;
+        padding-top: 24px;
+        border-top: 1px solid var(--line);
+        color: var(--text-faint);
+        font-size: 0.72rem;
+        line-height: 1.5;
+      }
+
+      .toast {
+        position: fixed;
+        z-index: 50;
+        right: 22px;
+        bottom: 22px;
+        max-width: min(360px, calc(100vw - 44px));
+        padding: 12px 15px;
+        border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+        border-radius: 12px;
+        color: var(--text);
+        background: var(--surface-3);
+        box-shadow: var(--shadow);
+        font-size: 0.78rem;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(12px);
+        transition: 180ms ease;
+      }
+
+      .toast.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 1180px) {
+        .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+        .result-flow { grid-template-columns: repeat(2, 1fr); }
+        .result-step:nth-child(2n)::after { display: none; }
+        .architecture-flow { grid-template-columns: 1fr; }
+        .flow-arrow { min-height: 24px; transform: rotate(90deg); }
+        .architecture-card { min-height: 0; }
+        .architecture-notes { grid-template-columns: repeat(2, 1fr); }
+        .evidence-grid { grid-template-columns: repeat(2, 1fr); }
+        .next-actions { grid-template-columns: repeat(2, 1fr); }
+      }
+
+      @media (max-width: 900px) {
+        .app-shell { display: block; }
+        .sidebar {
+          position: relative;
+          z-index: 10;
+          height: auto;
+          padding: 14px 18px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .brand-copy span, .nav-label, .sidebar-note { display: none; }
+        .side-nav {
+          display: flex;
+          gap: 4px;
+          margin-top: 12px;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .side-nav::-webkit-scrollbar { display: none; }
+        .side-nav a { flex: 0 0 auto; padding: 8px 10px; font-size: 0.76rem; }
+        .side-nav a::before { display: none; }
+        main { padding-top: 18px; }
+        .section-head { grid-template-columns: 1fr; gap: 10px; }
+        .hero-grid { grid-template-columns: 1fr; }
+        .explain-grid { grid-template-columns: 1fr; }
+        .explain-card { min-height: 0; }
+        .explain-card .card-index { margin-bottom: 28px; }
+        .plain-language { grid-template-columns: 1fr; }
+        .roadmap-grid { grid-template-columns: 1fr; }
+        .checkpoint { grid-template-columns: 1fr; }
+        .structure-grid { grid-template-columns: 1fr; }
+        .analysis-grid { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 620px) {
+        main { padding-right: 14px; padding-left: 14px; }
+        .topbar { margin-bottom: 24px; }
+        .live-state { max-width: 210px; font-size: 0.7rem; }
+        .toolbar .icon-button:last-child { display: none; }
+        h1 { font-size: clamp(2.25rem, 13vw, 4rem); }
+        section + section { margin-top: 68px; }
+        .metrics-grid, .result-flow, .architecture-notes, .evidence-grid, .next-actions { grid-template-columns: 1fr; }
+        .result-step::after { display: none; }
+        .roadmap-card { grid-template-columns: 44px minmax(0, 1fr); }
+        .roadmap-no { width: 44px; height: 44px; border-radius: 12px; }
+        .roadmap-card .chip { grid-column: 2; grid-row: 2; }
+        .boundary-box { align-items: flex-start; flex-direction: column; }
+        footer { flex-direction: column; }
+      }
+
+      @media print {
+        :root {
+          --bg: #ffffff;
+          --surface: #ffffff;
+          --surface-2: #f7f7f7;
+          --surface-3: #eeeeee;
+          --text: #111111;
+          --text-soft: #3f3f3f;
+          --text-faint: #666666;
+          --line: #dddddd;
+          --line-strong: #bbbbbb;
+          --accent: #4d8214;
+          --amber: #a65d00;
+          --cyan: #006b66;
+          --blue: #205aaf;
+          --shadow: none;
+        }
+        body { background: #ffffff; }
+        .app-shell { display: block; }
+        .sidebar, .topbar, .filters, .button, .toast { display: none !important; }
+        main { padding: 0; }
+        section + section { margin-top: 42px; }
+        .roadmap-card[hidden] { display: grid; }
+        .panel, .current-stage, .next-gate, .metric-card, .roadmap-card, .architecture-card, .result-card, .evidence-card, .risk-card { break-inside: avoid; box-shadow: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#overview">Перейти к содержимому</a>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Навигация по дашборду">
+        <a class="brand" href="#overview" aria-label="К началу карты проекта">
+          <span class="brand-mark" aria-hidden="true">WC</span>
+          <span class="brand-copy">
+            <strong>WorkCard Lifecycle</strong>
+            <span>Карта проекта</span>
+          </span>
+        </a>
+
+        <p class="nav-label">Разделы</p>
+        <nav class="side-nav">
+          <a href="#overview" aria-current="true">Обзор</a>
+          <a href="#purpose">Что создаём</a>
+          <a href="#roadmap">Этапы</a>
+          <a href="#architecture">Архитектура</a>
+          <a href="#structure">Структура</a>
+          <a href="#scenario">Сценарий</a>
+          <a href="#quality">Качество</a>
+          <a href="#next">Что дальше</a>
+        </nav>
+
+        <div class="sidebar-note">
+          <span class="label">Срез состояния</span>
+          <strong>2 сентября 2026</strong>
+          <p>Локальная ревизия с незавершёнными изменениями серверного этапа.</p>
+        </div>
+      </aside>
+
+      <main>
+        <div class="topbar">
+          <span class="live-state">Этап 7 находится на проверке</span>
+          <div class="toolbar" aria-label="Настройки отображения">
+            <button class="icon-button" id="theme-toggle" type="button" aria-label="Переключить цветовую тему" title="Переключить тему">◐</button>
+            <button class="icon-button" id="print-button" type="button" aria-label="Распечатать или сохранить в PDF" title="Печать / PDF">⇩</button>
+          </div>
+        </div>
+
+        <div class="content">
+          <section id="overview" aria-labelledby="overview-title">
+            <p class="eyebrow">Наглядный разбор проекта • актуальный срез</p>
+            <h1 id="overview-title">
+              Цифровой путь рабочей карточки.
+              <span class="muted">От производственного паспорта до принятой партии.</span>
+            </h1>
+            <p class="lead">
+              Это независимый демонстрационный проект о том, как сделать понятным и проверяемым узкий производственный процесс: выпуск рабочих карточек, распределение работы, контроль первой детали, завершение партии и история действий.
+            </p>
+
+            <div class="hero-grid">
+              <article class="current-stage">
+                <div class="stage-topline">
+                  <span class="stage-kicker">● Сейчас на проверке</span>
+                  <span class="stage-number">Этап 7 из дорожной карты 0–12</span>
+                </div>
+                <h2>Серверный сценарий и локальный контейнер проверены. Ждём CI нового SHA.</h2>
+                <p>
+                  Масштабный тест подтверждает выпуск 3 комплектов, 250 карточек и 254 связанных события, а компактный API-only сценарий проходит контроль первой детали, серию, финальную приёмку, аудит и демонстрационную передачу нормо-часов. Текущий checkout также пересобран и запущен локально; до закрытия этапа нужны зелёные jobs именно для будущего commit SHA.
+                </p>
+                <div class="progress-labels">
+                  <span>7 этапов завершено</span>
+                  <span>1 проверяется</span>
+                  <span>5 впереди</span>
+                </div>
+                <div class="segmented-progress" role="img" aria-label="Из 13 этапов 7 завершены, 1 на проверке, 5 не начаты">
+                  <span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment current"></span><span class="segment"></span><span class="segment"></span><span class="segment"></span><span class="segment"></span><span class="segment"></span>
+                </div>
+              </article>
+
+              <aside class="next-gate">
+                <span class="gate-icon" aria-hidden="true">7→8</span>
+                <h3>Ближайшая контрольная точка</h3>
+                <p>Отправить текущую серверную ревизию в удалённый CI и подтвердить сборку и запуск всего контура с чистого окружения.</p>
+                <p class="small-note">После этого начинается браузерный интерфейс, связанный с реальным API.</p>
+              </aside>
+            </div>
+
+            <div class="metrics-grid" aria-label="Ключевые показатели проекта">
+              <article class="metric-card"><strong class="accent">7</strong><span>этапов полностью завершены</span></article>
+              <article class="metric-card"><strong class="amber">1</strong><span>этап реализован и проходит проверку</span></article>
+              <article class="metric-card"><strong class="cyan">55</strong><span>документов прошли структурный аудит без ошибок</span></article>
+              <article class="metric-card"><strong class="blue">23</strong><span>маршрута серверного сценария и demo-сессии</span></article>
+            </div>
+          </section>
+
+          <section id="purpose" aria-labelledby="purpose-title">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Сначала — смысл</p>
+                <h2 id="purpose-title">Что мы делаем и зачем</h2>
+              </div>
+              <p>Этот блок объясняет проект без технических терминов. Архитектура и код — ниже, когда уже понятен сам производственный процесс.</p>
+            </div>
+
+            <div class="explain-grid">
+              <article class="explain-card">
+                <span class="card-index">01</span>
+                <h3>Проблема</h3>
+                <p>Одна партия проходит несколько операций, у каждой — свои карточки и нормы. На бумаге трудно быстро увидеть общую картину, распределение работы, контроль качества и историю решений.</p>
+              </article>
+              <article class="explain-card">
+                <span class="card-index">02</span>
+                <h3>Решение</h3>
+                <p>Собрать узкий браузерный сценарий, где видно: кто и когда создал партию, какие комплекты выпущены, кому назначена работа, пройдена ли первая деталь и принята ли вся партия.</p>
+              </article>
+              <article class="explain-card">
+                <span class="card-index">03</span>
+                <h3>Итог MVP</h3>
+                <p>Работающая демонстрация с интерфейсом, API, базой данных, аудитом и тестами. Это не полноценная MES и не реальное внедрение, а честный, воспроизводимый portfolio case study.</p>
+              </article>
+            </div>
+
+            <div class="panel plain-language">
+              <div>
+                <p class="eyebrow">Простыми словами</p>
+                <h3>Что такое рабочая карточка в этом проекте?</h3>
+              </div>
+              <p>
+                Это цифровая запись конкретного объёма работы внутри производственной операции. Она знает свою операцию, норму, исполнителя и состояние, но не притворяется серийным номером физической детали. Несколько комплектов карточек могут относиться к одной партии, поэтому у партии из 112 изделий в демонстрации получается 250 карточек.
+              </p>
+            </div>
+
+            <div class="result-flow" aria-label="Путь от исходных данных к результату">
+              <article class="result-step"><span class="step-no">Вход</span><h3>Готовый паспорт</h3><p>Операции и нормы уже подготовлены технологом и БТБ.</p></article>
+              <article class="result-step"><span class="step-no">План</span><h3>Партия 112</h3><p>ПДБ создаёт производственную партию по готовому паспорту.</p></article>
+              <article class="result-step"><span class="step-no">Выпуск</span><h3>3 комплекта / 250 карточек</h3><p>Система атомарно создаёт весь предусмотренный объём.</p></article>
+              <article class="result-step"><span class="step-no">Контроль</span><h3>Первая деталь</h3><p>До положительной приёмки серийная работа не открывается.</p></article>
+              <article class="result-step"><span class="step-no">Работа</span><h3>Распределение 60 + 52</h3><p>Мастер назначает и фиксирует выполнение заданий.</p></article>
+              <article class="result-step"><span class="step-no">Качество</span><h3>Карточки закрыты</h3><p>БТК подтверждает результат по правилам цифрового сценария.</p></article>
+              <article class="result-step"><span class="step-no">Итог</span><h3>Партия принята</h3><p>Отдельное действие подтверждает завершённую партию целиком.</p></article>
+              <article class="result-step"><span class="step-no">Доказательство</span><h3>Аудит и нормо-часы</h3><p>История восстанавливается, повторный экспорт не дублируется.</p></article>
+            </div>
+          </section>
+
+          <section id="roadmap" aria-labelledby="roadmap-title">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Дорожная карта</p>
+                <h2 id="roadmap-title">Что даёт каждый этап</h2>
+              </div>
+              <p>Этап считается завершённым не по объёму текста или кода, а по проверяемому результату. Нажмите фильтр, чтобы оставить только нужные статусы.</p>
+            </div>
+
+            <div class="filters" role="group" aria-label="Фильтр этапов">
+              <button class="filter-button" type="button" data-filter="all" aria-pressed="true">Все 13</button>
+              <button class="filter-button" type="button" data-filter="done" aria-pressed="false">Завершены</button>
+              <button class="filter-button" type="button" data-filter="current" aria-pressed="false">Сейчас</button>
+              <button class="filter-button" type="button" data-filter="planned" aria-pressed="false">Впереди</button>
+            </div>
+
+            <div class="roadmap-grid" id="roadmap-grid">
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">0</span><div class="roadmap-body"><h3>Инициализация</h3><p class="roadmap-question">Как сделать работу управляемой с первого дня?</p><p class="roadmap-result"><strong>Результат:</strong> репозиторий, правила работы, структура документов и единая точка навигации.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">1</span><div class="roadmap-body"><h3>Продукт и границы MVP</h3><p class="roadmap-question">Какую проблему решаем и чего намеренно не делаем?</p><p class="roadmap-result"><strong>Результат:</strong> понятная ценность, пользователи, границы и критерии успеха.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">2</span><div class="roadmap-body"><h3>Предметная модель</h3><p class="roadmap-question">Какие сущности, роли, состояния и правила существуют?</p><p class="roadmap-result"><strong>Результат:</strong> партия, комплекты, карточки, переходы, первая и финальная приёмки описаны без противоречий.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">3</span><div class="roadmap-body"><h3>Требования</h3><p class="roadmap-question">Как превратить правила в проверяемые сценарии?</p><p class="roadmap-result"><strong>Результат:</strong> use cases, истории, негативные сценарии, критерии приёмки и трассировка.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">4</span><div class="roadmap-body"><h3>Проектирование опыта</h3><p class="roadmap-question">Как человек пройдёт процесс в браузере?</p><p class="roadmap-result"><strong>Результат:</strong> карта 7 экранов и проходимый 14-шаговый интерактивный прототип.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">5</span><div class="roadmap-body"><h3>Техническая архитектура</h3><p class="roadmap-question">Как разделить интерфейс, правила, данные и доверие?</p><p class="roadmap-result"><strong>Результат:</strong> системный контекст, модель данных, API, безопасность, транзакции и 6 ADR.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">6</span><div class="roadmap-body"><h3>Инженерный фундамент</h3><p class="roadmap-question">Как сделать проект собираемым и воспроизводимым?</p><p class="roadmap-result"><strong>Результат:</strong> monorepo, React-оболочка, Fastify, PostgreSQL, миграции, Docker и CI.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card current" data-status="current"><span class="roadmap-no">7</span><div class="roadmap-body"><h3>Серверный вертикальный срез</h3><p class="roadmap-question">Работают ли ключевые правила независимо от интерфейса?</p><p class="roadmap-result"><strong>Результат:</strong> код, интеграционные тесты и local clean-container готовы; осталось получить CI для нового SHA.</p></div><span class="chip current">На проверке</span></article>
+              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">8</span><div class="roadmap-body"><h3>Браузерный вертикальный срез</h3><p class="roadmap-question">Может ли пользователь пройти сценарий через реальный API?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> роли, 7 экранов, таблицы, массовые действия, история и обработка конфликтов.</p></div><span class="chip planned">Не начато</span></article>
+              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">9</span><div class="roadmap-body"><h3>Качество</h3><p class="roadmap-question">Защищены ли критические правила на всех уровнях?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> браузерный E2E, проверки безопасности, миграций, производительности и мобильного интерфейса.</p></div><span class="chip planned">Не начато</span></article>
+              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">10</span><div class="roadmap-body"><h3>Релиз</h3><p class="roadmap-question">Можно ли воспроизводимо развернуть и наблюдать приложение?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> staging/production, health checks, логи, миграции и запуск с чистого окружения.</p></div><span class="chip planned">Не начато</span></article>
+              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">11</span><div class="roadmap-body"><h3>Упаковка портфолио</h3><p class="roadmap-question">Поймёт ли работодатель ценность и глубину работы?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> ясный README, демонстрационный сценарий, изображения, ограничения и ретроспектива.</p></div><span class="chip planned">Не начато</span></article>
+              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">12</span><div class="roadmap-body"><h3>Финальный аудит</h3><p class="roadmap-question">Соответствуют ли обещания реальному результату?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> проверены scope, документация, тесты, воспроизводимость и честность демонстрации.</p></div><span class="chip planned">Не начато</span></article>
+            </div>
+
+            <div class="checkpoint">
+              <article class="panel checkpoint-card">
+                <p class="eyebrow">Что уже доказано на этапе 7</p>
+                <h3>Сервер имеет два взаимодополняющих доказательства</h3>
+                <ul class="check-list">
+                  <li>Доверенные demo-роли и права на все 9 команд.</li>
+                  <li>Атомарный масштабный выпуск 3 комплектов и 250 карточек.</li>
+                  <li>Компактный API-only путь: первая деталь, серия, качество, финальная приёмка, payroll и read-back.</li>
+                  <li>Версионные конфликты, неизменяемый аудит и защита от повторов.</li>
+                  <li>Ранний порядок session → role → Origin/CSRF → schema без побочных эффектов.</li>
+                </ul>
+              </article>
+              <article class="panel checkpoint-card">
+                <p class="eyebrow">Что отделяет этап 7 от «готово»</p>
+                <h3>Один внешний gate для текущей ревизии</h3>
+                <ul class="next-list">
+                  <li>Зафиксировать текущие локальные изменения в отдельной ревизии.</li>
+                  <li>Запустить удалённые code/database и clean-container jobs.</li>
+                  <li>Закрыть этап только после зелёного запуска контейнера и health checks.</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <section id="architecture" aria-labelledby="architecture-title">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Как всё устроено</p>
+                <h2 id="architecture-title">Архитектура без лишней сложности</h2>
+              </div>
+              <p>Это модульный монолит: один сервер приложения, один браузерный интерфейс и одна база данных. Для узкого MVP этого достаточно, а ключевые границы остаются явными.</p>
+            </div>
+
+            <div class="architecture-flow" aria-label="Поток от пользователя к базе данных">
+              <article class="architecture-card">
+                <span class="tag actual">Участники</span>
+                <h3>Производственные роли</h3>
+                <p>ПДБ, мастер, исполнитель, БТК и администратор-аудитор проходят один общий процесс с разными правами.</p>
+                <ul><li>Русский интерфейс</li><li>Подготовленные demo-роли</li><li>Разрешения зависят от роли и состояния</li></ul>
+              </article>
+              <div class="flow-arrow" aria-hidden="true">→</div>
+              <article class="architecture-card">
+                <span class="tag partial">Пока оболочка</span>
+                <h3>Браузерный интерфейс</h3>
+                <p>React SPA должна показать партии, комплекты, карточки, массовые действия, историю и восстановление после конфликта.</p>
+                <ul><li>Текущая реализация: health-экран</li><li>Целевой UI: 7 маршрутов</li><li>Полный этап начинается после этапа 7</li></ul>
+              </article>
+              <div class="flow-arrow" aria-hidden="true">→</div>
+              <article class="architecture-card">
+                <span class="tag actual">Реализовано локально</span>
+                <h3>Сервер приложения</h3>
+                <p>Fastify принимает команды, восстанавливает доверенную роль, проверяет входные данные и выполняет предметные правила.</p>
+                <ul><li>Demo-сессия и CSRF</li><li>Партии, комплекты и карточки</li><li>Аудит, финальная приёмка, mock payroll</li></ul>
+              </article>
+              <div class="flow-arrow" aria-hidden="true">→</div>
+              <article class="architecture-card">
+                <span class="tag actual">Реализовано локально</span>
+                <h3>PostgreSQL</h3>
+                <p>База хранит текущее состояние, снимки норм, версии, чеки команд и неизменяемые события аудита.</p>
+                <ul><li>3 последовательные миграции</li><li>Разделение owner/runtime прав</li><li>Транзакции и блокировки</li></ul>
+              </article>
+            </div>
+
+            <div class="architecture-notes">
+              <article class="architecture-note"><strong>Браузеру не доверяем</strong><span>Скрытая кнопка не является защитой: решение всегда повторно принимает сервер.</span></article>
+              <article class="architecture-note"><strong>Изменение атомарно</strong><span>Состояние, чек команды и аудит сохраняются одной транзакцией.</span></article>
+              <article class="architecture-note"><strong>Конфликт заметен</strong><span>Устаревшая версия не перезаписывает новые данные молча.</span></article>
+              <article class="architecture-note"><strong>История доказуема</strong><span>Массовые операции связываются единым correlation context.</span></article>
+            </div>
+
+            <div class="architecture-explainer">
+              <strong>Почему не микросервисы?</strong>
+              <p>В проекте один узкий процесс и одна команда разработки. Разносить его на сетевые сервисы сейчас означало бы добавить эксплуатационную сложность без продуктовой пользы. Модули уже разделены по ответственности внутри одного deployable и могут быть выделены позже только при реальной необходимости.</p>
+            </div>
+          </section>
+
+          <section id="structure" aria-labelledby="structure-title">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Что лежит в репозитории</p>
+                <h2 id="structure-title">Структура проекта</h2>
+              </div>
+              <p>Код, общие контракты, инфраструктура и документация разделены. Цвет статуса показывает, насколько слой реализован сейчас.</p>
+            </div>
+
+            <div class="structure-grid">
+              <article class="panel tree-panel">
+                <h3>Дерево верхнего уровня</h3>
+                <div class="tree" aria-label="Дерево каталогов"><span class="folder">WorkCard-Lifecycle/</span>
+├─ <span class="folder">apps/</span>
+│  ├─ <span class="folder">api/</span>        <span class="done">● серверный срез</span>
+│  └─ <span class="folder">web/</span>        <span class="partial">● только оболочка</span>
+├─ <span class="folder">packages/</span>
+│  └─ <span class="folder">contracts/</span>  <span class="done">● общие схемы</span>
+├─ <span class="folder">docs/</span>           <span class="done">● 55 документов</span>
+├─ <span class="folder">scripts/</span>        <span class="done">● UX-аудит</span>
+├─ <span class="file">compose.yaml</span>      <span class="done">● локальный контур</span>
+├─ <span class="file">Dockerfile</span>        <span class="done">● production-образ</span>
+└─ <span class="file">package.json</span>      <span class="done">● общие quality gates</span></div>
+              </article>
+
+              <article class="panel structure-notes">
+                <h3>Ответственность частей</h3>
+                <div class="structure-list">
+                  <div class="structure-item"><span class="structure-icon">WEB</span><div><strong>apps/web</strong><span>React + Vite. Сейчас проверяет готовность API; полный производственный интерфейс относится к этапу 8.</span></div><span class="chip current">Частично</span></div>
+                  <div class="structure-item"><span class="structure-icon">API</span><div><strong>apps/api</strong><span>HTTP-маршруты, demo-сессия, предметный сервис, миграции, seed и проверка базы.</span></div><span class="chip done">Готово локально</span></div>
+                  <div class="structure-item"><span class="structure-icon">TYP</span><div><strong>packages/contracts</strong><span>TypeBox-схемы и TypeScript-типы, одинаково понимаемые интерфейсом и сервером.</span></div><span class="chip done">Реализовано</span></div>
+                  <div class="structure-item"><span class="structure-icon">DOC</span><div><strong>docs</strong><span>Продукт, предметная область, требования, UX, архитектура, инженерия, тестирование и план.</span></div><span class="chip done">Принято</span></div>
+                  <div class="structure-item"><span class="structure-icon">OPS</span><div><strong>Docker + CI</strong><span>Чистый PostgreSQL, сборка приложения, health checks и автоматические проверки.</span></div><span class="chip current">Локально готово; ждёт CI</span></div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section id="scenario" aria-labelledby="scenario-title">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Как выглядит готовый результат</p>
+                <h2 id="scenario-title">Сквозной демонстрационный сценарий</h2>
+              </div>
+              <p>В финальном MVP один человек сможет переключать подготовленные роли и пройти весь путь. Это демонстрирует процесс, но не имитирует настоящую систему учётных записей.</p>
+            </div>
+
+            <div class="scenario" tabindex="0" aria-label="Горизонтальная схема демонстрационного сценария">
+              <article class="scenario-step"><span class="scenario-role">ПДБ</span><h3>Создаёт партию</h3><p>Выбирает готовый паспорт и количество 112.</p><span class="scenario-result">Результат: партия создана</span></article>
+              <article class="scenario-step"><span class="scenario-role">ПДБ</span><h3>Выпускает карточки</h3><p>Одно действие создаёт 3 комплекта: 112 + 112 + 26.</p><span class="scenario-result">Результат: 250 карточек</span></article>
+              <article class="scenario-step"><span class="scenario-role">Мастер</span><h3>Ведёт первую деталь</h3><p>Назначает, фиксирует начало и завершение первой карточки.</p><span class="scenario-result">Результат: ожидается БТК</span></article>
+              <article class="scenario-step"><span class="scenario-role">БТК</span><h3>Открывает серию</h3><p>Положительно принимает первую деталь комплекта.</p><span class="scenario-result">Результат: серия разрешена</span></article>
+              <article class="scenario-step"><span class="scenario-role">Мастер</span><h3>Распределяет серию</h3><p>Формирует проверяемый итог 60 + 52 = 112.</p><span class="scenario-result">Результат: работа назначена</span></article>
+              <article class="scenario-step"><span class="scenario-role">Мастер + БТК</span><h3>Закрывают карточки</h3><p>Мастер фиксирует выполнение, БТК — цифровой результат.</p><span class="scenario-result">Результат: 250/250 закрыто</span></article>
+              <article class="scenario-step"><span class="scenario-role">БТК</span><h3>Принимает партию</h3><p>Отдельно подтверждает полностью завершённую партию.</p><span class="scenario-result">Результат: приёмка записана</span></article>
+              <article class="scenario-step"><span class="scenario-role">Аудитор</span><h3>Проверяет доказательства</h3><p>Читает историю и создаёт единственную mock payroll-запись.</p><span class="scenario-result">Результат: история восстановима</span></article>
+            </div>
+          </section>
+
+          <section id="quality" aria-labelledby="quality-title">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">На чём основан статус</p>
+                <h2 id="quality-title">Доказательства готовности</h2>
+              </div>
+              <p>Зелёный статус означает проверенный результат. Жёлтый — реализация есть, но финальное доказательство текущей ревизии ещё не получено. Серый — этап не начинался.</p>
+            </div>
+
+            <div class="evidence-grid">
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено</span><span class="evidence-value">55 / 0 / 0</span></div><h3>Документация</h3><p>55 документов, 0 структурных ошибок и 0 предупреждений. Дополнительно выполнена смысловая сверка ключевых решений.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено локально</span><span class="evidence-value">11 + 5</span></div><h3>Автоматические тесты</h3><p>11 обычных и 5 PostgreSQL integration tests покрывают порядок защиты routes, роли, инварианты, конфликты, масштабный выпуск и компактный API-only workflow.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено локально</span><span class="evidence-value">3</span></div><h3>Миграции базы</h3><p>Чистая база применяет миграции 0001–0003, повторный seed и runtime verification.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено локально</span><span class="evidence-value">Compose ✓</span></div><h3>Текущий checkout</h3><p>Основной стек пересобран с сохранением volume; отдельный clean-container smoke подтвердил образ, новую базу, SPA, health и API routes.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Зелёный baseline</span><span class="evidence-value">CI ✓</span></div><h3>Последняя отправленная ревизия</h3><p>Quality и clean-container jobs для commit d0ecc812 завершились успешно 2 сентября 2026 года.</p></article>
+              <article class="evidence-card pending"><div class="evidence-top"><span class="chip current">Нужна проверка</span><span class="evidence-value">CI ?</span></div><h3>Текущий серверный diff</h3><p>Локальная реализация этапа 7 новее зелёного baseline. Именно она ещё должна пройти удалённые quality/database и clean-container jobs.</p></article>
+              <article class="evidence-card future"><div class="evidence-top"><span class="chip planned">Впереди</span><span class="evidence-value">E2E —</span></div><h3>Браузерный сценарий</h3><p>Связанный интерфейс, desktop/mobile проверка и Playwright E2E относятся к этапам 8–9.</p></article>
+            </div>
+
+            <div class="analysis-grid">
+              <article class="risk-card strengths">
+                <p class="eyebrow">Сильные стороны</p>
+                <h3>Что уже выглядит зрелым</h3>
+                <ul>
+                  <li><strong>Чёткая предметная граница:</strong> проект не разрастается до mini-MES.</li>
+                  <li><strong>Трассировка:</strong> продукт, правила, требования, UX, API и тесты связаны между собой.</li>
+                  <li><strong>Корректность на сервере:</strong> права, версии, транзакции и аудит не зависят от честности браузера.</li>
+                  <li><strong>Воспроизводимость:</strong> фиксированные зависимости, миграции, контейнер и CI уже заложены.</li>
+                </ul>
+              </article>
+              <article class="risk-card gaps">
+                <p class="eyebrow">Риски и разрывы</p>
+                <h3>Что важно не потерять дальше</h3>
+                <ul>
+                  <li><strong>Интерфейс пока не доказывает сценарий:</strong> apps/web остаётся health-оболочкой.</li>
+                  <li><strong>Большой workflow-service:</strong> около 2,2 тыс. строк уже требуют дисциплины модульных границ при росте.</li>
+                  <li><strong>Целевая архитектура шире текущих зависимостей:</strong> Router, Query и ORM описаны, но пока не подключены.</li>
+                  <li><strong>Текущий код не прошёл удалённый контейнер:</strong> локальный Compose зелёный, но remote CI относится к baseline до серверного среза.</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <section id="next" aria-labelledby="next-title">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Маршрут к готовому MVP</p>
+                <h2 id="next-title">Что делать дальше</h2>
+              </div>
+              <p>Порядок сохраняет доказательность: сначала подтверждаем уже написанный сервер, затем строим пользовательский путь поверх стабильного API.</p>
+            </div>
+
+            <div class="next-actions">
+              <article class="result-card"><span class="action-no">ШАГ 01</span><h3>Закрыть этап 7</h3><p>Отправить текущую ревизию и дождаться зелёных quality/database и clean-container jobs.</p><p class="definition">Готово, когда текущий commit запускается с чистого окружения.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 02</span><h3>Собрать интерфейс</h3><p>Связать 7 спроектированных экранов с реальным API и пройти основной сценарий по ролям.</p><p class="definition">Готово, когда процесс выполняется в браузере без ручной правки данных.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 03</span><h3>Защитить E2E</h3><p>Добавить браузерные проверки, конфликтные состояния, mobile layout и критические security/performance gates.</p><p class="definition">Готово, когда ключевые сбои воспроизводимо ловят тесты.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 04</span><h3>Развернуть и упаковать</h3><p>Подготовить release, demo script, изображения, ограничения и финальный честный аудит.</p><p class="definition">Готово, когда незнакомый человек понимает ценность и может повторить демонстрацию.</p></article>
+            </div>
+
+            <div class="boundary-box">
+              <div>
+                <h3>Честная граница проекта</h3>
+                <p>Это синтетическая демонстрация, а не внедрённая заводская система. Она не хранит серийную идентичность деталей, не редактирует паспорта и нормы, не рассчитывает зарплату и не подключается к реальным MES, ERP или payroll.</p>
+              </div>
+              <button class="button primary" id="copy-summary" type="button">Скопировать краткий статус</button>
+            </div>
+
+            <div class="source-list" aria-label="Основные источники данных дашборда">
+              <a href="project/project-plan.md">План проекта</a>
+              <a href="project/backlog.md">Бэклог</a>
+              <a href="product/product-brief.md">Описание продукта</a>
+              <a href="architecture/system-context.md">Системный контекст</a>
+              <a href="engineering/repository-structure.md">Структура репозитория</a>
+              <a href="engineering/quality-gates.md">Проверки качества</a>
+              <a href="ux/prototype.html">14-шаговый прототип</a>
+              <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33567116785">Последний зелёный CI baseline</a>
+            </div>
+          </section>
+
+          <footer>
+            <span>Production Work Card Workflow · независимый portfolio case study</span>
+            <span>Срез собран по рабочему дереву и документации на 02.09.2026</span>
+          </footer>
+        </div>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      const root = document.documentElement;
+      const themeButton = document.querySelector('#theme-toggle');
+      const printButton = document.querySelector('#print-button');
+      const copyButton = document.querySelector('#copy-summary');
+      const toast = document.querySelector('#toast');
+      const filterButtons = [...document.querySelectorAll('[data-filter]')];
+      const roadmapCards = [...document.querySelectorAll('.roadmap-card')];
+      const navLinks = [...document.querySelectorAll('.side-nav a')];
+      const sections = [...document.querySelectorAll('main section[id]')];
+
+      const savedTheme = localStorage.getItem('project-dashboard-theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        root.dataset.theme = savedTheme;
+      } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+        root.dataset.theme = 'light';
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('visible');
+        window.clearTimeout(showToast.timeoutId);
+        showToast.timeoutId = window.setTimeout(() => toast.classList.remove('visible'), 2400);
+      }
+
+      themeButton.addEventListener('click', () => {
+        const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        root.dataset.theme = nextTheme;
+        localStorage.setItem('project-dashboard-theme', nextTheme);
+        showToast(nextTheme === 'dark' ? 'Включена тёмная тема' : 'Включена светлая тема');
+      });
+
+      printButton.addEventListener('click', () => window.print());
+
+      filterButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const filter = button.dataset.filter;
+          filterButtons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+          roadmapCards.forEach((card) => {
+            card.hidden = filter !== 'all' && card.dataset.status !== filter;
+          });
+        });
+      });
+
+      const summary = [
+        'Production Work Card Workflow — статус на 02.09.2026.',
+        'Завершены этапы 0–6.',
+        'Этап 7: серверный vertical slice реализован локально и находится на проверке.',
+        'Local clean-container текущего checkout прошёл; следующий gate — зелёные CI jobs для нового commit SHA.',
+        'После него: этап 8 — браузерный интерфейс, связанный с реальным API.',
+      ].join(' ');
+
+      copyButton.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(summary);
+          showToast('Краткий статус скопирован');
+        } catch {
+          showToast('Не удалось скопировать автоматически');
+        }
+      });
+
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            const visible = entries
+              .filter((entry) => entry.isIntersecting)
+              .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+            if (!visible) return;
+            navLinks.forEach((link) => {
+              link.setAttribute('aria-current', String(link.getAttribute('href') === `#${visible.target.id}`));
+            });
+          },
+          { rootMargin: '-18% 0px -70% 0px', threshold: [0.01, 0.2, 0.5] },
+        );
+        sections.forEach((section) => observer.observe(section));
+      }
+    </script>
+  </body>
+</html>
