@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.security-baseline
 status: accepted
-version: 2
+version: 3
 owner: architecture
 updated: 2026-09-02
 ---
@@ -40,7 +40,7 @@ updated: 2026-09-02
 - Mutation требует session cookie, `X-CSRF-Token`, совпадающий с hash текущей session, и допустимый `Origin`.
 - CORS middleware не подключён: поддерживаются same-origin deployment и development через Vite proxy. Separate-origin deployment требует отдельной явной политики на этапе 10.
 - GET/HEAD не меняют состояние.
-- Текущая frontend-оболочка ещё не реализует demo-session flow; требование этапа 8 — не хранить session/CSRF в `localStorage`, держать token в memory и перечитывать его через session endpoint после reload.
+- Frontend при bootstrap перечитывает actor, permissions и новый CSRF token через session endpoint, хранит token только в памяти и не использует `localStorage`/`sessionStorage` для session state. До подтверждения server session защищённый экран не монтируется; смена пользователя очищает command state и permission-sensitive cache.
 
 ## Authorization
 

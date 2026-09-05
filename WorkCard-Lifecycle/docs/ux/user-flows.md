@@ -1,9 +1,9 @@
 ---
 artifact_id: ux.user-flows
 status: accepted
-version: 4
+version: 5
 owner: ux
-updated: 2026-07-17
+updated: 2026-09-05
 ---
 
 # User Flows
@@ -28,6 +28,8 @@ flowchart LR
 ```
 
 `UC-007` дополнительно проверяет provenance: per-card close не записывает финальную приёмку, а `UC-015` создаёт её только отдельной командой. `UC-008`, `UC-010`–`UC-014` дают остальные supporting-сценарии.
+
+Полный браузерный проход описан в [[demo-script]]. Перед финальной приёмкой все обязательные карточки должны пройти реальные команды мастера и БТК; подготовленное состояние документационного прототипа не является backend-доказательством. Числа `3/3` и `250/250` относятся к каноническому паспорту: для другого подготовленного паспорта readiness определяется всем его планом, а не фиксированными константами.
 
 ## F-01. Создание партии
 
@@ -114,41 +116,45 @@ flowchart TD
 1. БТК открывает `S-03`; UI раздельно показывает `first-article gates: 3/3`, `closed cards: 250/250`, `FinalBatchAcceptance: ещё нет`.
 2. До выполнения любого условия action disabled с точной причиной; другие роли его не видят.
 3. «Принять завершённую партию» вызывает `RecordFinalBatchAcceptance` с batch version и явным confirmation.
-4. Success refreshes batch и показывает `FINAL_ACCEPTED`, `acceptanceId`, актора и время; физическая подпись не показывается.
+4. Success перечитывает batch и показывает финальную приёмку, актора и время; `FINAL_ACCEPTED`, `acceptanceId` и технические версии доступны только во вложенном закрытом блоке «Технические коды для разработчика». Физическая подпись не показывается.
 5. Replay того же command ID показывает существующую запись без нового success; новый command недоступен.
 
 ## F-08. Mock payroll
 
-1. `ADMIN_AUDITOR` открывает `CLOSED` карточку.
-2. Первый export создаёт запись operation-scoped нормы и открывает `S-07`.
-3. Повтор/существующая запись открывает ту же `S-07` без сообщения о новом начислении.
-4. Money, taxes, actual time, edit/delete отсутствуют.
+1. `ADMIN_AUDITOR` открывает `S-05` и переходит в «Тестовый учёт нормо-часов» (`S-07`). Переход только читает карточку и проверяет существующую запись.
+2. Если запись отсутствует и карточка `CLOSED` с исполнителем, «Создать тестовую запись нормо-часов» открывает диалог с группой операций, исполнителем и нормой. Только отдельное подтверждение отправляет первый export.
+3. Ответ команды обязательно сверяется с read-back; `S-07` показывает неизменяемую запись operation-scoped нормы, исполнителя, администратора и время.
+4. Повторное открытие или существующая запись показывают ту же `S-07` без новой команды и сообщения о новом начислении. Если конкурирующий export уже создал запись, идемпотентный ответ также показывает существующий результат.
+5. Money, taxes, actual time, edit/delete отсутствуют.
 
 ## F-09. Audit и correlation
 
 1. `ADMIN_AUDITOR` открывает историю карточки.
-2. События показываются по versions/time; technical envelope раскрывается по запросу.
-3. Correlation context показывает полный набор выпуска, assignment или first-article acceptance, включая batch/set/card aggregates.
-4. UX фиксирует потребность, но не endpoint.
+2. События показываются в порядке versions/time с русскими названиями; technical envelope раскрывается во вложенном developer context.
+3. Контекст события открывает server-side correlation query и загружает все страницы выпуска, assignment или first-article acceptance, включая batch/set/card aggregates.
+4. Клиент сверяет authoritative totals, уникальность, порядок и общий command/correlation context. Полный выпуск канонической партии даёт 254 события: партия, три комплекта и 250 карточек. Частичный набор не показывается как полный аудит. Endpoint закреплён в [[api-contracts]].
 
 ## F-10. Conflict recovery
 
 ```mermaid
 flowchart TD
-    submit["Submit expected versions"] --> conflict{"Conflict?"}
-    conflict -->|Нет| success["Refresh confirmed result"]
-    conflict -->|Да| preserve["No success / no auto retry"]
-    preserve --> reload["Explicit reload all targets"]
-    reload --> allowed{"Action still allowed?"}
-    allowed -->|Да| confirm["New explicit command"]
-    allowed -->|Нет| explain["Hide control, explain current gate/state"]
+    submit["Команда с ожидаемыми версиями"] --> conflict{"Конфликт или неизвестный исход?"}
+    conflict -->|Нет| success["Проверить полный read-back результата"]
+    conflict -->|Да| preserve["Без успеха; сбросить диалог и выбор"]
+    preserve --> reload["Автоматически перечитать все затронутые цели"]
+    reload --> complete{"Все чтения завершились?"}
+    complete -->|Нет| retry["Команды заблокированы; явный повтор чтения"]
+    retry --> reload
+    complete -->|Да| allowed{"Действие ещё доступно?"}
+    allowed -->|Да| confirm["Новое решение и подтверждение пользователя"]
+    allowed -->|Нет| explain["Показать актуальное состояние и причину"]
 ```
 
-Assignment очищает selection после refresh; first-article acceptance перечитывает и card, и set. «Force overwrite» отсутствует.
+Сброс прежнего диалога и selection происходит до безопасного перечитывания. Assignment перечитывает set и все выбранные cards; first-article acceptance — card и set; final acceptance — batch, completion summary и существующую acceptance; payroll — card и существующую запись. Частичные чтения не применяются. Mutation не повторяется автоматически, «Force overwrite» отсутствует. Ошибки ввода сохраняют редактируемые поля; неизвестный результат создания партии требует актуального списка партий перед новой попыткой.
 
 ## F-11. Role switch
 
-Выбор подготовленной identity обновляет shell, route data и permissions. Command dialogs/selections очищаются. Если route защищён, показывается access state. Предметные данные не меняются.
+Выбор подготовленной identity заменяет серверную HttpOnly session и CSRF token в памяти. Shell, route data и permissions перечитываются; прежний экран размонтируется, незавершённые чтения отменяются, command dialogs/selections и защищённое состояние очищаются. Если route защищён, показывается access state до загрузки предметных данных. Предметные данные не меняются.
 
 ## Общие правила команд
 
@@ -157,6 +163,6 @@ Assignment очищает selection после refresh; first-article acceptance
 - success отображается только после backend response и refresh;
 - клиент не меняет status/gate оптимистически;
 - network uncertainty требует read before retry;
-- UUID доступен для copy/debug, но никогда не оформляется как номер детали.
+- UUID доступен для copy/debug только во вложенном закрытом developer context «Сведений о прототипе» и никогда не оформляется как номер детали.
 
 Состояния описывает [[ui-states]], permissions — [[permission-ux]]. [Кликабельный прототип](prototype.html) проходит эти flow за 14 шагов и демонстрирует role-aware controls.

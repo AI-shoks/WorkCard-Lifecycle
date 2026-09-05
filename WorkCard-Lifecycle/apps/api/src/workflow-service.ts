@@ -6,6 +6,7 @@ import type {
   AssignWorkCardsBody,
   AuditEvent,
   BatchLifecycleStatus,
+  BatchOperationPlanSnapshot,
   CardVersionCommandBody,
   CommandName,
   CreateBatchResponse,
@@ -1813,6 +1814,31 @@ export function createWorkflowService(pool: Pool) {
       );
       const batch = batchResult.rows[0];
       if (!batch) throw resourceNotFound();
+      const operationPlanResult = await pool.query<{
+        id: string;
+        norm_hours: string;
+        planned_card_count: number;
+        position: number;
+        scope_code: string;
+        scope_name: string;
+      }>(
+        `SELECT id, position, scope_code, scope_name, norm_hours::text, planned_card_count
+         FROM batch_operation_plan_snapshots
+         WHERE batch_id = $1
+         ORDER BY position, id`,
+        [batchId],
+      );
+      const operationPlan: BatchOperationPlanSnapshot[] = operationPlanResult.rows.map((row) => ({
+        id: row.id,
+        position: row.position,
+        scopeCode: row.scope_code,
+        scopeName: row.scope_name,
+        normHours: row.norm_hours,
+        plannedCardCount: row.planned_card_count,
+      }));
+      if (operationPlan.length === 0) {
+        throw new Error('Снимок плана операций партии не найден.');
+      }
       const setsResult = await pool.query<
         SetRow & { actual_card_count: number; closed_card_count: number }
       >(
@@ -1906,6 +1932,7 @@ export function createWorkflowService(pool: Pool) {
           actualCardCount: batch.actual_card_count,
           closedCardCount: batch.closed_card_count,
         },
+        operationPlan,
         sets,
         finalAcceptance,
         availableActions,

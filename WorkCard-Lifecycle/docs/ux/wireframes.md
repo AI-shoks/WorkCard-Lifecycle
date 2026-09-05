@@ -1,20 +1,22 @@
 ---
 artifact_id: ux.wireframes
 status: accepted
-version: 4
+version: 5
 owner: ux
-updated: 2026-07-17
+updated: 2026-09-05
 ---
 
 # Wireframes
 
 Текстовые low-fidelity wireframes фиксируют новую предметную модель и служат спецификацией для отдельного [кликабельного прототипа](prototype.html). Сам текстовый документ не подменяет интерактивный артефакт.
 
+Схемы ниже используют сокращённые технические обозначения для документации. Пользовательский текст живой SPA и прототипа подчиняется [[ux-copy-guidelines]]; UUID, enum, role/command/event codes и версии переносятся только во вложенный закрытый developer context «Сведений о прототипе».
+
 ## Общая сетка
 
 - desktop: header, container до 1200 px, 12 columns; mobile: одна column и sticky primary action;
 - status, operation scope и business context видимы без вкладок;
-- internal UUID — secondary metadata с copy control, а не пользовательский заголовок;
+- internal UUID — только во вложенном закрытом developer context, а не пользовательский заголовок;
 - запрещены карточочные labels `#01`, «3 из 112» и ranges деталей;
 - protected data не загружается для роли без доступа.
 
@@ -206,14 +208,23 @@ Operation context must include all batch/set/card events for the correlation. No
 ## W-07. Mock payroll `S-07`
 
 ```text
-┌ Mock payroll record PR-…                         [Demo, not payment] ┐
-│ WorkCard UUID   9f4e2b7a-…                                         │
-│ Beneficiary     Алексей Смирнов                                    │
-│ Operation norm  0.80 ч (snapshot)                                  │
-│ Exported        17.07.2026 11:52 UTC                               │
-│ Money, taxes, actual time and payment are not calculated.          │
-└─────────────────────────────────────────────────────────────────────┘
+┌ Тестовый учёт нормо-часов                         [К карточке] ┐
+│ Группа операций: Операции 010–030                             │
+│ Исполнитель: Алексей Смирнов   Норма: 0,80 ч                   │
+│ Запись ещё не создана                                         │
+│ [Создать тестовую запись нормо-часов]                          │
+└──────────────────────────────────────────────────────────────┘
+                       ↓ явное подтверждение в диалоге
+┌ Тестовая запись перечитана с сервера                          ┐
+│ Исполнитель: Алексей Смирнов   Норма: 0,80 ч                   │
+│ Создал запись: Администратор демонстрации                     │
+│ Время сервера: дата и локальное время                         │
+│ Денежный расчёт не выполняется; изменение/удаление недоступны │
+│ [Сведения о прототипе ▸]                                      │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+Переход из `S-05` ничего не экспортирует: сначала читаются карточка и существующая запись. Если запись уже есть, сразу показывается read-only результат. Если записи нет и карточка готова, диалог называет роль, группу операций, исполнителя и норму. Отмена не отправляет команду; подтверждение требует backend response и read-back. Конфликт или неизвестный исход закрывает диалог и запускает безопасное перечитывание перед новым решением.
 
 ## Mobile
 
@@ -228,7 +239,7 @@ Operation context must include all batch/set/card events for the correlation. No
 - commands keyboard-accessible; dialog focus returns to initiator;
 - status/gate never use color alone;
 - disabled reason is programmatically linked;
-- table checkbox accessible name uses operation context + UUID fragment, not a card number;
+- table checkbox accessible name uses Russian operation/assignment context; UUID fragments and card/detail numbers are excluded;
 - assignment result and gate change announced via `aria-live`;
 - DOM order matches visual order.
 

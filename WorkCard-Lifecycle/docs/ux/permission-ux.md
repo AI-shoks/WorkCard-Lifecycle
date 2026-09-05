@@ -1,9 +1,9 @@
 ---
 artifact_id: ux.permission-ux
 status: accepted
-version: 4
+version: 5
 owner: ux
-updated: 2026-07-17
+updated: 2026-09-05
 ---
 
 # Permission UX
@@ -106,7 +106,7 @@ Protected route data is never loaded before being hidden.
 
 - no production lifecycle actions;
 - audit/payroll links;
-- first export only for eligible `CLOSED`, else existing record link;
+- переход из `S-05` в `S-07` только читает состояние; первый export требует eligible `CLOSED`, отсутствующей записи и отдельного подтверждения; существующая запись показывается без команды;
 - no edit/delete of audit/payroll.
 
 ## Disabled reasons
@@ -133,9 +133,9 @@ Prepared identity/role only; no arbitrary role input. Shell/dialogs show active 
 1. no optimistic success;
 2. stop pending;
 3. safe message;
-4. explicit refresh of all affected aggregates;
+4. automatically perform only safe reads of all affected aggregates; if a read fails, keep commands blocked and offer an explicit read retry;
 5. recompute controls;
-6. no local success event/auto retry.
+6. no local success event/automatic mutation retry; a new command requires a new explicit decision and confirmation where applicable.
 
 ## Tampering/stale UI
 

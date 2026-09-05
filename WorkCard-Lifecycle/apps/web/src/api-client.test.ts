@@ -52,6 +52,16 @@ const releasedBatch = {
   finalAcceptedAt: null,
   id: releaseResponse.batchId,
   lifecycleStatus: 'RELEASED',
+  operationPlan: [
+    {
+      id: '50000000-0000-4000-8000-000000000001',
+      normHours: '0.25',
+      plannedCardCount: 2,
+      position: 1,
+      scopeCode: 'OP-010',
+      scopeName: 'Подготовительная операция',
+    },
+  ],
   passportSnapshot: {
     code: 'WC-DEMO-001',
     productName: 'Демонстрационное изделие',

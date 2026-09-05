@@ -1,9 +1,9 @@
 ---
 artifact_id: ux.screen-map
 status: accepted
-version: 4
+version: 5
 owner: ux
-updated: 2026-07-17
+updated: 2026-09-05
 ---
 
 # Screen Map
@@ -15,7 +15,7 @@ updated: 2026-07-17
 - навигация: `Паспорт → Партия → несколько комплектов → WorkCard`;
 - партия показывает quantity и снимок паспорта, но не один норматив;
 - комплект является operation-scoped: собственные норма, planned count и first-article gate;
-- карточка показывает внутренний UUID только как secondary technical metadata, не как `#01` или номер детали;
+- карточка показывает внутренний UUID только во вложенном закрытом developer context «Сведений о прототипе», не как `#01` или номер детали;
 - мастер владеет assignment/start/complete controls, `WORKER` получает read-only view;
 - БТК видит positive-only first-piece action или синтетическое per-card serial quality action;
 - на экране партии БТК отдельно выполняет `RecordFinalBatchAcceptance` только после всех first-article gates и закрытия всех обязательных WorkCard;
@@ -25,7 +25,7 @@ updated: 2026-07-17
 
 ## Глобальная оболочка
 
-На защищённых маршрутах присутствуют название, переход к партиям, активные demo identity/role, breadcrumbs, `aria-live`, состояние загрузки и явный refresh после conflict. Role switch перечитывает permissions и очищает command state без предметного эффекта.
+На защищённых маршрутах присутствуют название, переход к партиям, активные demo identity/role, breadcrumbs, `aria-live`, состояние загрузки и явный refresh. После conflict выполняются только безопасные чтения всех целей; при их ошибке доступен явный повтор чтения, а следующая команда требует нового решения. Role switch перечитывает permissions и очищает command state без предметного эффекта.
 
 ## Реестр экранов
 
@@ -37,7 +37,7 @@ updated: 2026-07-17
 | `S-04` | Комплект `/card-sets/:setId` | operation scope, норма, planned count, gate, assignment summary, карточки | demo-роли по матрице | first-article/serial assignment — `MASTER` | `UC-003`, `UC-007`, `UC-011`, `UC-012` |
 | `S-05` | WorkCard `/work-cards/:workCardId` | status, purpose, assignee, batch quantity snapshot, operation/norm snapshots, version, UUID metadata | demo-роли по матрице | master lifecycle или БТК action по точному state/gate | `UC-004`–`UC-007`, `UC-009`, `UC-012` |
 | `S-06` | Audit context | card/set/batch history и операция по correlation | `ADMIN_AUDITOR` | read/copy ID | `UC-008`, `UC-014` |
-| `S-07` | Mock payroll `/work-cards/:id/payroll` | единственная запись, beneficiary, operation-scoped norm | `ADMIN_AUDITOR` | read-only; первый export с `S-05` | `UC-009`, `UC-013` |
+| `S-07` | Тестовый учёт нормо-часов `/work-cards/:workCardId/payroll` | существующая запись либо карточка, beneficiary и operation-scoped norm перед созданием | `ADMIN_AUDITOR` | переход с `S-05` только читает; первый export здесь после отдельного подтверждения, существующая запись read-only | `UC-009`, `UC-013` |
 
 ## Иерархия
 
@@ -55,7 +55,7 @@ flowchart TD
     card --> payroll["S-07 Mock payroll"]
 ```
 
-`S-06`/`S-07` защищены route/backend guards. Источник полного correlation-набора определит [[api-contracts]].
+`S-06`/`S-07` защищены route/backend guards. Источник полного correlation-набора закреплён в [[api-contracts]]: server-side query с authoritative totals и cursor pagination.
 
 ## Пользовательские статусы
 
@@ -66,20 +66,20 @@ flowchart TD
 | партия завершена, acceptance отсутствует | Готова к финальной приёмке | БТК выполняет отдельное действие |
 | `FINAL_ACCEPTED` | Финальная приёмка выполнена | Read-only actor/time/acceptance ID |
 | `FIRST_ARTICLE_PENDING` | Ожидается первая деталь | Мастер выбирает/ведёт first article, затем БТК |
-| `SERIAL_ALLOWED` | Серийная работа разрешена | Мастер распределяет серийные карточки |
-| `RELEASED` | Доступна к назначению | Мастер |
-| `ASSIGNED` | Назначена | Мастер фиксирует начало |
-| `IN_PROGRESS` | В работе | Мастер фиксирует завершение |
-| `COMPLETED` | Выполнена | БТК может выполнить digital per-card действие |
-| `CLOSED` | Цифровая карточка закрыта | Admin может mock export; финальная приёмка партии не выводится |
+| `SERIAL_ALLOWED` | Обработка партии разрешена | Мастер распределяет карточки обработки партии |
+| `RELEASED` | Выпущена | Мастер |
+| `ASSIGNED` | Назначена исполнителю | Мастер фиксирует начало |
+| `IN_PROGRESS` | Выполняется | Мастер фиксирует завершение |
+| `COMPLETED` | Работа завершена | БТК может выполнить digital per-card действие |
+| `CLOSED` | Закрыта | Admin может mock export; финальная приёмка партии не выводится |
 
-Technical enums доступны в details/tooltips, но не заменяют пользовательский смысл.
+Technical enums доступны только во вложенном закрытом developer context «Сведений о прототипе». Tooltip и `aria-*` используют русские пользовательские формулировки.
 
 ## Списки и фильтры
 
 ### Партии
 
-- поиск по batch ID и паспорту;
+- поиск по коду/редакции паспорта и названию изделия в загруженных страницах; UUID партии не является производственным поисковым полем;
 - фильтр release status;
 - columns quantity, set count, total card count;
 - один норматив партии не показывается.
@@ -92,7 +92,7 @@ Technical enums доступны в details/tooltips, но не заменяют
 ### Карточки комплекта
 
 - фильтры status, purpose, assignee;
-- optional поиск по полному внутреннему UUID в technical mode;
+- status и assignee входят в server query; purpose уточняет загруженную выборку, а доступная следующая страница остаётся явной;
 - counts `показано / карточек комплекта`, но не `n из batchQuantity`;
 - selection хранит `workCardId + version`; карточка не получает пользовательский порядковый номер;
 - assignment summary выражается counts по исполнителям, например `60 + 52 = 112`.
@@ -104,7 +104,7 @@ Technical enums доступны в details/tooltips, но не заменяют
 - assignment: остаётся `S-04`, перечитываются комплект и карточки;
 - lifecycle/acceptance: остаётся `S-05`, затем refresh card + set;
 - final-batch acceptance: остаётся `S-03`, затем refresh batch + completion summary + acceptance read-back;
-- export: `S-05 → S-07`;
+- тестовый учёт: `S-05 → S-07` только читает; при отсутствии записи отдельное подтверждение export сохраняет результат на `S-07`;
 - conflict сохраняет маршрут, не повторяет команду автоматически.
 
 ## Покрытие

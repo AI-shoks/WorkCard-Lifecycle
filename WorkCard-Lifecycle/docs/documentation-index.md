@@ -1,7 +1,7 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 8
+version: 9
 owner: project
 updated: 2026-09-02
 ---
@@ -45,7 +45,7 @@ docs/
 
 ## Текущая контрольная точка
 
-Этапы 1–6 завершены. Backend vertical slice этапа 7 реализован и прошёл локальные code/DB integration и clean-container gates, но остаётся на проверке до зелёных jobs для нового commit SHA. Machine-readable API, транзакции и тесты теперь являются доказательством backend-сценария; frontend flow ещё не подключён к нему. Наглядный, неканонический обзор состояния доступен в [project-dashboard.html](project-dashboard.html).
+Этапы 1–7 завершены. Backend vertical slice зафиксирован implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1), прошёл локальные code/DB integration и clean-container gates, а также полностью зелёные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041). Machine-readable API, транзакции и тесты являются доказательством backend-сценария; frontend flow этапа 8 ещё не подключён. Наглядный, неканонический обзор состояния доступен в [project-dashboard.html](project-dashboard.html).
 
 ## Происхождение и семантическая проверка
 

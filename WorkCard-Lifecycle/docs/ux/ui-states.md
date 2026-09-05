@@ -1,9 +1,9 @@
 ---
 artifact_id: ux.ui-states
 status: accepted
-version: 4
+version: 6
 owner: ux
-updated: 2026-07-17
+updated: 2026-09-05
 ---
 
 # UI States
@@ -23,32 +23,34 @@ stateDiagram-v2
     Refreshing --> Ready: all targets refreshed
     Submitting --> ValidationError
     Submitting --> BusinessOrGateError
-    Submitting --> VersionConflict
-    VersionConflict --> Refreshing: explicit reload
+    Submitting --> Recovery: conflict / network / integrity
+    Recovery --> Ready: all affected targets refreshed
+    Recovery --> RecoveryError: full read failed
+    RecoveryError --> Recovery: explicit read retry
 ```
 
-Если backend подтвердил command, но refresh не удался, UI сообщает неопределённость результата и требует read before retry.
+Если исход команды или обязательного read-back не подтверждён, UI немедленно очищает устаревшие selection/dialog state и выполняет только безопасные чтения. Mutation не повторяется; частичные результаты чтений не применяются, а новая команда требует нового явного решения по свежим данным.
 
 ## Типы состояний
 
 | State | Представление | Действие |
 |---|---|---|
-| initial loading | skeleton итоговой структуры, shell/role видимы | wait/navigation |
+| initial loading | loading panel/skeleton, shell/role видимы | wait/navigation |
 | background refresh | existing data + progress; commands blocked | read |
 | submitting | command label + spinner; duplicate disabled | wait |
 | empty | причина и role-relevant next step | CTA/reset filter |
 | validation | summary + field errors | correct/resubmit |
 | authorization/access | safe message without protected data | back/switch role |
 | state/gate conflict | доступная причина и current state | refresh |
-| version conflict | blocking alert; no overwrite | reload all targets |
-| network/server | request ID, no false result | retry read first |
+| version conflict | blocking alert; no overwrite | reload all targets, then new decision |
+| network/server | request ID, no false result | automatic safe reads; explicit read retry on failure |
 | integrity warning | passport plan/counts/snapshots disagree | stop commands, refresh |
 
 ## Loading
 
-- `S-03` skeleton reserves operation-plan/set table;
-- `S-04` background refresh preserves cards/distribution but blocks selection;
-- `S-05` shows current status/gate as updating and blocks command;
+- первичный вход и явное «Обновить данные» перемонтируют предметный экран и показывают loading state до свежего чтения;
+- безопасное recovery внутри экрана может сохранять ранее подтверждённое представление, но помечает перечитывание и блокирует соответствующие команды/selection;
+- подгрузка cursor page сохраняет уже полученные строки; ошибка следующей страницы не выдаёт их за полную выборку;
 - protected cache is cleared on role switch;
 - slow loading is announced without claiming error.
 
@@ -63,14 +65,14 @@ stateDiagram-v2
 | `S-04`, cards missing vs planned | integrity warning | refresh; assignment blocked |
 | `S-04`, filter empty | «Нет карточек с такими условиями» | reset filters |
 | `S-06`, no history | «Успешных событий не найдено» | refresh |
-| `S-07`, no payroll | safe not-found; first export lives on `S-05` | back |
+| `S-07`, no payroll | «Тестовая запись ещё не создана»; карточка и отсутствие записи перечитаны | для eligible `CLOSED` — создание после отдельного подтверждения; иначе доступная причина |
 
 ## Success feedback
 
 | Command | Message after confirmed refresh | Main change |
 |---|---|---|
-| `CreateProductionBatch` | «Партия B-112 создана по паспорту PP-DEMO» | `S-03`, version 1 |
-| `ReleaseWorkCards` | «Выпущены 3 комплекта, 250 карточек» | sets `112/112/26`; release removed |
+| `CreateProductionBatch` | созданная партия по выбранному паспорту и quantity | `S-03`, version 1 |
+| `ReleaseWorkCards` | «Выпущены 3 комплекта, 250 карточек» для канонического паспорта | sets `112/112/26`; повторное действие disabled с причиной |
 | first-article `AssignWorkCards` | «Карточка назначена для первой детали» | set stores technical first-article UUID |
 | serial `AssignWorkCards` | «Все N карточек назначены» | rows + distribution summary |
 | `StartWorkCard` | «Мастер зафиксировал начало» | `IN_PROGRESS` |
@@ -78,8 +80,8 @@ stateDiagram-v2
 | `AcceptFirstArticle` | «Первая деталь принята; серийная работа разрешена» | card `CLOSED`, set `SERIAL_ALLOWED` |
 | `ConfirmWorkCardQuality` | «Карточка цифрово закрыта; финальная приёмка партии не записана» | `CLOSED` only for selected WorkCard |
 | `RecordFinalBatchAcceptance` | «Завершённая партия принята БТК» | `FINAL_ACCEPTED` + immutable acceptance actor/time/ID |
-| first export | «Mock payroll запись создана» | `S-07` |
-| repeat export | «Показана существующая запись» | same `S-07` |
+| first export | «Тестовая запись создана и перечитана» | неизменяемая запись на текущей `S-07` |
+| repeat export / existing read | «Открыта существующая тестовая запись» | та же `S-07`, без нового начисления |
 
 Toast дополняет, но не заменяет visible state.
 
@@ -115,19 +117,34 @@ Toast дополняет, но не заменяет visible state.
 ## Version conflict
 
 ```text
-┌ Данные изменились ────────────────────────────────────────────────┐
-│ Загруженные версии устарели. Команда не применена и не повторится.│
-│ Перечитайте карточку и связанный комплект.                        │
-│                              [Остаться] [Перечитать данные]       │
+┌ Данные изменились — перечитываем ────────────────────────────────┐
+│ Загруженные версии устарели. Команда не повторяется.              │
+│ Выбор и прежний диалог сброшены; читаются все связанные цели.     │
+└───────────────────────────────────────────────────────────────────┘
+
+┌ Свежие данные получены ──────────────────────────────────────────┐
+│ Доступность действия пересчитана. Для новой команды заново        │
+│ выберите цели и подтвердите решение.                              │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
+- create recovery reloads batch/passport lists, clears the form and sends the user to the fresh batch list before another create decision;
 - assignment reloads set + all selected cards and clears selection;
+- start/complete reload card + related set;
 - first-article acceptance reloads card + set;
 - release reloads batch + existing sets;
+- per-card quality confirmation reloads card + related set;
 - final-batch acceptance reloads batch + all completion counters + existing acceptance;
-- new explicit confirmation is required after refresh;
-- force overwrite/auto merge absent.
+- payroll export reloads card + existing record;
+- fresh state is applied only after every required read succeeds; otherwise commands remain blocked and only a read retry is offered;
+- new explicit action and, where applicable, a new confirmation dialog are required after refresh;
+- force overwrite, auto merge and automatic command retry are absent.
+
+Ошибки валидации полей не считаются неизвестным результатом: форма сохраняет выбор и ввод, показывает связанные с полями ошибки и разрешает исправление. При неизвестном исходе создания перечитывается список партий, чтобы пользователь не создавал дубликат вслепую.
+
+### Тестовый учёт нормо-часов
+
+Переход `S-05 → S-07` только читает карточку и существующую запись. Если записи нет, кнопка создания открывает диалог с нормой, исполнителем и группой операций; отмена ничего не отправляет. Mutation выполняется только после подтверждения, а success — после полного read-back. При recovery диалог закрывается; новая попытка требует нового подтверждения. Существующая запись скрывает создание и остаётся неизменяемой.
 
 ## Атомарные операции
 
@@ -176,7 +193,7 @@ Permission-sensitive cache, selections и dialogs очищаются; unfinished
 | ID | Future browser test |
 |---|---|
 | `UX-T-001` | duplicate submit blocked; result shown after refresh |
-| `UX-T-002` | conflict requires explicit reload of all targets |
+| `UX-T-002` | conflict triggers a full safe reload of all targets and requires a new explicit command decision |
 | `UX-T-003` | failed mass assignment changes no row |
 | `UX-T-004` | role switch clears protected/command state |
 | `UX-T-005` | repeat export opens same record |

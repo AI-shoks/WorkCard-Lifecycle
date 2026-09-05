@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DemoSessionResponse, DemoUser, Role } from '@work-card/contracts';
 
+import { createAdminAuditClient } from './admin-audit.js';
+import { createApiClient } from './api-client.js';
 import { AppLink } from './AppLink.js';
+import { createBatchCommandClient } from './batch-commands.js';
 import { Icon } from './Icon.js';
 import { AccessDenied, RouteLoadingState, ScreenContent } from './ScreenContent.js';
 import {
@@ -13,6 +16,11 @@ import {
 } from './app-routing.js';
 import { bootstrapDemoSession, createDemoSessionClient, isAbortError } from './demo-session.js';
 import { fetchReadiness, toReadinessView } from './health.js';
+import { createMasterCommandClient } from './master-commands.js';
+import { createPayrollCommandClient } from './payroll-commands.js';
+import { createQualityCommandClient } from './quality-commands.js';
+import { createReadModelClient } from './read-model.js';
+import { ConfirmationDialog } from './read-only-screens.js';
 import { resetSessionScope, SessionScope } from './session-scope.js';
 
 type RolePresentation = {
@@ -333,6 +341,21 @@ export function App() {
   );
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [announcement, setAnnouncement] = useState('Подготавливаем приложение.');
+  const [hasUnfinishedForm, setHasUnfinishedForm] = useState(false);
+  const [pendingRoleId, setPendingRoleId] = useState<string | null>(null);
+  const apiClient = useMemo(
+    () =>
+      createApiClient({
+        getConfirmedDemoSession: () => (sessionPhase === 'ready' ? session : null),
+      }),
+    [session, sessionPhase],
+  );
+  const adminAudit = useMemo(() => createAdminAuditClient(apiClient), [apiClient]);
+  const batchCommands = useMemo(() => createBatchCommandClient(apiClient), [apiClient]);
+  const masterCommands = useMemo(() => createMasterCommandClient(apiClient), [apiClient]);
+  const payrollCommands = useMemo(() => createPayrollCommandClient(apiClient), [apiClient]);
+  const qualityCommands = useMemo(() => createQualityCommandClient(apiClient), [apiClient]);
+  const readModel = useMemo(() => createReadModelClient(apiClient), [apiClient]);
   const route = useMemo(() => matchAppRoute(pathname), [pathname]);
   const routeAccess = routeAccessFor(session?.actor.role ?? null, route);
   const hasAccess = routeAccess === 'allowed';
@@ -351,6 +374,8 @@ export function App() {
     const revision = resetSessionScope(sessionScope);
     setSessionScopeRevision(revision);
     setRefreshVersion(0);
+    setHasUnfinishedForm(false);
+    setPendingRoleId(null);
   }, [sessionScope]);
 
   useEffect(() => {
@@ -426,8 +451,15 @@ export function App() {
 
   function changeRole(demoUserId: string) {
     if (sessionPhase === 'ready' && session?.actor.id === demoUserId) return;
+    if (sessionPhase === 'ready' && hasUnfinishedForm) {
+      setPendingRoleId(demoUserId);
+      return;
+    }
+    performRoleChange(demoUserId);
+  }
 
-    sessionActionControllerRef.current?.abort();
+  function performRoleChange(demoUserId: string) {
+    if (sessionActionControllerRef.current) return;
     const controller = new AbortController();
     sessionActionControllerRef.current = controller;
     clearSessionBoundary();
@@ -573,10 +605,21 @@ export function App() {
               <RouteLoadingState />
             ) : (
               <ScreenContent
+                adminAudit={adminAudit}
+                batchCommands={batchCommands}
+                masterCommands={masterCommands}
                 navigate={navigate}
+                onAnnounce={setAnnouncement}
+                onFormDirtyChange={setHasUnfinishedForm}
                 onRefresh={refreshPage}
+                payrollCommands={payrollCommands}
+                permissions={session.permissions}
+                qualityCommands={qualityCommands}
+                readModel={readModel}
                 role={session.actor.role}
+                roleLabel={session.actor.displayName}
                 route={route}
+                users={users}
               />
             )}
           </main>
@@ -588,6 +631,20 @@ export function App() {
           </footer>
         </div>
       </div>
+      <ConfirmationDialog
+        boundaryText="Введённые данные и выбор карточек будут очищены. Для продолжения потребуется новое решение в выбранной роли."
+        busy={false}
+        busyLabel="Меняем роль…"
+        confirmLabel="Очистить форму и сменить роль"
+        description={`У пользователя «${session.actor.displayName}» есть незавершённая форма. Подтвердите смену роли или вернитесь к форме.`}
+        onCancel={() => setPendingRoleId(null)}
+        onConfirm={() => {
+          if (pendingRoleId) performRoleChange(pendingRoleId);
+        }}
+        open={pendingRoleId !== null}
+        preview={<p>Новая роль: {users.find((user) => user.id === pendingRoleId)?.displayName}</p>}
+        title="Сменить роль и очистить незавершённую форму?"
+      />
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>

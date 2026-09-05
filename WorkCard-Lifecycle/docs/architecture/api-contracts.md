@@ -39,7 +39,7 @@ HTTP/JSON контракт MVP v1. Каноническая machine-readable в�
 | `GET /production-passports` | read-only список паспортов с operation plan summary | все authenticated demo-роли |
 | `GET /production-passports/{passportId}` | паспорт и operation plans | все authenticated demo-роли |
 | `GET /production-batches?cursor&limit` | партии и status/count summary | все authenticated по [[roles-permissions]] |
-| `GET /production-batches/{batchId}` | batch snapshot, sets summary, final acceptance read-back | разрешённые demo-роли |
+| `GET /production-batches/{batchId}` | batch и operation-plan snapshots, sets summary, final acceptance read-back | разрешённые demo-роли |
 | `GET /work-card-sets/{setId}` | operation scope, norm, gate, assignment/status counts | разрешённые demo-роли |
 | `GET /work-card-sets/{setId}/work-cards?cursor&limit&status&assigneeId` | cursor page карточек | разрешённые demo-роли; worker ограничен собой |
 | `GET /work-cards/{workCardId}` | одна карточка, timestamps, permissions projection | разрешённые demo-роли |
@@ -57,21 +57,47 @@ Default `limit = 50`, maximum `100`. Cursor — непрозрачная base64u
 {
   "id": "uuid",
   "quantity": 112,
-  "lifecycleStatus": "RELEASED",
-  "version": 2,
+  "lifecycleStatus": "CREATED",
+  "version": 1,
   "passportSnapshot": {
     "code": "SYN-PASS-001",
     "revision": "A",
     "productName": "Синтетическое изделие"
   },
-  "counts": { "setCount": 3, "plannedCardCount": 250, "actualCardCount": 250, "closedCardCount": 1 },
+  "counts": { "setCount": 0, "plannedCardCount": 250, "actualCardCount": 0, "closedCardCount": 0 },
+  "operationPlan": [
+    {
+      "id": "uuid",
+      "position": 1,
+      "scopeCode": "OP-010-030",
+      "scopeName": "Операции 010–030",
+      "normHours": "0.80",
+      "plannedCardCount": 112
+    },
+    {
+      "id": "uuid",
+      "position": 2,
+      "scopeCode": "OP-040-060",
+      "scopeName": "Операции 040–060",
+      "normHours": "1.25",
+      "plannedCardCount": 112
+    },
+    {
+      "id": "uuid",
+      "position": 3,
+      "scopeCode": "OP-070",
+      "scopeName": "Операция 070",
+      "normHours": "0.55",
+      "plannedCardCount": 26
+    }
+  ],
   "sets": [],
   "finalAcceptance": null,
   "availableActions": []
 }
 ```
 
-`availableActions` — подсказка интерфейсу, но не разрешение: mutation повторно проходит backend authorization и invariant checks.
+`operationPlan` — неизменяемый снимок, созданный вместе с партией; preview выпуска не перечитывает актуальный reference-паспорт. `availableActions` — подсказка интерфейсу, но не разрешение: mutation повторно проходит backend authorization и invariant checks.
 
 ## Command endpoints
 

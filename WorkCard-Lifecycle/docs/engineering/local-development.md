@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.local-development
 status: accepted
-version: 2
+version: 4
 owner: engineering
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # Local Development
@@ -60,6 +60,42 @@ $env:INTEGRATION_MIGRATION_DATABASE_URL = $env:MIGRATION_DATABASE_URL
 pnpm --filter @work-card/api test:integration
 ```
 
+### Проверка с отдельной PostgreSQL на host
+
+Если Docker недоступен, browser/API и DB integration можно проверить с PostgreSQL `18.6` на host, в том числе portable runtime на Windows. Для этого выделяют отдельный cluster с loopback listener и две чистые БД: одну для браузерного сценария, вторую для integration suite. Системный PostgreSQL, его службы и существующие данные не используются и не перенастраиваются. Порт выбирается свободным и не является частью предметной fixture.
+
+После создания отдельной пустой БД задайте owner/runtime URL и учётные данные через локальное окружение; placeholders ниже нужно заменить своими значениями, не сохраняя их в документации:
+
+```powershell
+$env:MIGRATION_DATABASE_URL = '<owner-url-for-disposable-database>'
+$env:DATABASE_URL = '<runtime-url-for-the-same-database>'
+$env:APP_DATABASE_USER = '<runtime-role-name>'
+$env:APP_DATABASE_PASSWORD = '<runtime-password>'
+pnpm db:migrate
+pnpm db:migrate
+pnpm db:seed
+pnpm db:seed
+pnpm db:verify
+```
+
+Повторный migrate проверяет уже применённые версии и checksums, повторный seed подтверждает неизменность reference data, а `db:verify` подключается именно runtime-ролью. Выполните тот же bootstrap для второй чистой БД, направьте на неё `INTEGRATION_DATABASE_URL` и `INTEGRATION_MIGRATION_DATABASE_URL` и запустите integration suite. Не направляйте integration suite на БД активного браузерного сценария.
+
+Host PostgreSQL подтверждает работу реальной БД и API, но не проверяет Dockerfile, Compose, Linux image или clean-container startup. Контейнерный gate остаётся отдельным обязательством.
+
+### Production SPA на host и обновление assets
+
+Для проверки собранной SPA сервер API должен раздавать текущую `apps/web/dist` под тем же origin. До запуска задайте `DATABASE_URL`, точный `APP_ORIGIN`, loopback `HOST`/свободный `PORT` и локальный `SESSION_SIGNING_SECRET` согласно [[environments]]. Путь к сборке передавайте абсолютным, потому что package script запускается из `apps/api`:
+
+```powershell
+pnpm build
+$env:WEB_DIST_PATH = (Resolve-Path 'apps/web/dist').Path
+pnpm --filter @work-card/api start
+```
+
+После каждого нового `pnpm build` production API необходимо остановить и запустить заново. `@fastify/static` зарегистрирован с `wildcard: false`, поэтому пути файлов фиксируются при запуске API; новая Vite-сборка меняет имена assets. Если оставить старый процесс, запрос нового `.js`/`.css` может попасть в SPA fallback и получить HTML.
+
+После перезапуска проверьте `/`, `/health/live`, `/health/ready` и browser Network/Console. Файлы из актуального `index.html` должны отвечать `200` с JavaScript/CSS MIME-типом, а не `text/html`; ошибок загрузки модулей и MIME mismatch быть не должно. Vite development server использует свой hot reload и не заменяет эту проверку production-раздачи.
+
 ## Диагностика и остановка
 
 ```powershell
@@ -72,4 +108,10 @@ docker compose down
 
 ## Проверенный baseline
 
-1 сентября 2026 года foundation clean build создал образ и подтвердил UI/health. 2 сентября текущий backend checkout прошёл local clean-container startup; отдельная чистая БД применила `0001`–`0003`, повторный seed/verify и 5 backend integration tests. Основной Compose-стек также пересобран из текущего checkout с сохранением существующего volume. Удалённый CI этого незакоммиченного diff ещё не запускался; проектный PostgreSQL использует `55439` по умолчанию.
+1 сентября 2026 года foundation clean build создал образ и подтвердил UI/health. 2 сентября implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) прошёл local clean-container startup; отдельная чистая БД применила `0001`–`0003`, повторный seed/verify и 5 backend integration tests. Основной Compose-стек также пересобран с сохранением существующего volume. [Push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041) для того же SHA подтвердили code/database quality и clean-container startup; проектный PostgreSQL использует `55439` по умолчанию.
+
+### Проверка текущего checkout 5 сентября 2026 года
+
+Для frontend-работ этапа 8 поднят отдельный portable PostgreSQL `18.6` на Windows с раздельными чистыми browser/integration БД. Применение миграций `0001`–`0003`, повторный migrate с проверкой checksums, seed дважды, runtime verification и все `5/5` реальных PostgreSQL integration tests завершились успешно. Системные службы и существующие данные не менялись.
+
+Docker в этой среде отсутствовал, поэтому этот результат не является clean-container проверкой текущего checkout. Текущие изменения этапа 8 ещё не зафиксированы implementation commit и не проверены удалённым CI. Исторические зелёные jobs SHA `17d2b04d13b58c7dff677543ed4399751a8593a1` относятся только к этапу 7. Для закрытия этапа 8 по-прежнему необходимы актуальный clean-container и зелёные `quality`/`container` jobs одного implementation SHA по [[ci-pipeline]] и [[backlog]].

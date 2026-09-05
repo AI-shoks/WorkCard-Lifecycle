@@ -190,6 +190,19 @@ export const WorkCardSetSummarySchema = Type.Object(
 );
 export type WorkCardSetSummary = Static<typeof WorkCardSetSummarySchema>;
 
+export const BatchOperationPlanSnapshotSchema = Type.Object(
+  {
+    id: UuidSchema,
+    position: Type.Integer({ minimum: 1 }),
+    scopeCode: Type.String({ minLength: 1 }),
+    scopeName: Type.String({ minLength: 1 }),
+    plannedCardCount: Type.Integer({ minimum: 1 }),
+    normHours: DecimalHoursSchema,
+  },
+  { additionalProperties: false },
+);
+export type BatchOperationPlanSnapshot = Static<typeof BatchOperationPlanSnapshotSchema>;
+
 export const ProductionBatchSummarySchema = Type.Object(
   {
     id: UuidSchema,
@@ -212,6 +225,7 @@ export const ProductionBatchDetailSchema = Type.Object(
     version: Type.Integer({ minimum: 1 }),
     passportSnapshot: PassportSnapshotSchema,
     counts: BatchCountsSchema,
+    operationPlan: Type.Array(BatchOperationPlanSnapshotSchema, { minItems: 1 }),
     sets: Type.Array(WorkCardSetSummarySchema),
     finalAcceptance: Type.Union([FinalBatchAcceptanceSchema, Type.Null()]),
     availableActions: Type.Array(CommandNameSchema, { uniqueItems: true }),

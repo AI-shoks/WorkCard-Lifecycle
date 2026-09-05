@@ -24,15 +24,43 @@ describe('состояния экранов', () => {
     expect(markup).not.toContain('Учебный расчёт');
   });
 
+  it('останавливает защищённый экран до создания audit/payroll-компонента', () => {
+    const markup = renderToStaticMarkup(
+      <ScreenContent
+        navigate={vi.fn()}
+        onRefresh={vi.fn()}
+        permissions={['AssignWorkCards', 'StartWorkCard', 'CompleteWorkCard']}
+        role="MASTER"
+        roleLabel="Мастер участка"
+        route={matchAppRoute('/work-cards/technical-card-id/audit')}
+      />,
+    );
+
+    expect(markup).toContain('Содержимое защищённого раздела не загружалось');
+    expect(markup).not.toContain('Загружаем историю');
+  });
+
   it('показывает создание партии только роли ПДБ', () => {
     const route = matchAppRoute('/batches');
     const commonProps = { navigate: vi.fn(), onRefresh: vi.fn(), route };
-    const plannerMarkup = renderToStaticMarkup(<ScreenContent {...commonProps} role="PLANNER" />);
-    const masterMarkup = renderToStaticMarkup(<ScreenContent {...commonProps} role="MASTER" />);
+    const plannerMarkup = renderToStaticMarkup(
+      <ScreenContent
+        {...commonProps}
+        permissions={['CreateProductionBatch', 'ReleaseWorkCards']}
+        role="PLANNER"
+      />,
+    );
+    const masterMarkup = renderToStaticMarkup(
+      <ScreenContent
+        {...commonProps}
+        permissions={['AssignWorkCards', 'StartWorkCard', 'CompleteWorkCard']}
+        role="MASTER"
+      />,
+    );
 
     expect(plannerMarkup).toContain('Создать партию');
     expect(masterMarkup).not.toContain('Создать партию');
-    expect(masterMarkup).toContain('Партии появятся здесь после создания специалистом ПДБ');
+    expect(masterMarkup).toContain('Получаем первую страницу партий с сервера');
   });
 
   it('оставляет технические коды в закрытом вложенном блоке', () => {
@@ -40,13 +68,17 @@ describe('состояния экранов', () => {
       <ScreenContent
         navigate={vi.fn()}
         onRefresh={vi.fn()}
+        permissions={['AssignWorkCards', 'StartWorkCard', 'CompleteWorkCard']}
         role="MASTER"
         route={matchAppRoute('/work-cards/technical-card-id')}
       />,
     );
 
-    expect(markup).toContain('<details class="developer-details">');
-    expect(markup).not.toContain('<details class="developer-details" open="">');
+    expect(markup).toContain(
+      '<details class="developer-details" data-ux-technical-exception="developer-codes">',
+    );
+    expect(markup).not.toContain('open=""');
     expect(markup).toContain('Технические коды для разработчика');
+    expect(markup).toContain('не являются номерами деталей или карточек');
   });
 });

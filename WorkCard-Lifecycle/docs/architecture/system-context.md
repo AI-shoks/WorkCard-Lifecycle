@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.system-context
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # System Context
@@ -93,13 +93,26 @@ sequenceDiagram
     API-->>Web: server state
 ```
 
-Клиент не показывает optimistic success до ответа API и не ставит mutations в offline/background queue.
+Клиент показывает успех только после ответа API и обязательного чтения всех затронутых projections с проверкой согласованности. Mutation не попадает в offline/background queue. При конфликте, сетевой неопределённости или нарушении целостности UI очищает прежние диалог/selection и автоматически выполняет только безопасные чтения; частичные результаты не применяются. Если чтение не завершилось, команды остаются заблокированы до явного повтора чтения. Следующая команда требует нового решения по свежим данным.
+
+## Frontend-модули
+
+| Модуль | Ответственность |
+|---|---|
+| `App`, `demo-session`, `session-scope` | server-backed identity, память CSRF, shell и очистка границы роли |
+| `app-routing`, `App`, `permission-guards` | семь маршрутов, History API, безопасные deep links и проекция разрешений до загрузки экрана |
+| `api-client`, `read-model` | `/api/v1`, runtime validation, problem details, request context и cursor pagination |
+| `batch-commands`, `master-commands`, `quality-commands`, `payroll-commands` | явные команды, версии и обязательная проверка read-back |
+| `admin-audit` | server-side correlation query, все страницы и authoritative totals |
+| `command-recovery`, экраны | восстановление полного текущего состояния без автоматического повтора команды |
+
+Экран рабочего получает только доступные ему назначения; чужие audit/payroll routes не монтируют защищённые данные. Frontend guards улучшают UX, а доверенный actor и окончательное решение о доступе принадлежат API.
 
 ## Runtime и deployment shapes
 
 | Среда | Процессы | Данные |
 |---|---|---|
-| Local | `web`, `api`, `postgres` через Compose; migration/seed как one-shot profiles | именованный Docker volume; допустим явный reset только командой разработчика |
+| Local | Compose запускает `app` со SPA/API, `database` и одноразовые `migrate`/`seed`; host development использует отдельные Vite/API процессы | именованный Docker volume; допустим явный reset только командой разработчика |
 | CI | build/test jobs + чистая PostgreSQL service/container | ephemeral database на job |
 | Hosted demo | один OCI application container + managed PostgreSQL | migrations перед rollout, backup/restore определяются этапом 10 |
 
@@ -115,4 +128,4 @@ sequenceDiagram
 
 ## Граница готовности
 
-Backend-контейнеры, health checks и серверные модули реализованы локально на этапах 6–7; frontend пока остаётся health-оболочкой. Hosted TLS/network/operations относятся к этапу 10, поэтому схема hosted demo не является заявлением о production deployment.
+Backend-контейнеры, health checks и серверные модули реализованы на этапах 6–7; история их локальной и удалённой проверки приведена в [[quality-gates]]. Текущий frontend содержит связанные с API производственные экраны и команды этапа 8. Факт наличия кода не заменяет browser demo, текущий clean-container и CI для implementation SHA: состояние этих gates принадлежит [[backlog]]. Hosted TLS/network/operations относятся к этапу 10, поэтому схема hosted demo не является заявлением о production deployment.

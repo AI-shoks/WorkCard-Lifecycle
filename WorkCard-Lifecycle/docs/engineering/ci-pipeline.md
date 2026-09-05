@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.ci-pipeline
 status: accepted
-version: 3
+version: 5
 owner: engineering
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # CI Pipeline
@@ -41,4 +41,14 @@ Job зависит от `quality`, строит multi-stage образ чере�
 
 ## Критерий принятия
 
-Workflow обнаруживается GitHub из корневой `.github/workflows/`, а shell steps выполняются в `WorkCard-Lifecycle/`. Последний известный зелёный run обоих jobs относится к commit `d0ecc812`. Backend diff этапа 7 пока не имеет нового commit SHA и удалённо не проверялся; локальные code/database/container gates не заменяют обязательный зелёный run будущего SHA.
+Закрытие этапа требует зелёных `quality` и `container` jobs для одного implementation SHA, содержащего проверяемую реализацию. Локальные проверки, portable PostgreSQL и успешные runs прежнего SHA не подменяют этот gate. Commit и push выполняются только после отдельного разрешения пользователя; отсутствие такого разрешения не разрешает отмечать удалённый CI выполненным.
+
+Workflow обнаруживается GitHub из корневой `.github/workflows/`, а shell steps выполняются в `WorkCard-Lifecycle/`. Implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) подтверждён полностью зелёными [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041): в обоих запусках jobs `Code and database quality` и `Clean container startup` завершены успешно. Это закрывает удалённый acceptance gate этапа 7. Неблокирующее предупреждение GitHub о переводе runtime используемых actions с Node.js 20 на 24 учтено как maintenance item в [[backlog]].
+
+## Состояние проверки этапа 8 на 5 сентября 2026 года
+
+Текущие изменения frontend vertical slice находятся в рабочем checkout без нового implementation commit. Удалённый CI для них ещё не запускался; приведённые выше runs доказывают только этап 7 и не распространяются на незакоммиченные изменения.
+
+Локальная проверка использовала отдельный portable PostgreSQL `18.6` на Windows, раздельные чистые browser/integration БД и реальные backend integration tests. Миграции `0001`–`0003`, повторный migrate/checksums, seed дважды, runtime verification и `5/5` integration tests прошли. Системные службы и данные не менялись. Docker отсутствует, поэтому local clean-container текущего checkout остаётся непроверенным; portable runtime не является доказательством job `container`.
+
+Оставшиеся условия — clean-container текущей реализации и полностью зелёные `quality`/`container` для одного её implementation SHA. Их статус учитывается в [[backlog]], без переноса исторического успеха этапа 7 на этап 8.

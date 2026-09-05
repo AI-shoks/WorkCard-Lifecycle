@@ -1,7 +1,7 @@
 ---
 artifact_id: project.case-study-positioning
 status: accepted
-version: 6
+version: 7
 owner: project
 updated: 2026-09-02
 ---
@@ -15,9 +15,9 @@ updated: 2026-09-02
 - подтверждённые выводы `CONFIRMED_AS_IS` отделены от синтетических `TO_BE_DECISION` в [[decision-provenance]];
 - физические карточки, роли ПДБ/технолога/БТБ, первая и финальная приёмки, самоконтроль и мастерское ведение заданий описываются только в обезличенном виде;
 - данные, партия, нормы, пользователи и payroll являются синтетическими;
-- текущий checkout демонстрирует product analysis, AS-IS/TO-BE analysis, domain modeling, requirements engineering, UX design, traceability, принятую техническую архитектуру, воспроизводимый инженерный фундамент и локально проверенный backend vertical slice;
+- implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) демонстрирует product analysis, AS-IS/TO-BE analysis, domain modeling, requirements engineering, UX design, traceability, принятую техническую архитектуру, воспроизводимый инженерный фундамент и проверенный backend vertical slice;
 - отдельная цифровая `FinalBatchAcceptance` является синтетическим TO-BE-решением уровня партии, а не утверждением о существующей заводской ИС;
-- связанный frontend flow и deployment являются целями следующих этапов; backend vertical slice и clean-container текущего checkout проверены локально, но CI будущего commit SHA ещё не запускался;
+- связанный frontend flow и deployment являются целями следующих этапов; backend vertical slice подтверждён локально и полностью зелёными [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041) для implementation SHA;
 - ограничения и допущения документируются явно.
 
 ## Чего не утверждаем
@@ -38,4 +38,4 @@ updated: 2026-09-02
 - цифровая финальная приёмка показывается отдельной неизменяемой записью actor/time/ID и не называется копией подписи на физической карточке;
 - утверждения о бизнес-функциях появятся только после их кода, тестов и воспроизводимой демонстрации.
 
-Текущий код и DB integration tests дают два раздельных доказательства: масштабный выпуск `3 → 250` с `254` release events и компактный API-only процесс от создания партии до final acceptance, payroll и audit/read-back. Они также проверяют trusted roles, ранний auth/CSRF order, concurrency, replay и immutable boundaries. Это не доказывает browser E2E, production deployment или прохождение ещё не запущенных remote jobs для нового commit SHA.
+Код implementation commit и DB integration tests дают два раздельных доказательства: масштабный выпуск `3 → 250` с `254` release events и компактный API-only процесс от создания партии до final acceptance, payroll и audit/read-back. Они также проверяют trusted roles, ранний auth/CSRF order, concurrency, replay и immutable boundaries. Зелёные CI jobs подтверждают code/database gates и clean-container startup этого SHA, но не доказывают browser E2E или production deployment.

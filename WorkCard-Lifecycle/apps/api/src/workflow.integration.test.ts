@@ -308,6 +308,25 @@ describe.skipIf(!integrationEnabled).sequential('backend vertical slice', () => 
     batchId = createBody.batch.id;
     expect(createBody.batch).toMatchObject({ quantity: 112, version: 1 });
 
+    const createdReadBack = await app.inject({
+      method: 'GET',
+      url: `/api/v1/production-batches/${batchId}`,
+      headers: { cookie: planner.cookie },
+    });
+    expect(createdReadBack.statusCode).toBe(200);
+    expect(createdReadBack.json<ProductionBatchDetail>()).toMatchObject({
+      counts: { actualCardCount: 0, plannedCardCount: 250, setCount: 0 },
+      lifecycleStatus: 'CREATED',
+      operationPlan: [
+        { plannedCardCount: 112 },
+        { plannedCardCount: 112 },
+        { plannedCardCount: 26 },
+      ],
+      quantity: 112,
+      sets: [],
+      version: 1,
+    });
+
     const replay = await app.inject({
       method: 'POST',
       url: '/api/v1/production-batches',

@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.technology-stack
 status: accepted
-version: 1
+version: 3
 owner: architecture
-updated: 2026-09-01
+updated: 2026-09-05
 ---
 
 # Technology Stack
@@ -23,13 +23,13 @@ updated: 2026-09-01
 
 | Область | Выбор | Граница решения |
 |---|---|---|
-| Репозиторий | `pnpm` workspace, TypeScript monorepo | `apps/api`, `apps/web`, `packages/contracts`, `packages/config` |
+| Репозиторий | `pnpm` workspace, TypeScript monorepo | `apps/api`, `apps/web`, `packages/contracts`; общие настройки находятся в корне workspace |
 | Runtime | Node.js `24` Active LTS | только чётная LTS-линия; версия фиксируется в `.node-version`, `package.json#engines` и образах |
 | Язык | TypeScript `5.9`, strict ESM | TypeScript 6.0 не принимается в день релиза; обновление — отдельная квалификация зависимостей |
 | Backend | Fastify `5`, TypeBox JSON Schema, `@fastify/swagger` | модульный монолит; маршруты не содержат доменные правила |
-| Frontend | React `19.2`, Vite `8`, React Router, TanStack Query | SPA с русским производственным UI; server state перечитывается после command success |
+| Frontend | React `19.2`, Vite `8`, собственный типизированный router поверх History API и явные resource/command states | SPA с русским производственным UI; server state перечитывается после command response, до сообщения об успехе |
 | БД | PostgreSQL `18` | текущая модель состояния + append-only audit; event sourcing не используется |
-| Доступ к данным | Drizzle ORM + `node-postgres`; SQL migrations в Git | типизированные простые запросы, raw SQL для `FOR UPDATE`, version predicates и сложных агрегатных проверок |
+| Доступ к данным | архитектурный выбор ADR-0001 — Drizzle ORM + `node-postgres`; фактический runtime — `pg` и параметризованный SQL | SQL migrations в Git; Drizzle пока не подключён, ORM-слой не заявляется реализованным |
 | Контракты | TypeBox-схемы в `packages/contracts`, OpenAPI 3.1 | runtime validation и TS-типы строятся из одного определения |
 | Unit/API tests | Vitest, Fastify `inject` | быстрые domain/unit и HTTP contract tests |
 | DB integration | Vitest + PostgreSQL container | реальные constraints, транзакции, конкурентность и миграции; SQLite не подменяет PostgreSQL |
@@ -38,6 +38,12 @@ updated: 2026-09-01
 | Доставка | multi-stage OCI image + PostgreSQL; Docker Compose локально | frontend собирается отдельно и раздаётся API под тем же origin |
 
 Точные patch-версии принадлежат lockfile и digest/tag контейнеров. Архитектурные документы фиксируют поддерживаемые линии, чтобы обновление patch не требовало нового ADR.
+
+### Уточнение frontend-реализации этапа 8
+
+Первоначально в перечне frontend-библиотек были указаны React Router и TanStack Query. Текущий vertical slice использует семь фиксированных маршрутов в `app-routing.ts`, History API через `useBrowserNavigation` в `App.tsx` и явные состояния загрузки/команд в React. Эти библиотеки не установлены и не объявляются частью реализованного runtime. Малый набор маршрутов не требует вложенных маршрутизаторов, а безопасное восстановление команды управляет перечитыванием всех её целей явно. Это уточняет вспомогательные библиотеки внутри принятого React/Vite SPA и сохраняет границы ADR-0001.
+
+Типизированный API client валидирует runtime-контракты, сохраняет request/correlation context и завершает mutation только после обязательного read-back. Смена серверной identity размонтирует предметный экран, отменяет незавершённые чтения и очищает command/permission-sensitive state. Offline queue, автоматический повтор mutations и optimistic domain state отсутствуют.
 
 ## Почему модульный монолит
 
@@ -48,7 +54,9 @@ updated: 2026-09-01
 
 ## Почему PostgreSQL и Drizzle
 
-PostgreSQL даёт транзакции, row-level locks, `jsonb`, частичные/уникальные индексы и стабильную пятилетнюю политику поддержки major-линий. Drizzle не скрывает SQL и допускает точечные запросы, необходимые [[transactions-concurrency|стратегии конкурентности]]. Схема и миграции остаются проверяемым SQL, а не неявным runtime-sync.
+PostgreSQL даёт транзакции, row-level locks, `jsonb`, частичные/уникальные индексы и стабильную пятилетнюю политику поддержки major-линий. В архитектурном выборе ADR-0001 Drizzle рассматривается как слой типизированных запросов, который не скрывает SQL и допускает точечные запросы, необходимые [[transactions-concurrency|стратегии конкурентности]]. Схема и миграции остаются проверяемым SQL, а не неявным runtime-sync.
+
+Фактическая реализация backend vertical slice использует пакет `pg` из `apps/api/package.json` и параметризованные `Pool`/`PoolClient.query` в `apps/api/src/workflow-service.ts`, включая явные транзакции, locks и version predicates. Drizzle не установлен и ORM-слой не реализован. Это различие между принятым архитектурным выбором и текущим кодом фиксируется явно; историческое решение ADR-0001 не изменяется и наличие ORM не выводится из статуса завершения этапа 7.
 
 ## Осознанно не выбрано
 

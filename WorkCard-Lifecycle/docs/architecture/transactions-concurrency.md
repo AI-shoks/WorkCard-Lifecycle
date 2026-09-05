@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.transactions-concurrency
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # Transactions and Concurrency
@@ -143,8 +143,10 @@ Lock card, проверить expected version, `CLOSED` и assignee. Затем
 - Version mismatch → `409 VERSION_CONFLICT` с expected/actual только для ресурсов, которые caller вправе видеть.
 - Invalid current state/gate → `409 STATE_CONFLICT`/`GATE_CLOSED`.
 - Deadlock/serialization/connection failure → rollback и `503`; в MVP сервер не скрывает business conflict автоматическим повтором.
-- UI очищает submitting state, выполняет GET актуальной projection и просит пользователя повторно оценить действие.
-- Тот же `commandId` используют только для проверки результата неопределённого transport outcome; новое осознанное решение получает новый ID.
+- UI закрывает устаревший dialog, очищает command selection и выполняет только GET всех затронутых целей: batch detail включает existing sets/completion/acceptance, assignment перечитывает set и каждую выбранную card, card command — card и связанный set, payroll — card и record.
+- Свежие данные применяются только полным набором; сбой любого recovery-read не оставляет частичную projection в UI и блокирует mutation до явного повтора чтения.
+- Клиент не выполняет automatic command retry, auto merge или force overwrite. После полного чтения доступность действия вычисляется заново из server `availableActions`, state/gate и permissions.
+- Тот же `commandId` используют только для явной проверки результата неопределённого transport outcome; новая команда возможна лишь после нового решения/подтверждения пользователя и получает новый ID.
 
 ## Read consistency
 

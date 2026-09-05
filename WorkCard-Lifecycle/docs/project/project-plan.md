@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 13
+version: 14
 owner: project
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # Project Plan
@@ -28,8 +28,8 @@ updated: 2026-09-02
 | 4 | UX-проектирование | `[x]` выполнено | 14-шаговый прототип и UX-спецификация согласованы с моделью |
 | 5 | Техническая архитектура | `[x]` выполнено | Приняты данные, API, транзакции, безопасность и шесть ADR |
 | 6 | Инженерный фундамент | `[x]` выполнено | Созданы monorepo, БД bootstrap, контейнерный runtime и CI |
-| 7 | Backend vertical slice | `[-]` на проверке | Код, DB integration и local clean-container готовы; ожидается CI нового SHA |
-| 8 | Frontend vertical slice | `[-]` в работе | Основной сценарий выполняется в браузере |
+| 7 | Backend vertical slice | `[x]` выполнено | Код, DB integration, local clean-container и CI implementation SHA подтверждены |
+| 8 | Frontend vertical slice | `[-]` в работе | Полный браузерный процесс и локальные проверки пройдены; остаются clean-container и CI implementation SHA |
 | 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
 | 10 | Релиз | `[ ]` не начато | Проект воспроизводимо разворачивается |
 | 11 | Упаковка портфолио | `[ ]` не начато | Ценность и глубина проекта понятны работодателю |
@@ -69,7 +69,7 @@ updated: 2026-09-02
 
 **Закрыт:** 2026-09-01. Foundation содержит Fastify API с health endpoints, React shell, общие контракты, PostgreSQL bootstrap, multi-stage Docker image, Compose и GitHub Actions. На момент закрытия этапа 6 он ещё не реализовывал производственный backend-сценарий этапа 7.
 
-## Этап 7. Backend vertical slice — на проверке
+## Этап 7. Backend vertical slice — выполнено
 
 - [x] Read-only паспорт, operation plans и нормы технолога/БТБ.
 - [x] Партия и несколько operation-scoped `WorkCardSet`.
@@ -81,11 +81,13 @@ updated: 2026-09-02
 - [x] Mock payroll export и защита от повтора.
 - [x] API/integration tests критических разрешений, инвариантов и конфликтов.
 - [x] Подтвердить обновлённый образ и clean-container startup локально на текущем checkout.
-- [ ] Подтвердить этот же diff удалёнными `quality`/`container` jobs после создания нового commit SHA.
+- [x] Подтвердить implementation commit удалёнными `quality`/`container` jobs для того же SHA.
 
-**Локальный результат 2026-09-02:** 11 обычных тестов и 5 PostgreSQL integration tests проходят; большой сценарий подтверждает `3 sets / 250 cards / 254 release events`, а компактная fixture из двух карточек проходит все lifecycle-переходы, финальную приёмку, payroll и audit/read-back только через HTTP API. Чистый контейнер текущего checkout применяет `0001`–`0003`, повторный seed и runtime grants verification. Этап не переводится в `[x]`, потому что последний удалённый зелёный run относится к `d0ecc812`, а новый commit SHA ещё не создан и не проверен CI.
+**Закрыт 2026-09-02:** implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) локально прошёл 11 обычных тестов, 5 PostgreSQL integration tests, production build, clean-container, миграции `0001`–`0003`, повторный seed и runtime grants verification. Большой сценарий подтверждает `3 sets / 250 cards / 254 release events`, а компактная fixture из двух карточек проходит все lifecycle-переходы, финальную приёмку, payroll и audit/read-back только через HTTP API. [Push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041) для того же SHA полностью зелёные: оба jobs `Code and database quality` и `Clean container startup` завершены успешно.
 
 ## Этапы 8–12
+
+**Этап 8, проверка 2026-09-05:** роли и маршруты `S-01`–`S-07` работают с реальным API; `pnpm check` прошёл с 157 frontend-тестами и 9 обычными API-тестами, отдельно прошли 5 PostgreSQL 18.6 integration tests. На новой чистой БД весь браузерный процесс завершил `3/3` first-article gates, `250/250 CLOSED`, отдельную финальную приёмку, полный audit `254/254` и единственную payroll-запись. Проверены desktop/mobile, 14 шагов прототипа, UX-copy, strict audit и semantic review. Этап не закрыт до clean-container startup и зелёных `quality`/`container` для одного implementation SHA: Docker локально отсутствует, commit/push требуют отдельного разрешения пользователя. Фактические результаты — [[quality-gates]], незакрытые критерии — [[backlog]].
 
 - **Frontend vertical slice:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
 - **Качество:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
@@ -97,10 +99,10 @@ updated: 2026-09-02
 
 Это оценка сфокусированного труда, а не обещанная календарная дата:
 
-- остаток этапа 8 — 6–10 рабочих дней;
+- остаток этапа 8 — контейнерная и удалённая CI-проверка после отдельного разрешения на commit/push; прежняя оценка 6–10 дней относилась к ещё не реализованному frontend;
 - этап 9 — 2–4 рабочих дня;
 - этапы 10–12 — 3–5 рабочих дней;
-- общий остаток — 11–18 сфокусированных рабочих дней.
+- общий остаток этапов 9–12 — 5–9 сфокусированных рабочих дней без оценки ожидания разрешения и CI для этапа 8.
 
 ## После базового MVP
 
