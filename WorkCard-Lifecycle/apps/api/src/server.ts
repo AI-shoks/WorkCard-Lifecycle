@@ -7,24 +7,17 @@ import { Pool } from 'pg';
 import { buildApp } from './app.js';
 import { loadAppConfig } from './config.js';
 import { createDatabaseReadiness } from './readiness.js';
+import { databaseBudgets, safeLogger } from './runtime-protection.js';
 
 async function main(): Promise<void> {
   const config = loadAppConfig();
   const pool = new Pool({
     connectionString: config.databaseUrl,
-    connectionTimeoutMillis: 3_000,
-    idleTimeoutMillis: 10_000,
-    max: 10,
+    ...databaseBudgets,
   });
   const app = await buildApp({
     appVersion: config.appVersion,
-    logger: {
-      level: config.logLevel,
-      redact: {
-        paths: ['req.headers.authorization', 'req.headers.cookie', 'req.headers.x-csrf-token'],
-        censor: '[REDACTED]',
-      },
-    },
+    logger: safeLogger(config.logLevel),
     pool,
     readiness: createDatabaseReadiness(pool),
     security: {
@@ -53,8 +46,7 @@ async function main(): Promise<void> {
   await app.listen({ host: config.host, port: config.port });
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : 'Неизвестная ошибка запуска.';
-  console.error(message);
+main().catch(() => {
+  console.error('Запуск не выполнен. Проверьте конфигурацию и доступность БД.');
   process.exitCode = 1;
 });

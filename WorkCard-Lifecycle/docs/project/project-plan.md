@@ -1,7 +1,7 @@
 ---
 artifact_id: project.plan
 status: active
-version: 14
+version: 15
 owner: project
 updated: 2026-09-05
 ---
@@ -29,8 +29,8 @@ updated: 2026-09-05
 | 5 | Техническая архитектура | `[x]` выполнено | Приняты данные, API, транзакции, безопасность и шесть ADR |
 | 6 | Инженерный фундамент | `[x]` выполнено | Созданы monorepo, БД bootstrap, контейнерный runtime и CI |
 | 7 | Backend vertical slice | `[x]` выполнено | Код, DB integration, local clean-container и CI implementation SHA подтверждены |
-| 8 | Frontend vertical slice | `[-]` в работе | Полный браузерный процесс и локальные проверки пройдены; остаются clean-container и CI implementation SHA |
-| 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
+| 8 | Frontend vertical slice | `[x]` выполнено | Полный браузерный процесс, clean-container и CI подтверждены для `b00ff294…` |
+| 9 | Качество | `[-]` в работе | Реализация и локальные gates готовы; commit/push разрешены, ожидаются CI нового SHA |
 | 10 | Релиз | `[ ]` не начато | Проект воспроизводимо разворачивается |
 | 11 | Упаковка портфолио | `[ ]` не начато | Ценность и глубина проекта понятны работодателю |
 | 12 | Финальный аудит | `[ ]` не начато | Результат готов к честной демонстрации |
@@ -87,7 +87,9 @@ updated: 2026-09-05
 
 ## Этапы 8–12
 
-**Этап 8, проверка 2026-09-05:** роли и маршруты `S-01`–`S-07` работают с реальным API; `pnpm check` прошёл с 157 frontend-тестами и 9 обычными API-тестами, отдельно прошли 5 PostgreSQL 18.6 integration tests. На новой чистой БД весь браузерный процесс завершил `3/3` first-article gates, `250/250 CLOSED`, отдельную финальную приёмку, полный audit `254/254` и единственную payroll-запись. Проверены desktop/mobile, 14 шагов прототипа, UX-copy, strict audit и semantic review. Этап не закрыт до clean-container startup и зелёных `quality`/`container` для одного implementation SHA: Docker локально отсутствует, commit/push требуют отдельного разрешения пользователя. Фактические результаты — [[quality-gates]], незакрытые критерии — [[backlog]].
+**Этап 8 закрыт, 2026-09-05:** implementation SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`; [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) имеют успешные `quality` и `container` для этого SHA. Локально подтверждены clean-container без кэша на новом томе, миграции/seed, healthy SPA/API/БД и HTTP 200. Ранее прошли 157 frontend, 9 API и 5 PostgreSQL integration tests, полный браузерный процесс `112 → 3 → 250`, отдельная финальная приёмка, audit `254/254`, единственный payroll, desktop/mobile и UX-copy. Старые отметки об отсутствии Docker и невыполненных commit/push сняты по подтверждённым результатам; они не являются ограничениями этапа 9.
+
+**Этап 9 в работе:** реализация и воспроизводимые проверки описаны в [[test-strategy]]. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review прошли; результаты текущего diff учитываются отдельно от этапа 8 в [[quality-gates]]. Пользователь разрешил scoped commit/push в `codex/portfolio` 2026-09-05. До закрытия нужны все обязательные CI jobs нового implementation SHA.
 
 - **Frontend vertical slice:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
 - **Качество:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
@@ -99,10 +101,9 @@ updated: 2026-09-05
 
 Это оценка сфокусированного труда, а не обещанная календарная дата:
 
-- остаток этапа 8 — контейнерная и удалённая CI-проверка после отдельного разрешения на commit/push; прежняя оценка 6–10 дней относилась к ещё не реализованному frontend;
 - этап 9 — 2–4 рабочих дня;
 - этапы 10–12 — 3–5 рабочих дней;
-- общий остаток этапов 9–12 — 5–9 сфокусированных рабочих дней без оценки ожидания разрешения и CI для этапа 8.
+- исходная оценка этапов 9–12 — 5–9 сфокусированных рабочих дней; она не заменяет фактические критерии закрытия и ожидание CI этапа 9.
 
 ## После базового MVP
 

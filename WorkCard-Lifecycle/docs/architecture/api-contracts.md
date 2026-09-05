@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # API Contracts
@@ -247,11 +247,13 @@ Errors используют `application/problem+json` (RFC 9457):
 | `404` | разрешённый caller не видит resource | `RESOURCE_NOT_FOUND` |
 | `409` | version/state/gate/idempotency conflict | `VERSION_CONFLICT`, `STATE_CONFLICT`, `GATE_CLOSED`, `COMMAND_ID_REUSED` |
 | `422` | schema валидна, business input недопустим | `INVALID_QUANTITY`, `MIXED_WORK_CARD_SET`, `INVALID_ASSIGNEE` |
-| `429` | зарезервировано для rate limit этапа 9; текущий backend ещё не выдаёт этот ответ | `TOO_MANY_REQUESTS` |
+| `429` | превышен лимит запросов IP/категории; `Retry-After` задаёт паузу в секундах | `TOO_MANY_REQUESTS` |
 | `500` | непредвиденная ошибка | `INTERNAL_ERROR`, без stack/SQL detail |
-| `503` | DB/readiness недоступны | `SERVICE_UNAVAILABLE` |
+| `503` | DB/readiness недоступны или исчерпан handler/DB budget | `SERVICE_UNAVAILABLE` |
 
 Технический `code` используется UI для детерминированного русского текста, но не показывается производственной роли на верхнем уровне. На conflict UI перечитывает ресурсы и требует нового осознанного действия.
+
+Лимиты этапа 9 описаны в [[security-baseline]]. `429` отклоняется до business handler и не создаёт receipt/event; автоматический повтор mutation не разрешается. `503`/потеря ответа не доказывают отсутствие commit: клиент сохраняет существующий recovery через безопасные reads и явное новое решение пользователя. Успешные схемы и предметные команды не изменены.
 
 ## Health и OpenAPI
 

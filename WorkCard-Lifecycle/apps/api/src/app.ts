@@ -23,6 +23,7 @@ import type { Pool } from 'pg';
 import { registerApiRoutes } from './api-routes.js';
 import { DomainError } from './domain-error.js';
 import type { ReadinessService } from './readiness.js';
+import { registerRateLimits } from './runtime-protection.js';
 import type { SessionManagerOptions } from './session-manager.js';
 
 const expectedMigrationVersion = 3;
@@ -44,9 +45,15 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       },
     },
     bodyLimit: 1_048_576,
+    connectionTimeout: 10_000,
+    requestTimeout: 15_000,
+    handlerTimeout: 20_000,
+    keepAliveTimeout: 5_000,
     logger: options.logger ?? false,
     trustProxy: false,
   });
+
+  await registerRateLimits(app);
 
   await app.register(helmet, {
     contentSecurityPolicy: {
@@ -190,7 +197,19 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       'code' in error &&
       typeof error.code === 'string' &&
       (error.code.startsWith('08') ||
-        ['57P01', '57P02', '57P03', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(error.code))
+        [
+          '57P01',
+          '57P02',
+          '57P03',
+          '57014',
+          '55P03',
+          '25P03',
+          '25P04',
+          'FST_ERR_HANDLER_TIMEOUT',
+          'ECONNREFUSED',
+          'ECONNRESET',
+          'ETIMEDOUT',
+        ].includes(error.code))
     ) {
       status = 503;
       code = 'SERVICE_UNAVAILABLE';
@@ -205,12 +224,24 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       error.statusCode < 500
     ) {
       status = error.statusCode;
-      code = status === 415 ? 'UNSUPPORTED_MEDIA_TYPE' : 'INVALID_REQUEST';
-      title = status === 415 ? 'Неподдерживаемый формат' : 'Некорректный запрос';
+      code =
+        status === 429
+          ? 'TOO_MANY_REQUESTS'
+          : status === 415
+            ? 'UNSUPPORTED_MEDIA_TYPE'
+            : 'INVALID_REQUEST';
+      title =
+        status === 429
+          ? 'Слишком много запросов'
+          : status === 415
+            ? 'Неподдерживаемый формат'
+            : 'Некорректный запрос';
       detail =
-        status === 415
-          ? 'Отправьте JSON с Content-Type application/json.'
-          : 'Проверьте формат запроса.';
+        status === 429
+          ? 'Подождите перед следующим действием.'
+          : status === 415
+            ? 'Отправьте JSON с Content-Type application/json.'
+            : 'Проверьте формат запроса.';
     } else {
       request.log.error({ err: error }, 'request failed');
     }

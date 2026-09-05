@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.database-bootstrap
 status: accepted
-version: 2
+version: 3
 owner: engineering
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # Database Bootstrap
@@ -14,7 +14,7 @@ Bootstrap отделяет полномочия изменения схемы о
 
 ```text
 PostgreSQL healthy
-  → migrate: advisory lock → runtime role → SQL migrations → grants
+  → migrate: advisory lock → history preflight → runtime role → SQL migrations → atomic grants
   → seed: transaction → insert-if-absent → exact fixture comparison
   → app: runtime role → readiness
 ```
@@ -23,13 +23,17 @@ PostgreSQL healthy
 
 1. подключается через `MIGRATION_DATABASE_URL`;
 2. захватывает session advisory lock, исключая параллельное применение;
-3. создаёт или безопасно обновляет отдельную login-роль приложения;
-4. создаёт `schema_migrations`;
-5. сверяет SHA-256 checksum уже применённых файлов;
+3. создаёт `schema_migrations` при отсутствии;
+4. сверяет всю применённую history с именами и SHA-256 файлов; отсутствующая/изменённая применённая версия, дубликаты и вставка версии перед применённой запрещены до нового SQL и изменения runtime-роли;
+5. создаёт или безопасно обновляет отдельную login-роль приложения;
 6. применяет каждый новый SQL-файл в отдельной транзакции;
-7. отзывает лишние права и выдаёт runtime-роли минимальные table-specific `SELECT`/`INSERT`/`UPDATE`/session `DELETE`; immutable/reference tables остаются без mutation-прав.
+7. в отдельной атомарной транзакции отзывает лишние права и выдаёт runtime-роли минимальные table-specific `SELECT`/`INSERT`/`UPDATE`/session `DELETE`; immutable/reference tables остаются без mutation-прав.
 
 Изменение имени или содержимого применённой миграции приводит к ошибке. Следующее изменение схемы создаётся новым файлом.
+
+CLI использует тот же `runMigrations` из `migration-runner.ts`; тесты передают ему временный каталог SQL, без нового runner или production test hooks. Ошибка нового файла откатывает его DDL, данные и запись версии, сохраняя ранее применённые версии. Весь набор файлов не является одной транзакцией; создание/обновление login-роли также не откатывается с отдельным SQL-файлом.
+
+`quality/migrations.test.ts` воспроизводит сбой после DDL/INSERT и отказ записи history, исправление неприменённого файла и два одновременных повторных запуска, checksum/missing/duplicate history, а также реальный отказ `0003` от потери точности. В последнем случае прежние данные и version 2 сохраняются; только явное исправление тестовой fixture позволяет применить `0003` и повторить migrate. Проверка сбоя grants подтверждает сохранение прежних прав после промежуточного REVOKE и успешный повтор после исправления fixture; ранее закоммиченный SQL/history при этом сохраняется.
 
 ## Первая миграция
 

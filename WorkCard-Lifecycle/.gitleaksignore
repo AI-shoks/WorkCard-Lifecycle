@@ -1,0 +1,9 @@
+# Reviewed synthetic test data in retired Python test files only (see security-baseline.md).
+# Four local test signing-key fixtures; no runtime or current-source allowlist.
+2ab56fcde3dc5ce88ebae9a9709f55b4ae7b72f0:WorkCard-Lifecycle/tests/integration/test_release_work_cards_postgres.py:generic-api-key:190
+f938030c299052fef001fbebfdd18f398425559e:WorkCard-Lifecycle/tests/integration/test_least_privilege_and_sessions.py:generic-api-key:37
+f938030c299052fef001fbebfdd18f398425559e:WorkCard-Lifecycle/tests/unit/test_config.py:generic-api-key:10
+f938030c299052fef001fbebfdd18f398425559e:WorkCard-Lifecycle/tests/integration/test_postgres_foundation.py:generic-api-key:79
+# Two deliberate scanner-positive fixtures (AWS-shaped token and JWT), not service credentials.
+f938030c299052fef001fbebfdd18f398425559e:WorkCard-Lifecycle/tests/unit/test_secret_scan.py:aws-access-token:14
+f938030c299052fef001fbebfdd18f398425559e:WorkCard-Lifecycle/tests/unit/test_secret_scan.py:jwt:22

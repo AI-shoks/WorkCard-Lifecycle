@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ${QUALITY_PROJECT:?Set a unique QUALITY_PROJECT}-app:local
+  migrate:
+    image: ${QUALITY_PROJECT:?Set a unique QUALITY_PROJECT}-app:local
+  seed:
+    image: ${QUALITY_PROJECT:?Set a unique QUALITY_PROJECT}-app:local
+
+volumes:
+  postgres-data:
+    name: ${QUALITY_PROJECT:?Set a unique QUALITY_PROJECT}-postgres

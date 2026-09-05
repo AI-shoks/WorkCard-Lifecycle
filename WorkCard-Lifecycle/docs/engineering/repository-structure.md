@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 3
+version: 4
 owner: engineering
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # Repository Structure
@@ -15,6 +15,7 @@ Git checkout содержит каталог приложения `WorkCard-Life
 ```text
 .
 ├── .github/workflows/ci.yml         GitHub Actions workflow
+├── .github/actions/setup-workspace/ общее закреплённое CI-окружение
 └── WorkCard-Lifecycle/
     ├── apps/
     │   ├── api/                     Fastify API, мигратор, seed и проверки БД
@@ -25,12 +26,16 @@ Git checkout содержит каталог приложения `WorkCard-Life
     │   └── contracts/               общие TypeBox-схемы и TypeScript-типы
     ├── docs/                        управляемые проектные артефакты
     ├── scripts/                     проверки документационного прототипа
+    ├── quality/                     isolated DB, browser, failure/security/performance tests
+    ├── playwright.config.ts         compact/canonical desktop/mobile browser projects
     ├── compose.yaml                 локальный воспроизводимый контур
     ├── Dockerfile                   единый production-образ API + SPA
     └── package.json                 корневые команды quality gate
 ```
 
 `node_modules`, `dist`, coverage, локальные `.env` и кэши являются производными данными и не входят в Git. `pnpm-lock.yaml`, SQL-миграции и `.env.example` входят в Git как воспроизводимая спецификация.
+
+`.quality-results`, `playwright-report` и `test-results` также игнорируются Git; CI прикладывает выбранные JSON/HTML/traces как временные artifacts. `quality/` — инженерные проверки, не новый workspace или production service. Runtime-образ содержит API/SPA и production dependencies без npm/shell; build stage остаётся отдельно.
 
 ## Границы
 

@@ -9,6 +9,9 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/coverage/**',
+      'test-results/**',
+      'playwright-report/**',
+      '.quality-results/**',
       '**/node_modules/**',
       '.obsidian/**',
       'docs/ux/prototype.html',
@@ -34,6 +37,13 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
       '@typescript-eslint/no-explicit-any': 'error',
       'no-console': ['error', { allow: ['info', 'warn', 'error'] }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXAttribute[name.name="dangerouslySetInnerHTML"]',
+          message: 'Производственный UI использует React escaping; raw HTML запрещён.',
+        },
+      ],
     },
   },
   {

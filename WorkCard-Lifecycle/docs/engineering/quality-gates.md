@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 6
+version: 7
 owner: engineering
 updated: 2026-09-05
 ---
@@ -58,9 +58,9 @@ git diff --check
 - [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041) для implementation SHA полностью зелёные: `Code and database quality` и `Clean container startup` завершены успешно;
 - strict documentation audit при закрытии этапа 7 — 55 документов, 0 ошибок, 0 предупреждений.
 
-## Проверка текущего checkout этапа 8 — 5 сентября 2026 года
+## Исторический результат этапа 8 — 5 сентября 2026 года
 
-Результаты ниже относятся к текущей локальной реализации и учитываются отдельно от исторического implementation SHA этапа 7. Они не означают закрытие этапа 8: обязательные browser/container/CI gates перечислены отдельно.
+Результаты ниже относятся к implementation SHA этапа 8 `b00ff294a7b7ce1e09379c088969d9a02bd033bf` и не переносятся на изменения этапа 9.
 
 | Проверка | Результат |
 |---|---|
@@ -103,15 +103,55 @@ Frontend coverage включает типизированные ответы и 
 
 Заключительный runtime UI audit прошёл `16` проверок: `S-01`–`S-07` и безопасный отказ защищённого audit route в двух viewport — desktop `1440×1000` и mobile `390×844`. Зафиксировано `0` недокументированных утечек латиницы/UUID, `0` сломанных ссылок `aria-labelledby`/`aria-describedby`, `0` неправильно расположенных или открытых по умолчанию technical exception blocks и `0` горизонтальных переполнений; `lang="ru"` сохранён. Допустимые business-коды паспорта/операций проверялись по [[ux-copy-guidelines]], без общего разрешения произвольной латиницы. Итоговые мобильные экраны партии и payroll также визуально просмотрены по снимкам.
 
-Локальные проверки frontend, реального браузерного процесса и UI завершены. Strict documentation audit после обновления результатов: `55` документов, `0` ошибок, `0` предупреждений; semantic review отдельно сопоставил реализацию с ролями, состояниями, cardinality, recovery и AS-IS/TO-BE границами. Локальное завершение не отменяет оставшиеся container/CI требования.
+Локальные проверки frontend, реального браузерного процесса и UI завершены. Strict documentation audit после обновления результатов: `55` документов, `0` ошибок, `0` предупреждений; semantic review отдельно сопоставил реализацию с ролями, состояниями, cardinality, recovery и AS-IS/TO-BE границами.
 
-### Оставшиеся обязательные gates
+### Закрытие этапа 8
 
-- подтвердить clean-container startup текущего checkout: Docker в доступной среде отсутствует, portable Windows PostgreSQL этот gate не доказывает;
-- получить зелёные `quality` и `container` jobs для одного implementation SHA текущей реализации; её изменения ещё не закоммичены и удалённым CI не проверены;
-- после будущих изменений для container/CI повторить релевантные проверки и перед закрытием подтвердить strict documentation audit и semantic review окончательного состояния.
+Для SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf` прошли [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414): `quality` и `container` успешны в обоих runs. Локальный clean-container выполнен без кэша на новом томе: миграции/seed, healthy приложение/БД, HTTP 200 для SPA и обоих health endpoints. Статусы runs и SHA повторно прочитаны через GitHub API при начале этапа 9. Старые отметки об отсутствии Docker и невыполненных commit/push устарели.
 
-Исторические зелёные jobs SHA `17d2b04d13b58c7dff677543ed4399751a8593a1` доказывают только этап 7. Commit/push требуют отдельного разрешения; отсутствие такого разрешения не меняет Definition of Done. Расширенные security/performance и полный автоматизированный browser E2E gate остаются этапу 9.
+## Проверки этапа 9
+
+Результаты относятся к незакоммиченному scoped diff поверх `b00ff294…`, а не к этому SHA самому по себе. Состав воспроизводимых команд и точные границы fixture — [[test-strategy]].
+
+| Проверка | Фактическое состояние локально |
+|---|---|
+| Новые PostgreSQL regression tests | PASS итогового кода: `10/10` в четырёх файлах, включая audit/business/receipt rollback, SQL/history/grants failure и restart, session/CSRF/permissions, rate limit и lock timeout |
+| Компактный browser lifecycle и recovery | PASS отдельно на desktop `1440×1000` и mobile `390×844`: по 2 теста, `6 CLOSED`, отдельная финальная приёмка, audit 10 и одна payroll-запись |
+| Канонический browser gate | PASS: `2/2` desktop tests; полный lifecycle `250 CLOSED`, отдельная финальная приёмка, audit `254`, единственный payroll и recovery. Основной проход 14,5 минуты, suite 14,8 минуты на локальной машине |
+| Dependency audit всех scopes | PASS: `pnpm security:dependencies`, известных уязвимостей не найдено |
+| Secret scan | PASS: 40 Git commits и текущий исходный код; шесть узких исторических fixture fingerprints описаны в [[security-baseline]] |
+| Production build и clean-container | PASS окончательного кода: no-cache build, новый том `wcl-quality-0905-verified-postgres`, БД `55479`, HTTP `35539`; migrate/seed exit 0, runtime grants, healthy app/DB, SPA/live/ready 200, UID 65532, read-only/cap-drop/no-new-privileges |
+| Image vulnerabilities | PASS окончательного образа `sha256:855c8bfb1e5a2803bc06d2dca3b39915baf74667a5f6814178bb464695580f1f`: Trivy 0.74.0 проверил 14 OS и 100 Node packages, HIGH/CRITICAL 0, включая unfixed; JSON `.quality-results/image-vulnerabilities-verified.json` |
+| Workflow syntax/expressions | PASS: actionlint 1.7.12; удалённый CI ещё не запускался |
+| Итоговый `pnpm check` | PASS: format, lint, strict types (включая `quality/`), production build, `157` frontend и `15` API тестов (`10` обычных + `5` реальных PostgreSQL integration); integration URL явно направлены в тестовый Compose |
+| Strict docs | PASS: `project-docs-auditor --fail-on-warning`, 55 документов, 0 ошибок, 0 предупреждений |
+| Документационный prototype UX audit | PASS: desktop `1440×1000` и mobile `390×844`, в каждом 14 шагов, 70 ролевых вариантов, 7 системных состояний, 0 нарушений/переполнений/browser errors. Desktop canonical и mobile compact snapshots финальной приёмки также визуально просмотрены |
+
+Браузерный негативный сценарий подтверждает реальный `409` между двумя вкладками и потерю ответа после commit с единственным event/receipt, автоматическими безопасными reads и без повторной mutation. Первый canonical запуск не завершился во время параллельного тяжёлого сканирования: trace показал успешный API response за 312 мс и задержку browser automation. Повтор без сканера прошёл, assertions и таймауты не ослаблялись. Уточнение ранее зарезервированного code `TOO_MANY_REQUESTS` после запуска браузера отдельно проверяется security suite; оно не меняет успешный lifecycle или conflict/recovery.
+
+Первый Trivy упёрся в ресурсы при параллельном запуске; отдельный scan прежнего Debian 12 runtime обнаружил HIGH/CRITICAL OS/global npm уязвимости. Исправление — закреплённый distroless Node `24.20.0` / Debian `13.6` runtime без npm/shell, без игнорирования CVE. Build stage и production dependency versions сохранены. Проверки не объявляют временной сбой сканера или старый образ успешными.
+
+### Производительность
+
+Локальный профиль окончательного кода, 2026-09-05: Windows `10.0.26200`, Node `24.19.0`, Intel Core i3-10110U, 4 logical CPUs, 7,84 GiB host RAM, PostgreSQL `18.6` в Docker Desktop с примерно 3,74 GiB RAM. `quality/performance.ts` создаёт 40 партий и 120 комплектов через HTTP, всего 10 000 карточек и 12 800 событий. Команды измеряются при росте БД; чтения — после полного объёма и `ANALYZE`, с одним прогревочным detail read. Сканеры, browser suites и build при измерении не выполнялись. Никакие производственные состояния не подготавливаются SQL-изменениями. Для 40 samples median — среднее двух центральных значений; p95 — nearest rank.
+
+| Операция | Samples | Median, ms | p95, ms |
+|---|---:|---:|---:|
+| Выпуск 250 карточек | 40 | 125,84 | 257,41 |
+| Атомарное назначение 59 карточек | 40 | 57,64 | 147,41 |
+| Detail партии при 10 000 карточек | 40 | 26,23 | 52,01 |
+| Полные 112 карточек, все страницы | 40 | 56,49 | 94,74 |
+| Полный audit выпуска 254, все страницы | 40 | 94,61 | 190,29 |
+
+Четыре конкурентных detail reads завершились за 132,18 мс одним smoke sample; это не статистика нагрузки. Raw samples, timestamp и условия сохраняются в `.quality-results/performance.json` и CI artifact. Принятые документы не задают числовой бизнес-SLA: gate проверяет корректность, объём и завершение под явными runtime budgets, сохраняет показатели для сравнения. Профиль не измеряет длительную production-нагрузку, внешнюю сеть, production hardware, final acceptance на большой истории или payroll throughput. После уточнения расчёта median профиль выполнен заново; focused format/lint/quality types прошли, production-код после полного `pnpm check` не менялся.
+
+### Целевой semantic review
+
+Сопоставлены diff и тесты с [[acceptance-criteria]], [[mvp-scope]], [[roles-permissions]], [[glossary]], [[transactions-concurrency]], [[api-contracts]] и [[definition-of-done]]. Подтверждены отдельные first-article / per-card / final-batch действия, `112 → 3 → 250`, operation-scoped нормы, UUID без идентичности физической детали, backend permissions, атомарные audit/receipts и синтетический payroll без денег. Browser setup содержит только справочники; production mutations идут через UI. Новые fault fixtures не подменяют результат browser flow. Успешные API схемы сохранены, ответ 429 использует ранее принятый `TOO_MANY_REQUESTS`.
+
+Проверено различение прежних 5 integration tests, новых PostgreSQL и browser suites, compact и canonical, локальных результатов и будущего CI SHA. Негативная приёмка, переделка, переназначение, deployment и этапы 10–12 не добавлены. Соседние пользовательские dashboard/Home/Obsidian/site изменения не входят в scoped diff. Семантических противоречий в затронутых канонических документах не найдено; структурный audit учитывается отдельно.
+
+Локальные gates пройдены; пользователь разрешил scoped commit/push в `codex/portfolio` 2026-09-05. Этап 9 остаётся открытым до успешных обязательных jobs нового implementation SHA: `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)`, `performance`. Зелёные runs этапа 8 этого не доказывают.
 
 ## Правило слияния
 

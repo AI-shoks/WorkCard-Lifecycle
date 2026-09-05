@@ -23,16 +23,26 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "test": "pnpm --filter @work-card/contracts build && pnpm -r --if-present test",
-    "typecheck": "pnpm --filter @work-card/contracts build && pnpm -r --if-present typecheck"
+    "typecheck": "pnpm --filter @work-card/contracts build && pnpm -r --if-present typecheck && tsc -p tsconfig.quality.json",
+    "test:quality": "vitest run --config quality/vitest.config.ts",
+    "test:browser": "tsx quality/browser.ts",
+    "test:browser:canonical": "tsx quality/browser.ts canonical",
+    "test:performance": "tsx quality/performance.ts",
+    "security:dependencies": "pnpm audit --audit-level=high",
+    "security:secrets": "tsx quality/scan-secrets.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.62.1",
     "@types/node": "24.13.3",
+    "@types/pg": "8.23.1",
     "eslint": "10.9.1",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.5",
     "globals": "17.11.0",
+    "pg": "8.23.0",
     "prettier": "3.9.6",
+    "tsx": "4.23.13",
     "typescript": "5.9.3",
     "typescript-eslint": "8.69.0",
     "vitest": "4.1.11"

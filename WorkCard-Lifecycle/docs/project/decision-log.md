@@ -1,9 +1,9 @@
 ---
 artifact_id: project.decision-log
 status: active
-version: 9
+version: 10
 owner: project
-updated: 2026-07-17
+updated: 2026-09-05
 ---
 
 # Decision Log
@@ -33,3 +33,4 @@ updated: 2026-07-17
 | D-019 | 2026-07-17 | Не считать текстовые wireframes интерактивным прототипом | принято | Этап 4 может быть закрыт только после отдельного проходимого прототипа либо явного изменения exit criterion; документация не завышает готовность |
 | D-020 | 2026-07-17 | Разделить подтверждённые самоконтроль/финальную приёмку и синтетическое per-card закрытие WorkCard | принято | Самоконтроль рабочего не получает отдельной команды; `FinalBatchAcceptance` всей партии и подписи БТК остаются фактами `CONFIRMED_AS_IS`; `ConfirmWorkCardQuality` сохраняет выбранную per-card гранулярность MVP, но не считается записью финальной приёмки или цифровой подписью |
 | D-021 | 2026-07-17 | Включить в MVP v1 отдельную цифровую финальную приёмку всей завершённой партии | принято | `QUALITY_CONTROLLER` выполняет `RecordFinalBatchAcceptance` только после first-article gates и закрытия всех обязательных WorkCard; создаются одна неизменяемая `FinalBatchAcceptance` и `FinalBatchAccepted` в одной транзакции, но цифровая запись не заменяет подписи БТК на физических карточках |
+| D-022 | 2026-09-05 | Автоматизировать качество этапа 9 без расширения MVP | принято | Compact 6-card desktop/mobile и отдельный полный 250-card UI процесс; реальный PostgreSQL fault injection, resource budgets, dependency/secret/image CI gates. Performance profile 10 000 карточек не объявляется production SLA; завершение требует CI нового implementation SHA. Основания и текущие результаты — [[test-strategy]], [[security-baseline]], [[quality-gates]] |

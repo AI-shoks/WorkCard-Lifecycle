@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 9
+version: 10
 owner: project
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # Documentation Index
@@ -45,7 +45,7 @@ docs/
 
 ## Текущая контрольная точка
 
-Этапы 1–7 завершены. Backend vertical slice зафиксирован implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1), прошёл локальные code/DB integration и clean-container gates, а также полностью зелёные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041). Machine-readable API, транзакции и тесты являются доказательством backend-сценария; frontend flow этапа 8 ещё не подключён. Наглядный, неканонический обзор состояния доступен в [project-dashboard.html](project-dashboard.html).
+Этапы 1–8 завершены. Frontend vertical slice зафиксирован implementation SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`; полный процесс 250 карточек, отдельная финальная приёмка, audit/payroll и clean-container проверены локально, [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) зелёные. Этап 9 в работе: автоматизация качества описана в [[test-strategy]], локальные результаты и ожидаемые gates нового SHA — в [[quality-gates]]. Наглядный, неканонический обзор доступен в [project-dashboard.html](project-dashboard.html); он не заменяет актуальные канонические статусы плана/backlog.
 
 ## Происхождение и семантическая проверка
 

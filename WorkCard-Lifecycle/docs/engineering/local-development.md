@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.local-development
 status: accepted
-version: 4
+version: 5
 owner: engineering
 updated: 2026-09-05
 ---
@@ -114,4 +114,24 @@ docker compose down
 
 Для frontend-работ этапа 8 поднят отдельный portable PostgreSQL `18.6` на Windows с раздельными чистыми browser/integration БД. Применение миграций `0001`–`0003`, повторный migrate с проверкой checksums, seed дважды, runtime verification и все `5/5` реальных PostgreSQL integration tests завершились успешно. Системные службы и существующие данные не менялись.
 
-Docker в этой среде отсутствовал, поэтому этот результат не является clean-container проверкой текущего checkout. Текущие изменения этапа 8 ещё не зафиксированы implementation commit и не проверены удалённым CI. Исторические зелёные jobs SHA `17d2b04d13b58c7dff677543ed4399751a8593a1` относятся только к этапу 7. Для закрытия этапа 8 по-прежнему необходимы актуальный clean-container и зелёные `quality`/`container` jobs одного implementation SHA по [[ci-pipeline]] и [[backlog]].
+Первоначальная отметка о недоступном Docker устарела: установленный Docker Desktop был запущен, выполнен clean-container без кэша с новым томом, миграциями, seed, healthy app/DB и HTTP 200 SPA/health. Этап 8 завершён SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`; [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) подтвердили `quality`/`container`. Эти результаты не доказывают последующие изменения этапа 9.
+
+## Изолированные проверки этапа 9
+
+Для тестов нужен отдельный PostgreSQL server/control DB и owner с правом создавать disposable БД/роли. `QUALITY_OWNER_URL` обязателен: fallback на application DB отсутствует. Каждый suite создаёт собственную `q9_*` БД и runtime-роль, удаляя только их после выполнения. Справочные fixtures не создают production batches/cards/results.
+
+```powershell
+$env:QUALITY_OWNER_URL = '<owner-url-for-isolated-local-control-database>'
+pnpm test:quality
+pnpm build
+pnpm exec playwright install chromium
+pnpm test:browser
+pnpm test:browser:canonical
+pnpm test:performance
+pnpm security:dependencies
+pnpm security:secrets
+```
+
+Compact browser suite проверяет 6 карточек на desktop/mobile; отдельная canonical команда проходит все 250 через UI. Performance создаёт 40 партий / 10 000 карточек через API и сохраняет измерения в `.quality-results/performance.json`. Не запускайте измерения или браузер вместе с тяжёлым build/image scan на ограниченной машине. Точные условия и результаты — в [[quality-gates]].
+
+Для отдельного Compose используйте `-p <quality-project> -f compose.yaml -f quality/compose.override.yaml`, задав `QUALITY_PROJECT` тем же значением, свободные `POSTGRES_PORT`/`PORT` и соответствующий `COMPOSE_APP_ORIGIN`. Override меняет не только project name, но и явно именованный volume/image. До старта проверьте отсутствие такого volume; до удаления — точные имена и Compose labels. Остановка с `down --volumes` допустима только для этого проверенного тестового проекта, а не для обычного demo stack. Установка Docker повторно и глобальный prune не нужны.

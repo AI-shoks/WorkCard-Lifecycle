@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.environments
 status: accepted
-version: 2
+version: 3
 owner: engineering
-updated: 2026-09-02
+updated: 2026-09-05
 ---
 
 # Environments and Secrets
@@ -50,8 +50,8 @@ Compose формирует внутренние URL с hostname `database`; host
 
 - `.env` и логи исключены из Git; `.env.example` не содержит настоящих секретов.
 - owner URL отсутствует в environment runtime-контейнера `app`.
-- logger настроен на redaction `authorization`, cookie и CSRF header; automated redaction proof относится к этапу 9.
-- session cookie подписана, имеет `HttpOnly`/`SameSite=Lax`, а `Secure` включается для HTTPS origin; frontend-этап 8 обязан не хранить CSRF token в browser storage.
+- logger исключает query/body/headers и driver message/stack; автоматический тест проверяет отсутствие cookie, token и DB URL в logs/response согласно [[security-baseline]].
+- session cookie подписана, имеет `HttpOnly`/`SameSite=Lax`, а `Secure` включается для HTTPS origin; SPA хранит CSRF только в памяти и очищает защищённое состояние при смене роли.
 - секреты не передаются в browser bundle, health response или OpenAPI.
 - уникальные staging/production credentials и platform rotation являются требованиями release-этапа 10, а не текущего локального runtime.
 - утечка секрета требует ротации; удаление строки из Git не считается устранением утечки.
