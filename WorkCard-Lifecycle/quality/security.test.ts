@@ -97,6 +97,42 @@ it('session rate limiting returns 429/Retry-After without trusting forwarded IPs
   }
 });
 
+it('общий demo-контур отклоняет новую сессию после жёсткого лимита', async () => {
+  const sessionsBefore = (
+    await db.owner.query('SELECT COUNT(*)::integer AS count FROM demo_sessions')
+  ).rows[0].count as number;
+  const app = await buildApp({
+    appVersion: 'capacity-test',
+    demoCapacity: { maximumBatches: 20, maximumSessions: sessionsBefore + 1 },
+    pool: db.runtime,
+    readiness: { check: async () => ({ database: 'up', migrationVersion: 3 }) },
+    security: { allowedOrigin: origin, cookieSecure: true, signingSecret: randomUUID() },
+  });
+  try {
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/v1/demo-session',
+      headers: { origin },
+      payload: { demoUserId: demoUsers[0].id },
+    });
+    expect(first.statusCode).toBe(201);
+
+    const rejected = await app.inject({
+      method: 'POST',
+      url: '/api/v1/demo-session',
+      headers: { origin },
+      payload: { demoUserId: demoUsers[1].id },
+    });
+    expect(rejected.statusCode).toBe(409);
+    expect(rejected.json()).toMatchObject({ code: 'DEMO_CAPACITY_REACHED' });
+    expect(
+      (await db.owner.query('SELECT COUNT(*)::integer AS count FROM demo_sessions')).rows[0].count,
+    ).toBe(sessionsBefore + 1);
+  } finally {
+    await app.close();
+  }
+});
+
 it('Origin, missing/cross-session CSRF, forged cookie, schema injection and oversized input cannot change business data', async () => {
   const before = await businessSnapshot(db);
   const valid = api.headers('PLANNER');
@@ -244,6 +280,13 @@ it('role rotation invalidates old cookie/token, logout revokes the row, idle/abs
       (await api.app.inject({ url: '/api/v1/demo-session', headers: { cookie: session.cookie } }))
         .statusCode,
     ).toBe(401);
+    expect(
+      (
+        await db.owner.query('SELECT COUNT(*)::integer AS count FROM demo_sessions WHERE id=$1', [
+          id,
+        ])
+      ).rows[0].count,
+    ).toBe(0);
   }
   const disabled = await login();
   await db.owner.query('UPDATE demo_users SET enabled=false WHERE id=$1', [demoUsers[0].id]);
@@ -251,5 +294,12 @@ it('role rotation invalidates old cookie/token, logout revokes the row, idle/abs
     (await api.app.inject({ url: '/api/v1/demo-session', headers: { cookie: disabled.cookie } }))
       .statusCode,
   ).toBe(401);
+  expect(
+    (
+      await db.owner.query('SELECT COUNT(*)::integer AS count FROM demo_sessions WHERE id=$1', [
+        disabled.cookie.split('=')[1]!.split('.')[0]!,
+      ])
+    ).rows[0].count,
+  ).toBe(0);
   expect(await businessSnapshot(db)).toEqual(before);
 });

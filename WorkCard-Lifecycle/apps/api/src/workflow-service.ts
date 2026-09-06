@@ -36,12 +36,14 @@ import type { Pool, PoolClient } from 'pg';
 
 import {
   DomainError,
+  demoCapacityReached,
   gateClosed,
   invalidBusinessInput,
   resourceNotFound,
   stateConflict,
   versionConflict,
 } from './domain-error.js';
+import { defaultDemoCapacity, demoMaintenanceLockKey } from './demo-maintenance.js';
 import { decodeCursor, encodeCursor, pageLimit, type PageInput } from './pagination.js';
 import type { ActorContext } from './session-manager.js';
 
@@ -460,7 +462,10 @@ async function executeCommand<T>(
   }
 }
 
-export function createWorkflowService(pool: Pool) {
+export function createWorkflowService(
+  pool: Pool,
+  maximumBatches: number = defaultDemoCapacity.maximumBatches,
+) {
   return {
     async listPassports(): Promise<ProductionPassportSummary[]> {
       const result = await pool.query<{
@@ -585,6 +590,15 @@ export function createWorkflowService(pool: Pool) {
             throw invalidBusinessInput(
               'INVALID_PRODUCTION_PASSPORT',
               'Подготовленный паспорт не содержит плана операций.',
+            );
+          }
+          await client.query('SELECT pg_advisory_xact_lock($1::bigint)', [demoMaintenanceLockKey]);
+          const capacity = await client.query<{ count: number }>(
+            'SELECT COUNT(*)::integer AS count FROM production_batches',
+          );
+          if ((capacity.rows[0]?.count ?? maximumBatches) >= maximumBatches) {
+            throw demoCapacityReached(
+              'Достигнут лимит партий общего демонстрационного контура. Дождитесь планового сброса.',
             );
           }
           const batchId = randomUUID();

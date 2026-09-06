@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 4
+version: 7
 owner: engineering
 updated: 2026-09-05
 ---
@@ -14,7 +14,7 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 ```text
 .
-├── .github/workflows/ci.yml         GitHub Actions workflow
+├── .github/workflows/               CI и ручной release-image workflow
 ├── .github/actions/setup-workspace/ общее закреплённое CI-окружение
 └── WorkCard-Lifecycle/
     ├── apps/
@@ -24,8 +24,9 @@ Git checkout содержит каталог приложения `WorkCard-Life
     │   └── web/                     React SPA и frontend-тесты
     ├── packages/
     │   └── contracts/               общие TypeBox-схемы и TypeScript-типы
-    ├── docs/                        управляемые проектные артефакты
-    ├── scripts/                     проверки документационного прототипа
+    ├── infra/terraform/             reviewable GCP IaC и GitHub WIF без backend/apply
+    ├── docs/                        управляемые артефакты и release/evidence schemas
+    ├── scripts/                     UX audit, release validator/generator/evidence appender
     ├── quality/                     isolated DB, browser, failure/security/performance tests
     ├── playwright.config.ts         compact/canonical desktop/mobile browser projects
     ├── compose.yaml                 локальный воспроизводимый контур
@@ -34,6 +35,10 @@ Git checkout содержит каталог приложения `WorkCard-Life
 ```
 
 `node_modules`, `dist`, coverage, локальные `.env` и кэши являются производными данными и не входят в Git. `pnpm-lock.yaml`, SQL-миграции и `.env.example` входят в Git как воспроизводимая спецификация.
+
+`infra/terraform` содержит root module, переиспользуемый runtime module, provider lockfile, placeholder inputs, ограниченный GitHub OIDC/WIF trust и plan-safety checker. `.terraform/`, state и plan files игнорируются; remote backend до provisioning ещё не настроен.
+
+`scripts/release/create-release-manifest.mjs` после успешной публикации и semantic scan validation создаёт только новый `docs/release/manifests/<SHA>.json` по `docs/release/release-manifest.schema.json`; перезапись существующего build record запрещена. `validate-release-manifest.mjs` проверяет schema, cross-field bindings и исходный Trivy JSON. Последующие реальные lifecycle-факты создаёт `append-release-evidence.mjs` как новые последовательные hash-chained файлы по `docs/release/release-evidence.schema.json`, не меняя initial manifest. Фактических manifest/evidence-файлов до разрешённых hosted runs нет.
 
 `.quality-results`, `playwright-report` и `test-results` также игнорируются Git; CI прикладывает выбранные JSON/HTML/traces как временные artifacts. `quality/` — инженерные проверки, не новый workspace или production service. Runtime-образ содержит API/SPA и production dependencies без npm/shell; build stage остаётся отдельно.
 
@@ -55,4 +60,4 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 ## Критерий принятия
 
-Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflow запускает команды из `WorkCard-Lifecycle/`.
+Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender покрыты позитивными и негативными tests, оба workflows проходят `actionlint`; Terraform-каталог дополнительно прошёл `fmt`, `validate` и secret-safe review plan без `apply`. Удалённый запуск новой обязательной `release_iac` job пока отсутствует.

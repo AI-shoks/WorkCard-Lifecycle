@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/AI-shoks/WorkCard-Lifecycle/main/WorkCard-Lifecycle/docs/release/release-manifest.schema.json",
+  "title": "Work Card release image manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "generatedAt",
+    "sourceSha",
+    "sourceCiRunUrl",
+    "imageTag",
+    "imageDigest",
+    "immutableImage",
+    "imageConfigDigest",
+    "ociRevisionLabel",
+    "platform",
+    "buildScanRunUrl",
+    "scan",
+    "migrationsChecksumSummary",
+    "lifecycleEvidence"
+  ],
+  "properties": {
+    "$schema": { "const": "../release-manifest.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+    },
+    "sourceSha": { "$ref": "#/$defs/sourceSha" },
+    "sourceCiRunUrl": { "$ref": "#/$defs/runUrl" },
+    "imageTag": { "$ref": "#/$defs/imageTag" },
+    "imageDigest": { "$ref": "#/$defs/digest" },
+    "immutableImage": { "$ref": "#/$defs/immutableImage" },
+    "imageConfigDigest": { "$ref": "#/$defs/digest" },
+    "ociRevisionLabel": { "$ref": "#/$defs/sourceSha" },
+    "platform": { "const": "linux/amd64" },
+    "buildScanRunUrl": { "$ref": "#/$defs/runUrl" },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "image",
+        "imageConfigDigest",
+        "scannerImage",
+        "reportPath",
+        "reportSha256",
+        "reportSummary"
+      ],
+      "properties": {
+        "status": { "const": "passed" },
+        "image": { "$ref": "#/$defs/immutableImage" },
+        "imageConfigDigest": { "$ref": "#/$defs/digest" },
+        "scannerImage": {
+          "type": "string",
+          "pattern": "^aquasec/trivy:[0-9]+\\.[0-9]+\\.[0-9]+@sha256:[0-9a-f]{64}$"
+        },
+        "reportPath": {
+          "const": ".quality-results/release/image-vulnerabilities.json"
+        },
+        "reportSha256": { "$ref": "#/$defs/digest" },
+        "reportSummary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "artifactType",
+            "targetCount",
+            "vulnerabilityCount",
+            "severityThreshold"
+          ],
+          "properties": {
+            "schemaVersion": { "const": 2 },
+            "artifactType": { "const": "container_image" },
+            "targetCount": { "type": "integer", "minimum": 1 },
+            "vulnerabilityCount": { "const": 0 },
+            "severityThreshold": { "const": ["HIGH", "CRITICAL"] }
+          }
+        }
+      }
+    },
+    "migrationsChecksumSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "digest", "files"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "digest": { "$ref": "#/$defs/digest" },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^apps/api/migrations/[A-Za-z0-9._/-]+\\.sql$"
+              },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        }
+      }
+    },
+    "lifecycleEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "directory", "recordSchema"],
+      "properties": {
+        "mode": { "const": "append-only-files" },
+        "directory": {
+          "type": "string",
+          "pattern": "^docs/release/evidence/[0-9a-f]{40}$"
+        },
+        "recordSchema": { "const": "docs/release/release-evidence.schema.json" }
+      }
+    }
+  },
+  "$defs": {
+    "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "imageTag": {
+      "type": "string",
+      "pattern": "^europe-west1-docker\\.pkg\\.dev/[a-z][a-z0-9-]{4,28}[a-z0-9]/work-card/work-card:[0-9a-f]{40}$"
+    },
+    "immutableImage": {
+      "type": "string",
+      "pattern": "^europe-west1-docker\\.pkg\\.dev/[a-z][a-z0-9-]{4,28}[a-z0-9]/work-card/work-card@sha256:[0-9a-f]{64}$"
+    },
+    "runUrl": {
+      "type": "string",
+      "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/[1-9][0-9]*(?:/attempts/[1-9][0-9]*)?$"
+    }
+  }
+}

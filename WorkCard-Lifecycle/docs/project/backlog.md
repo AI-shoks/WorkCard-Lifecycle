@@ -1,14 +1,16 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 24
+version: 31
 owner: project
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Backlog
 
 Оперативные задачи проекта следуют каноническому [[project-plan|roadmap]]. Требования к поведению системы хранятся в `docs/requirements/`, а принятые решения — в [[decision-log]] и [[adr-index|ADR]].
+
+**На 2026-09-06 этапы 1–9 закрыты; этап 10 «Релиз» остаётся в работе на 4/7. Локальный hardening добавил узкий public-IAM operator, bounded shared demo, reset/lifetime runbooks и plan assertions, но это не hosted qualification.**
 
 ## Выполнено — этапы 1–4
 
@@ -76,7 +78,7 @@ Desktop/mobile UI, все 14 шагов прототипа и `window.runUxCopyA
 
 **Этап 8 закрыт:** SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`, успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414), включая оба jobs `quality`/`container`. Локальный clean-container прошёл без кэша, на новом томе, с миграциями/seed, healthy приложением/БД и HTTP 200. Docker установлен и Server доступен. Эти результаты подтверждают этап 8 и не переносятся на изменения этапа 9.
 
-## В работе — этап 9 «Качество»
+## Выполнено — этап 9 «Качество»
 
 - [x] Реализовать автоматизированный compact и отдельный canonical browser lifecycle через UI, реальный API и изолированный PostgreSQL.
 - [x] Добавить browser version conflict и восстановление после потери ответа уже закоммиченной команды без повторной mutation.
@@ -88,13 +90,25 @@ Desktop/mobile UI, все 14 шагов прототипа и `window.runUxCopyA
 - [x] Завершить локальные проверки итогового diff, включая compact desktop/mobile, canonical 250, image scan и clean-container.
 - [x] Обновить затронутые документы, выполнить strict `project-docs-auditor --fail-on-warning` и целевой semantic review.
 - [x] Получить отдельное прямое разрешение на scoped commit/push этапа 9: пользователь разрешил 2026-09-05 отправку в `codex/portfolio`.
-- [ ] После разрешения получить все обязательные CI jobs нового implementation SHA по [[ci-pipeline]].
+- [x] Подтвердить все 6 обязательных CI jobs implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) по [[ci-pipeline]]: [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850) — 6/6 `success` в каждом запуске.
 
-**Локальная реализация готова, этап ещё не закрыт:** результаты относятся к scoped diff поверх `b00ff294…`. `pnpm check` прошёл с 157 frontend и 15 API tests (10 обычных + 5 PostgreSQL), новые PostgreSQL проверки — 10/10. Compact desktop/mobile и отдельный canonical 250 UI процесс успешны; dependency/secret/image gates, новый no-cache clean-container и профиль 10 000 карточек выполнены. Strict docs: 55 документов, 0 errors/warnings; semantic review — без конфликтов. Точные условия, исправления и ограничения — [[quality-gates]]. Разрешение на scoped commit/push в `codex/portfolio` получено 2026-09-05; обязательные CI нового SHA ещё должны подтвердить реализацию.
+**Этап 9 закрыт 2026-09-05:** результаты локальной реализации относятся к implementation SHA `3ee65709966f5775928de87783fd2946d085e2bc`. `pnpm check` прошёл с 157 frontend и 15 API tests (10 обычных + 5 PostgreSQL), новые PostgreSQL проверки — 10/10. Compact desktop/mobile и отдельный canonical 250 UI процесс успешны; dependency/secret/image gates, новый no-cache clean-container и профиль 10 000 карточек выполнены. Strict docs: 55 документов, 0 errors/warnings; semantic review — без конфликтов. Точные условия, исправления и ограничения — [[quality-gates]]. Через GitHub API подтверждены `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` для того же SHA в обоих запусках выше.
+
+## В работе — этап 10 «Релиз»
+
+- [x] Выбрать Cloud Run/Artifact Registry и отдельные Cloud SQL PostgreSQL 18; зафиксировать в [[0007-cloud-run-and-cloud-sql-release|ADR-0007]], [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment]] build-once image, owner-only DB jobs, bounded shared demo, secrets/`APP_ORIGIN`, health/logging, staging smoke, promotion, rollback и lifetime.
+- [x] Реализовать [reviewable Terraform IaC](../../infra/terraform/README.md) для раздельных release/staging/production projects, IAM, Cloud SQL, Secret Manager, Cloud Run service/jobs, probes, logs, alerts, backups/PITR и budget controls; hardening добавляет reset identity/job, custom production service IAM role, отдельный future deployer WIF и deletion guards. `fmt`, `validate` и strict review plan `166/0/0` проходят без `apply`.
+- [x] Реализовать ручной `main`-only release workflow с short-lived Workload Identity, full-SHA immutable Artifact Registry tag, registry digest capture/recheck, pull/semantic Trivy scan exact опубликованного digest и schema-validated генерацией несекретного `docs/release/manifests/<SHA>.json`; будущие deployment/smoke/promotion/rollback факты пишутся отдельными append-only hash-chained records без placeholders. Обязательная будущая CI job проверяет actionlint, manifest/schema/tests и secret/WIF-safe Terraform plan; release preflight требует её успеха. Workflow и удалённая job для текущих изменений не запускались, image/manifest/hosted evidence ещё не существуют.
+- [x] Закрыть pre-deploy gaps из [[deployment]] на уровне кода/config: public health публикует только status; Pino пишет allowlisted Cloud Logging context; proxy/socket boundaries проверяются; общий demo ограничен 20 партиями/500 sessions, очищает expired sessions и имеет owner-only transactional reset. Фактические IAM close/restore, reset cadence, Cloud Logging ingestion, proxy chain/client IP и socket connection остаются обязательным hosted evidence, а не результатом этой задачи.
+- [ ] Реализовать hosted smoke runner без DB/owner credentials и выполнить реальный clean staging `migrate → seed → verify → deploy → smoke` для одного exact digest.
+- [ ] После отдельного разрешения продвинуть тот же digest в production, подтвердить узкий IAM close/restore, daily reset/fail-closed policy, backup/PITR, bounded smoke, traffic rollback и lifetime/teardown evidence.
+- [ ] Обновить evidence/ограничения, выполнить strict documentation audit и semantic review; закрыть этап только по фактическим hosted результатам.
+
+**Прогресс этапа 10 — ровно 4/7:** завершены release design, reviewable IaC, неисполненный release-image workflow и runtime pre-deploy controls, включая локальный IAM/demo hardening. Результат подтверждён только code tests/config/plan/docs audit; `terraform apply` и `workflow_dispatch` не выполнялись, поэтому cloud resources, реальные secrets, registry image, фактический source SHA/digest manifest, staging/production revisions, IAM/reset/Cloud Run/Cloud SQL qualification и smoke evidence не создавались. Этап остаётся в работе.
 
 ## Maintenance
 
-- [x] Закрепить `actions/setup-node` и `pnpm/action-setup` с нативным Node.js 24 runtime по SHA в общем setup action; удалённая проверка этих изменений входит в CI этапа 9.
+- [x] Закрепить `actions/setup-node` и `pnpm/action-setup` с нативным Node.js 24 runtime по SHA в общем setup action; удалённая проверка подтверждена обоими CI runs этапа 9, указанными выше.
 
 ## Сохранённые выводы
 

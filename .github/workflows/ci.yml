@@ -19,6 +19,86 @@ defaults:
     working-directory: WorkCard-Lifecycle
 
 jobs:
+  release_iac:
+    name: Release and IaC contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_LINUX_AMD64_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      TERRAFORM_VERSION: 1.16.1
+      TERRAFORM_LINUX_AMD64_SHA256: 745d33b4b02b7980c62a38ec1beea24ee084ea8caf3f503c200554bd9a0cbe49
+      TF_IN_AUTOMATION: "true"
+      GOOGLE_OAUTH_ACCESS_TOKEN: review-only-no-cloud-access
+      TF_VAR_staging_secret_values: >-
+        {"owner_database_password":"review-staging-owner-000000000001","app_database_password":"review-staging-runtime-0000000002","session_signing_secret":"review-staging-session-0000000003"}
+      TF_VAR_production_secret_values: >-
+        {"owner_database_password":"review-production-owner-0000000001","app_database_password":"review-production-runtime-00000002","session_signing_secret":"review-production-session-00000003"}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Install checksum-pinned actionlint and Terraform
+        run: |
+          set -euo pipefail
+
+          tools_directory="$RUNNER_TEMP/release-tools"
+          actionlint_archive="$RUNNER_TEMP/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          terraform_archive="$RUNNER_TEMP/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          mkdir -p "$tools_directory/actionlint" "$tools_directory/terraform"
+
+          curl --fail --show-error --silent --location --retry 3 \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            --output "$actionlint_archive"
+          printf '%s  %s\n' "$ACTIONLINT_LINUX_AMD64_SHA256" "$actionlint_archive" \
+            | sha256sum --check --strict
+          tar -xzf "$actionlint_archive" -C "$tools_directory/actionlint" actionlint
+
+          curl --fail --show-error --silent --location --retry 3 \
+            "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" \
+            --output "$terraform_archive"
+          printf '%s  %s\n' "$TERRAFORM_LINUX_AMD64_SHA256" "$terraform_archive" \
+            | sha256sum --check --strict
+          unzip -q "$terraform_archive" -d "$tools_directory/terraform"
+
+          echo "$tools_directory/actionlint" >> "$GITHUB_PATH"
+          echo "$tools_directory/terraform" >> "$GITHUB_PATH"
+
+      - name: Validate pinned tool versions
+        run: |
+          set -euo pipefail
+          actionlint -version | grep -Fqx "$ACTIONLINT_VERSION"
+          terraform version -json \
+            | jq -e --arg version "$TERRAFORM_VERSION" '.terraform_version == $version' >/dev/null
+
+      - name: Lint CI and release workflows
+        run: actionlint ../.github/workflows/ci.yml ../.github/workflows/release.yml
+
+      - name: Validate release manifests, schemas, and append-only evidence
+        run: pnpm test:release
+
+      - name: Validate Terraform formatting and configuration
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/terraform init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/terraform fmt -check -recursive
+          terraform -chdir=infra/terraform validate
+
+      - name: Prove the review plan keeps secrets out and WIF narrowly scoped
+        run: |
+          set -euo pipefail
+          cp infra/terraform/terraform.tfvars.example "$RUNNER_TEMP/review.tfvars"
+          terraform -chdir=infra/terraform plan \
+            -refresh=false \
+            -input=false \
+            -lock=false \
+            -var-file="$RUNNER_TEMP/review.tfvars" \
+            -out="$RUNNER_TEMP/review.tfplan"
+          terraform -chdir=infra/terraform show -json "$RUNNER_TEMP/review.tfplan" \
+            | node infra/terraform/scripts/assert-plan-safe.mjs
+
   quality:
     name: Code and database quality
     runs-on: ubuntu-latest

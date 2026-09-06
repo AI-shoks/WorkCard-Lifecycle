@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -12,6 +13,7 @@ import {
   type ReadinessResponse,
 } from '@work-card/contracts';
 import Fastify, {
+  LogController,
   type FastifyError,
   type FastifyInstance,
   type FastifyReply,
@@ -22,6 +24,7 @@ import type { Pool } from 'pg';
 
 import { registerApiRoutes } from './api-routes.js';
 import { DomainError } from './domain-error.js';
+import { defaultDemoCapacity } from './demo-maintenance.js';
 import type { ReadinessService } from './readiness.js';
 import { registerRateLimits } from './runtime-protection.js';
 import type { SessionManagerOptions } from './session-manager.js';
@@ -30,10 +33,15 @@ const expectedMigrationVersion = 3;
 
 export type BuildAppOptions = {
   appVersion: string;
+  demoCapacity?: {
+    maximumBatches: number;
+    maximumSessions: number;
+  };
   logger?: FastifyServerOptions['logger'];
   pool?: Pool;
   readiness: ReadinessService;
   security?: SessionManagerOptions;
+  trustProxy?: FastifyServerOptions['trustProxy'];
   webDistPath?: string;
 };
 
@@ -46,11 +54,17 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     },
     bodyLimit: 1_048_576,
     connectionTimeout: 10_000,
+    genReqId: () => randomUUID(),
     requestTimeout: 15_000,
     handlerTimeout: 20_000,
     keepAliveTimeout: 5_000,
+    logController: new LogController({
+      disableRequestLogging: true,
+      requestIdLogLabel: 'requestId',
+    }),
     logger: options.logger ?? false,
-    trustProxy: false,
+    requestIdHeader: false,
+    trustProxy: options.trustProxy ?? false,
   });
 
   await registerRateLimits(app);
@@ -86,6 +100,23 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     reply.header('X-Request-Id', request.id);
   });
 
+  app.addHook('onResponse', async (request, reply) => {
+    const fields = {
+      durationMs: reply.elapsedTime,
+      method: request.method,
+      requestId: request.id,
+      routeTemplate: request.routeOptions.url ?? '[unmatched]',
+      status: reply.statusCode,
+    };
+    if (reply.statusCode >= 500) {
+      request.log.error(fields, 'request completed');
+    } else if (reply.statusCode >= 400) {
+      request.log.warn(fields, 'request completed');
+    } else {
+      request.log.info(fields, 'request completed');
+    }
+  });
+
   app.setErrorHandler(problemDetailsErrorHandler);
 
   app.get(
@@ -96,11 +127,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
         tags: ['health'],
       },
     },
-    async (): Promise<LivenessResponse> => ({
-      status: 'ok',
-      service: 'work-card-api',
-      version: options.appVersion,
-    }),
+    async (): Promise<LivenessResponse> => ({ status: 'ok' }),
   );
 
   app.get(
@@ -114,18 +141,25 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
         tags: ['health'],
       },
     },
-    async (_request, reply): Promise<ReadinessResponse> => {
+    async (request, reply): Promise<ReadinessResponse> => {
       const snapshot = await options.readiness.check();
       const ready =
         snapshot.database === 'up' &&
         snapshot.migrationVersion !== null &&
         snapshot.migrationVersion >= expectedMigrationVersion;
-      const response: ReadinessResponse = {
-        status: ready ? 'ok' : 'unavailable',
-        database: snapshot.database,
+      const diagnostic = {
+        databaseStatus: snapshot.database,
+        event: 'health.readiness',
         migrationVersion: snapshot.migrationVersion,
         expectedMigrationVersion,
       };
+      if (ready) {
+        request.log.info(diagnostic, 'readiness check completed');
+      } else {
+        request.log.warn(diagnostic, 'readiness check unavailable');
+      }
+
+      const response: ReadinessResponse = { status: ready ? 'ok' : 'unavailable' };
 
       if (!ready) {
         return reply.code(503).send(response);
@@ -141,7 +175,10 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     if (!options.pool || !options.security) {
       throw new Error('Для производственных API routes нужны pool и security options.');
     }
-    await registerApiRoutes(app, options.pool, options.security);
+    await registerApiRoutes(app, options.pool, options.security, {
+      maximumBatches: options.demoCapacity?.maximumBatches ?? defaultDemoCapacity.maximumBatches,
+      maximumSessions: options.demoCapacity?.maximumSessions ?? defaultDemoCapacity.maximumSessions,
+    });
   }
 
   const webRoot = options.webDistPath ? resolve(options.webDistPath) : null;

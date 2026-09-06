@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/AI-shoks/WorkCard-Lifecycle/main/WorkCard-Lifecycle/docs/release/release-evidence.schema.json",
+  "title": "Work Card append-only release lifecycle evidence record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "sequence",
+    "recordedAt",
+    "sourceSha",
+    "immutableImage",
+    "previousRecordSha256",
+    "kind",
+    "evidence"
+  ],
+  "properties": {
+    "$schema": { "const": "../../release-evidence.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+    },
+    "sourceSha": { "$ref": "#/$defs/sourceSha" },
+    "immutableImage": { "$ref": "#/$defs/immutableImage" },
+    "previousRecordSha256": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/digest" }]
+    },
+    "kind": {
+      "enum": [
+        "staging-deployment",
+        "staging-smoke",
+        "promotion-decision",
+        "production-deployment",
+        "production-smoke",
+        "rollback-decision"
+      ]
+    },
+    "evidence": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "sequence": { "const": 1 } }, "required": ["sequence"] },
+      "then": { "properties": { "previousRecordSha256": { "type": "null" } } },
+      "else": {
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 2 },
+          "previousRecordSha256": { "$ref": "#/$defs/digest" }
+        }
+      }
+    }
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "kind": { "const": "staging-deployment" },
+        "evidence": { "$ref": "#/$defs/deploymentEvidence" }
+      }
+    },
+    {
+      "properties": {
+        "kind": { "const": "staging-smoke" },
+        "evidence": { "$ref": "#/$defs/smokeEvidence" }
+      }
+    },
+    {
+      "properties": {
+        "kind": { "const": "promotion-decision" },
+        "evidence": { "$ref": "#/$defs/promotionEvidence" }
+      }
+    },
+    {
+      "properties": {
+        "kind": { "const": "production-deployment" },
+        "evidence": { "$ref": "#/$defs/deploymentEvidence" }
+      }
+    },
+    {
+      "properties": {
+        "kind": { "const": "production-smoke" },
+        "evidence": { "$ref": "#/$defs/smokeEvidence" }
+      }
+    },
+    {
+      "properties": {
+        "kind": { "const": "rollback-decision" },
+        "evidence": { "$ref": "#/$defs/rollbackEvidence" }
+      }
+    }
+  ],
+  "$defs": {
+    "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "immutableImage": {
+      "type": "string",
+      "pattern": "^europe-west1-docker\\.pkg\\.dev/[a-z][a-z0-9-]{4,28}[a-z0-9]/work-card/work-card@sha256:[0-9a-f]{64}$"
+    },
+    "runUrl": {
+      "type": "string",
+      "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/[1-9][0-9]*(?:/attempts/[1-9][0-9]*)?$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "secretVersions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownerDatabasePassword",
+        "databaseUrl",
+        "migrationDatabaseUrl",
+        "appDatabasePassword",
+        "sessionSigningSecret"
+      ],
+      "properties": {
+        "ownerDatabasePassword": { "type": "integer", "minimum": 1 },
+        "databaseUrl": { "type": "integer", "minimum": 1 },
+        "migrationDatabaseUrl": { "type": "integer", "minimum": 1 },
+        "appDatabasePassword": { "type": "integer", "minimum": 1 },
+        "sessionSigningSecret": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "deploymentEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "resolvedImage", "runUrl", "secretVersions"],
+      "properties": {
+        "revision": { "$ref": "#/$defs/revision" },
+        "previousRevision": { "$ref": "#/$defs/revision" },
+        "resolvedImage": { "$ref": "#/$defs/immutableImage" },
+        "runUrl": { "$ref": "#/$defs/runUrl" },
+        "secretVersions": { "$ref": "#/$defs/secretVersions" }
+      }
+    },
+    "smokeEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "status", "runUrl", "checks"],
+      "properties": {
+        "revision": { "$ref": "#/$defs/revision" },
+        "status": { "enum": ["passed", "failed"] },
+        "runUrl": { "$ref": "#/$defs/runUrl" },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "promotionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "stagingRevision", "stagingSmokeRecordSha256", "runUrl"],
+      "properties": {
+        "decision": { "enum": ["approved", "rejected"] },
+        "stagingRevision": { "$ref": "#/$defs/revision" },
+        "stagingSmokeRecordSha256": { "$ref": "#/$defs/digest" },
+        "runUrl": { "$ref": "#/$defs/runUrl" }
+      }
+    },
+    "rollbackEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "runUrl"],
+      "properties": {
+        "decision": { "enum": ["not-required", "required", "completed"] },
+        "fromRevision": { "$ref": "#/$defs/revision" },
+        "toRevision": { "$ref": "#/$defs/revision" },
+        "runUrl": { "$ref": "#/$defs/runUrl" }
+      }
+    }
+  }
+}

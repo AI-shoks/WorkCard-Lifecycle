@@ -3,7 +3,13 @@ import { createHash, createHmac, timingSafeEqual, randomUUID } from 'node:crypto
 import type { CommandName, DemoSessionResponse, DemoUser, Role } from '@work-card/contracts';
 import type { Pool } from 'pg';
 
-import { actionForbidden, authenticationRequired, invalidBusinessInput } from './domain-error.js';
+import { demoMaintenanceLockKey } from './demo-maintenance.js';
+import {
+  actionForbidden,
+  authenticationRequired,
+  demoCapacityReached,
+  invalidBusinessInput,
+} from './domain-error.js';
 
 const sessionCookieName = 'wcl_session';
 const absoluteSessionHours = 8;
@@ -44,6 +50,7 @@ export type AuthenticatedSession = {
 export type SessionManagerOptions = {
   allowedOrigin: string;
   cookieSecure: boolean;
+  maximumSessions?: number;
   signingSecret: string;
 };
 
@@ -93,6 +100,7 @@ export function roleCan(role: Role, command: CommandName): boolean {
 }
 
 export function createSessionManager(pool: Pool, options: SessionManagerOptions) {
+  const maximumSessions = options.maximumSessions ?? 500;
   const signatureFor = (sessionId: string): string =>
     createHmac('sha256', options.signingSecret).update(`session:${sessionId}`).digest('base64url');
 
@@ -160,7 +168,22 @@ export function createSessionManager(pool: Pool, options: SessionManagerOptions)
         [sessionId],
       );
       const row = result.rows[0];
-      if (!row || !isRole(row.role_code)) throw authenticationRequired();
+      if (!row || !isRole(row.role_code)) {
+        await pool.query(
+          `DELETE FROM demo_sessions AS session
+           WHERE session.id = $1
+             AND (
+               session.expires_at <= CURRENT_TIMESTAMP
+               OR session.idle_expires_at <= CURRENT_TIMESTAMP
+               OR NOT EXISTS (
+                 SELECT 1 FROM demo_users AS demo_user
+                 WHERE demo_user.id = session.demo_user_id AND demo_user.enabled
+               )
+             )`,
+          [sessionId],
+        );
+        throw authenticationRequired();
+      }
       return {
         id: row.session_id,
         csrfTokenHash: row.csrf_token_hash,
@@ -194,8 +217,21 @@ export function createSessionManager(pool: Pool, options: SessionManagerOptions)
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock($1::bigint)', [demoMaintenanceLockKey]);
         if (previousSessionId) {
           await client.query('DELETE FROM demo_sessions WHERE id = $1', [previousSessionId]);
+        }
+        await client.query(
+          `DELETE FROM demo_sessions
+           WHERE expires_at <= CURRENT_TIMESTAMP OR idle_expires_at <= CURRENT_TIMESTAMP`,
+        );
+        const capacity = await client.query<{ count: number }>(
+          'SELECT COUNT(*)::integer AS count FROM demo_sessions',
+        );
+        if ((capacity.rows[0]?.count ?? maximumSessions) >= maximumSessions) {
+          throw demoCapacityReached(
+            'Достигнут лимит активных сессий общего контура. Повторите попытку позднее.',
+          );
         }
         await client.query(
           `INSERT INTO demo_sessions(

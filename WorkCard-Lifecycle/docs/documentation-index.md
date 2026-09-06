@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 10
+version: 17
 owner: project
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Documentation Index
@@ -45,7 +45,11 @@ docs/
 
 ## Текущая контрольная точка
 
-Этапы 1–8 завершены. Frontend vertical slice зафиксирован implementation SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`; полный процесс 250 карточек, отдельная финальная приёмка, audit/payroll и clean-container проверены локально, [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) зелёные. Этап 9 в работе: автоматизация качества описана в [[test-strategy]], локальные результаты и ожидаемые gates нового SHA — в [[quality-gates]]. Наглядный, неканонический обзор доступен в [project-dashboard.html](project-dashboard.html); он не заменяет актуальные канонические статусы плана/backlog.
+**Этапы 1–9 закрыты; этап 10 «Релиз» остаётся в работе на 4/7.** Локальный hardening сохраняет общий public interactive demo и добавляет лимиты 20 партий/500 sessions, expired cleanup, owner-only reset, узкий production IAM operator, отдельный future deployer WIF и 7/30-дневный lifetime с двухфазным teardown. Решение — [[0008-bounded-public-demo-operations|ADR-0008]], runbook — [[deployment]]. Это code/config/plan qualification: `apply` и workflows не запускались, поэтому cloud resources, release image/SHA/digest manifest, фактические IAM/reset/Cloud Logging/proxy/Cloud SQL observations и hosted evidence отсутствуют. Stage progress не повышен без hosted evidence; результаты проверок — в [[quality-gates]].
+
+Этап 9 зафиксирован implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc). На 2026-09-05 через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): все 6 обязательных jobs успешны в каждом запуске для этого SHA. Автоматизация качества описана в [[test-strategy]], локальные результаты и полная матрица CI — в [[quality-gates]].
+
+Историческое закрытие этапа 8: frontend vertical slice зафиксирован implementation SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`; полный процесс 250 карточек, отдельная финальная приёмка, audit/payroll и clean-container проверены локально, [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) зелёные. Наглядный, неканонический обзор доступен в [project-dashboard.html](project-dashboard.html); он не заменяет актуальные канонические статусы плана/backlog.
 
 ## Происхождение и семантическая проверка
 

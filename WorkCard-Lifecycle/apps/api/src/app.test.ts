@@ -14,7 +14,7 @@ function readiness(database: 'up' | 'down', migrationVersion: number | null): Re
 }
 
 describe('health routes', () => {
-  it('отвечает liveness без зависимости от БД', async () => {
+  it('отвечает sanitized liveness без версии и зависимости от БД', async () => {
     const app = await buildApp({
       appVersion: 'test',
       readiness: readiness('down', null),
@@ -24,7 +24,8 @@ describe('health routes', () => {
     const response = await app.inject({ method: 'GET', url: '/health/live' });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: 'ok', service: 'work-card-api', version: 'test' });
+    expect(response.json()).toEqual({ status: 'ok' });
+    expect(response.body).not.toContain('test');
   });
 
   it('отправляет принятые browser security headers', async () => {
@@ -51,7 +52,7 @@ describe('health routes', () => {
     const response = await app.inject({ method: 'GET', url: '/health/ready' });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ status: 'ok', database: 'up', migrationVersion: 3 });
+    expect(response.json()).toEqual({ status: 'ok' });
   });
 
   it('возвращает 503 до готовности БД', async () => {
@@ -61,6 +62,18 @@ describe('health routes', () => {
     const response = await app.inject({ method: 'GET', url: '/health/ready' });
 
     expect(response.statusCode).toBe(503);
-    expect(response.json()).toMatchObject({ status: 'unavailable', database: 'down' });
+    expect(response.json()).toEqual({ status: 'unavailable' });
+    expect(response.body).not.toContain('migration');
+    expect(response.body).not.toContain('database');
+  });
+
+  it('возвращает 503 без раскрытия номера отставшей migration', async () => {
+    const app = await buildApp({ appVersion: 'test', readiness: readiness('up', 2) });
+    apps.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/health/ready' });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ status: 'unavailable' });
   });
 });

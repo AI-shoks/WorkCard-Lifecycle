@@ -535,6 +535,26 @@ describe('смена серверной роли в оболочке', () => {
     });
   }
 
+  it('до выбора роли предупреждает об общем состоянии и ежедневном сбросе', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === '/health/ready') return jsonResponse({ status: 'ok' });
+      if (path === '/api/v1/demo-users') {
+        return jsonResponse({ items: [master, worker, admin, planner] });
+      }
+      if (path === '/api/v1/demo-session') {
+        return jsonResponse({ code: 'AUTHENTICATION_REQUIRED' }, 401);
+      }
+      throw new Error(`Неожиданный запрос: ${path}`);
+    });
+
+    await render(<App />);
+
+    expect(container.textContent).toContain('Это общий контур');
+    expect(container.textContent).toContain('изменения видны другим посетителям');
+    expect(container.textContent).toContain('ежедневно сбрасываются');
+  });
+
   it('сохраняет выбор при отмене смены роли, а после подтверждения очищает его и применяет новую permission-проекцию', async () => {
     const switchResponse = deferred<Response>();
     configureApp(master, switchResponse.promise);

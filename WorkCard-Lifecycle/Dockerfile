@@ -17,7 +17,11 @@ RUN cp -R apps/web/dist /opt/work-card/public
 
 FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:774b7d020b24214835769e24c3544835526cd0288f0b094eae48e8b2c2429a79 AS runtime
 
+ARG APP_VERSION=0.1.0-dev
+LABEL org.opencontainers.image.revision="${APP_VERSION}"
+
 ENV APP_ENV=production \
+    APP_VERSION="${APP_VERSION}" \
     HOST=0.0.0.0 \
     NODE_ENV=production \
     PATH=/nodejs/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \

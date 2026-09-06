@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.system-context
 status: accepted
-version: 3
+version: 6
 owner: architecture
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # System Context
@@ -112,15 +112,16 @@ sequenceDiagram
 
 | Среда | Процессы | Данные |
 |---|---|---|
-| Local | Compose запускает `app` со SPA/API, `database` и одноразовые `migrate`/`seed`; host development использует отдельные Vite/API процессы | именованный Docker volume; допустим явный reset только командой разработчика |
+| Local | Compose запускает `app` со SPA/API, `database` и одноразовые `migrate`/`seed`; host development использует отдельные Vite/API процессы и явный `db:reset-demo` | именованный Docker volume; reset только командой разработчика |
 | CI | build/test jobs + чистая PostgreSQL service/container | ephemeral database на job |
-| Hosted demo | один OCI application container + managed PostgreSQL | migrations перед rollout, backup/restore определяются этапом 10 |
+| Hosted staging | Cloud Run service + отдельные `migrate`/`reset`/`seed`/`verify` jobs + Cloud SQL PostgreSQL 18 | отдельная синтетическая БД; exact digest и hosted smoke по [[deployment]] |
+| Hosted production | публичный Cloud Run service + owner-isolated jobs + отдельный Cloud SQL PostgreSQL 18 | общая mutable synthetic DB без tenant isolation, лимиты 20 партий/500 sessions, daily reset, backups/PITR и traffic rollback по [[deployment]] |
 
 ## Нефункциональные границы MVP
 
 - один регион и один экземпляр API достаточны; correctness не зависит от in-memory locks;
 - API stateless кроме подписанной/DB-backed demo-session;
-- нет broker, cache, WebSocket, offline mode или cron jobs;
+- нет broker, cache, WebSocket, offline mode или cron jobs; reset — явная job, scheduler/orchestration пока не реализованы;
 - список карточек использует cursor pagination, а не выдачу всех `250` rows по умолчанию;
 - health endpoints разделяют liveness и readiness;
 - системные UTC timestamps отображаются пользователю в локальной зоне браузера;
@@ -128,4 +129,4 @@ sequenceDiagram
 
 ## Граница готовности
 
-Backend-контейнеры, health checks и серверные модули реализованы на этапах 6–7; история их локальной и удалённой проверки приведена в [[quality-gates]]. Текущий frontend содержит связанные с API производственные экраны и команды этапа 8. Факт наличия кода не заменяет browser demo, текущий clean-container и CI для implementation SHA: состояние этих gates принадлежит [[backlog]]. Hosted TLS/network/operations относятся к этапу 10, поэтому схема hosted demo не является заявлением о production deployment.
+Backend-контейнеры, health checks и серверные модули реализованы на этапах 6–7; история их локальной и удалённой проверки приведена в [[quality-gates]]. Текущий frontend содержит связанные с API производственные экраны и команды этапа 8. Факт наличия кода не заменяет browser demo, текущий clean-container и CI для implementation SHA: состояние этих gates принадлежит [[backlog]]. [[0007-cloud-run-and-cloud-sql-release|ADR-0007]], [[0008-bounded-public-demo-operations|ADR-0008]], [[deployment]] и reviewable Terraform описывают hosted shape, IAM, reset/lifetime, backups/PITR и runtime resources. `apply` не выполнялся, поэтому TLS/network, фактические IAM/backups/reset/teardown и runtime behavior ещё требуют hosted evidence этапа 10; схема не является заявлением о production deployment.

@@ -1,9 +1,9 @@
 ---
 artifact_id: requirements.traceability
 status: accepted
-version: 5
+version: 6
 owner: requirements
-updated: 2026-07-17
+updated: 2026-09-05
 ---
 
 # Requirements Traceability
@@ -73,7 +73,7 @@ updated: 2026-07-17
 
 | Обязательство | Evidence | Decision | BR | UC | US | AC | Future Test |
 |---|---|---|---|---|---|---|---|
-| `112 → 3 комплекта → 250 карточек` | `ASIS-003` | `D-014`, `D-018` | `BR-012`–`BR-014` | `UC-002`, `UC-011` | `US-002`, `US-013` | `AC-BAT-002`, `AC-READ-002` | `T-API-FIXTURE-112-001` |
+| `112 → 3 комплекта → 250 карточек` | `N/A` — синтетический demo-fixture, не факт AS-IS | `D-014`, `D-018`, `D-024` | `BR-012`–`BR-014` | `UC-002`, `UC-011` | `US-002`, `US-013` | `AC-BAT-002`, `AC-READ-002` | `T-API-FIXTURE-112-001` |
 | Нет индивидуальной нумерации деталей | `ASIS-001`, `ASIS-002` | `D-014` | `BR-004`, `BR-014` | `UC-002`, `UC-011` | `US-013` | `AC-BAT-002`, `AC-READ-002` | `T-E2E-NO-SEQUENCE-001` |
 | Operation-scoped нормы | `ASIS-004` | `D-014`, `D-016` | `BR-011`, `BR-013`, `BR-015` | `UC-002`, `UC-007`, `UC-011` | `US-002`, `US-018` | `AC-BAT-002`, `AC-READ-002`, `AC-PAY-005` | `T-DOM-NORM-001`, `T-API-SNAPSHOT-001` |
 | Мастер ведёт и закрывает нормированные часы | `ASIS-007` | `D-017` | `BR-030`, `BR-031` | `UC-004` | `US-004`, `US-005` | `AC-LIF-001`, `AC-LIF-002`, `AC-AUT-002` | `T-API-MASTER-001`, `T-API-MASTER-002`, `T-API-WORKER-DENY-001`, `T-API-WORKER-DENY-002` |

@@ -70,10 +70,13 @@ services:
       APP_VERSION: ${APP_VERSION:-0.1.0}
       APP_ORIGIN: ${COMPOSE_APP_ORIGIN:-http://localhost:3000}
       DATABASE_URL: postgresql://${APP_DATABASE_USER:-workcard_app}:${APP_DATABASE_PASSWORD:-workcard_app_local}@database:5432/${POSTGRES_DB:-workcard}
+      DEMO_MAX_BATCHES: ${DEMO_MAX_BATCHES:-20}
+      DEMO_MAX_SESSIONS: ${DEMO_MAX_SESSIONS:-500}
       HOST: 0.0.0.0
       LOG_LEVEL: ${LOG_LEVEL:-info}
       NODE_ENV: production
       PORT: 3000
+      PROXY_TRUST_MODE: none
       SESSION_SIGNING_SECRET: ${SESSION_SIGNING_SECRET:-local-compose-session-secret-change-me}
       WEB_DIST_PATH: /opt/work-card/public
     ports:

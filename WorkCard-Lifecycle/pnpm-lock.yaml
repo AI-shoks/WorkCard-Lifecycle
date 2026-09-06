@@ -21,6 +21,12 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.20.0)
       eslint:
         specifier: 10.9.1
         version: 10.9.1
@@ -78,6 +84,9 @@ importers:
       pg:
         specifier: 8.23.0
         version: 8.23.0
+      pino:
+        specifier: 10.3.1
+        version: 10.3.1
     devDependencies:
       '@types/pg':
         specifier: 8.23.1

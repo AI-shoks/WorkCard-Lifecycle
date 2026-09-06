@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.audit-log
 status: accepted
-version: 1
+version: 2
 owner: architecture
-updated: 2026-09-01
+updated: 2026-09-06
 ---
 
 # Audit Log Design
@@ -88,7 +88,7 @@ Defense in depth:
 4. API не публикует mutation endpoint для истории.
 5. Migration/owner role отделена от runtime role и используется только в контролируемом migration job.
 
-MVP не реализует purge/retention. Для синтетического demo-набора события сохраняются бессрочно; production retention потребовала бы отдельного решения и экспорта evidence до удаления.
+В local/test audit живёт вместе с соответствующей demo-БД. В общем public production он является изменяемыми synthetic demo-данными и удаляется owner-only reset не реже одного раза в 24 часа вместе с aggregate/receipt/result rows. Reset идёт только после закрытия public access и drain, транзакционно проверяет пустые mutable tables и не удаляет reference fixtures. Backup/PITR может содержать прежнее состояние до 7 дней. Audit не является release evidence: manifests, IAM snapshots и hosted execution records хранятся отдельно и reset их не затрагивает. Tenant/archive/export architecture вне MVP по [[0008-bounded-public-demo-operations|ADR-0008]].
 
 ## История aggregate
 

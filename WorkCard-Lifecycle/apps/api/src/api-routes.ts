@@ -68,9 +68,13 @@ export async function registerApiRoutes(
   app: FastifyInstance,
   pool: Pool,
   security: SessionManagerOptions,
+  capacity: { maximumBatches: number; maximumSessions: number },
 ): Promise<void> {
-  const sessions = createSessionManager(pool, security);
-  const workflow = createWorkflowService(pool);
+  const sessions = createSessionManager(pool, {
+    ...security,
+    maximumSessions: capacity.maximumSessions,
+  });
+  const workflow = createWorkflowService(pool, capacity.maximumBatches);
   const requestSessions = new WeakMap<object, AuthenticatedSession>();
 
   const sessionFor = (request: object): AuthenticatedSession => {

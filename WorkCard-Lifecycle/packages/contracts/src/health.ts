@@ -3,8 +3,6 @@ import { Type, type Static } from '@sinclair/typebox';
 export const LivenessResponseSchema = Type.Object(
   {
     status: Type.Literal('ok'),
-    service: Type.Literal('work-card-api'),
-    version: Type.String({ minLength: 1 }),
   },
   { additionalProperties: false },
 );
@@ -14,9 +12,6 @@ export type LivenessResponse = Static<typeof LivenessResponseSchema>;
 export const ReadinessResponseSchema = Type.Object(
   {
     status: Type.Union([Type.Literal('ok'), Type.Literal('unavailable')]),
-    database: Type.Union([Type.Literal('up'), Type.Literal('down')]),
-    migrationVersion: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
-    expectedMigrationVersion: Type.Integer({ minimum: 1 }),
   },
   { additionalProperties: false },
 );

@@ -6,6 +6,9 @@ import { Client } from 'pg';
 
 import { loadVerificationConfig } from './config.js';
 import { demoOperations, demoPassport, demoUsers } from './demo-fixtures.js';
+import { createProcessLogger } from './runtime-protection.js';
+
+const logger = createProcessLogger('verify');
 
 function postgresErrorCode(error: unknown): string | undefined {
   if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
@@ -124,6 +127,7 @@ async function verifyBackendSchema(client: Client): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  logger.info({ outcome: 'started', phase: 'verification' }, 'database verification started');
   const config = loadVerificationConfig();
   const client = new Client({ connectionString: config.databaseUrl });
 
@@ -132,14 +136,13 @@ async function main(): Promise<void> {
     await verifyReadModel(client, config.appDatabaseUser);
     await verifyReadOnlyRole(client);
     await verifyBackendSchema(client);
-    console.info('Схема backend slice, синтетические данные и права runtime-роли проверены.');
+    logger.info({ outcome: 'succeeded', phase: 'verification' }, 'database verification succeeded');
   } finally {
     await client.end();
   }
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : 'Неизвестная ошибка проверки БД.';
-  console.error(message);
+main().catch(() => {
+  logger.error({ outcome: 'failed', phase: 'verification' }, 'database verification failed');
   process.exitCode = 1;
 });

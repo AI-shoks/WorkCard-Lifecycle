@@ -6,9 +6,9 @@ tags:
   - case-study
   - workcard
 status: active
-version: 9
+version: 17
 owner: navigation
-updated: 2026-09-02
+updated: 2026-09-06
 ---
 
 # Production Work Card Workflow
@@ -17,15 +17,22 @@ updated: 2026-09-02
 
 ## Сейчас
 
-**Этапы 1–6 выполнены; backend vertical slice этапа 7 реализован локально и находится на проверке.** API и PostgreSQL проводят полный компактный сценарий независимо от UI, а отдельный масштабный тест подтверждает выпуск `3 / 250 / 254`. Следующая контрольная точка — удалённые CI jobs для будущего commit SHA; frontend-этап ещё не начат.
+**Этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7:** [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment|релизный runbook]] дополнили прежний release design локальным IAM/demo hardening: общий public interactive режим ограничен 20 партиями/500 sessions, получил owner-only reset, узкий deployer IAM/WIF и 7/30-дневный lifetime с двухфазным teardown. Terraform review-plan содержит `166/0/0`. Это локальная code/config/plan проверка, а не hosted qualification: `apply`/workflows не запускались, cloud resources, image/manifest, реальные IAM/reset/proxy/socket/logging observations и staging evidence отсутствуют. Implementation SHA этапа 9 [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) подтверждён только прежними [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850); текущие незакоммиченные изменения удалённо не запускались. Локальные результаты и ограничения — [[quality-gates]].
 
-**Последняя локальная проверка:** format, lint, typecheck, 11 обычных тестов, 5 DB integration tests, production build, clean-container текущего checkout и migration/seed/verify — PASS. Удалённый зелёный run относится к `d0ecc812`; текущий незакоммиченный diff в CI ещё не запускался.
+### Подтверждения предыдущих этапов
+
+**Этап 7 закрыт implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1).** API и PostgreSQL проводят полный компактный сценарий независимо от UI, а отдельный масштабный тест подтверждает выпуск `3 / 250 / 254`.
+
+**Подтверждено 2026-09-02:** format, lint, typecheck, 11 обычных тестов, 5 DB integration tests, production build, clean-container и migration/seed/verify — PASS. Для implementation SHA полностью зелёные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041): в обоих запусках успешны `Code and database quality` и `Clean container startup`.
+
+**Этап 8 закрыт 2026-09-05:** SHA [`b00ff294a7b7ce1e09379c088969d9a02bd033bf`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf), успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414), по 2/2 jobs `quality`/`container`. Исторические локальные результаты: 157 frontend, 9 обычных API и 5 PostgreSQL integration tests, полный браузерный процесс `112 → 3 → 250`, отдельная финальная приёмка, audit `254/254`, единственный payroll, desktop/mobile и clean-container — PASS.
 
 ## Репозиторий
 
 - [Repository](https://github.com/AI-shoks/WorkCard-Lifecycle)
 - [Наглядная карта проекта](docs/project-dashboard.html)
 - [README](README.md)
+- [Reviewable Terraform](infra/terraform/README.md)
 - [[project-plan|Канонический roadmap]]
 - [[backlog|Backlog]]
 - [[decision-log|Журнал решений]]
@@ -76,4 +83,5 @@ updated: 2026-09-02
 - [[screen-map]]
 - [[user-flows]]
 - [[test-strategy]]
+- [[deployment]]
 - [[demo-script]]

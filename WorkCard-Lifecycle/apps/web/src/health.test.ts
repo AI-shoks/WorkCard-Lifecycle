@@ -4,14 +4,10 @@ import { toReadinessView } from './health.js';
 
 describe('toReadinessView', () => {
   it('показывает готовую среду только после backend readiness', () => {
-    expect(
-      toReadinessView({
-        status: 'ok',
-        database: 'up',
-        migrationVersion: 1,
-        expectedMigrationVersion: 1,
-      }),
-    ).toEqual({ tone: 'ready', label: 'Среда готова' });
+    expect(toReadinessView({ status: 'ok' })).toEqual({
+      tone: 'ready',
+      label: 'Среда готова',
+    });
   });
 
   it('не заявляет готовность без подтверждения backend', () => {

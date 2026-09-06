@@ -1454,14 +1454,14 @@
 
         <div class="sidebar-note">
           <span class="label">Срез состояния</span>
-          <strong>2 сентября 2026</strong>
-          <p>Локальная ревизия с незавершёнными изменениями серверного этапа.</p>
+          <strong>6 сентября 2026</strong>
+          <p>Этапы 1–9 закрыты. Этап 10 «Релиз» в работе: design, reviewable Terraform и release-image workflow готовы, deployment ещё нет.</p>
         </div>
       </aside>
 
       <main>
         <div class="topbar">
-          <span class="live-state">Этап 7 находится на проверке</span>
+          <span class="live-state">Этапы 1–9 закрыты · этап 10 в работе · IaC без apply</span>
           <div class="toolbar" aria-label="Настройки отображения">
             <button class="icon-button" id="theme-toggle" type="button" aria-label="Переключить цветовую тему" title="Переключить тему">◐</button>
             <button class="icon-button" id="print-button" type="button" aria-label="Распечатать или сохранить в PDF" title="Печать / PDF">⇩</button>
@@ -1482,35 +1482,35 @@
             <div class="hero-grid">
               <article class="current-stage">
                 <div class="stage-topline">
-                  <span class="stage-kicker">● Сейчас на проверке</span>
-                  <span class="stage-number">Этап 7 из дорожной карты 0–12</span>
+                  <span class="stage-kicker">● Этап 10 в работе</span>
+                  <span class="stage-number">Релиз — этап 10 из дорожной карты 0–12</span>
                 </div>
-                <h2>Серверный сценарий и локальный контейнер проверены. Ждём CI нового SHA.</h2>
+                <h2>Runtime pre-deploy controls готовы. Облачные ресурсы ещё не созданы.</h2>
                 <p>
-                  Масштабный тест подтверждает выпуск 3 комплектов, 250 карточек и 254 связанных события, а компактный API-only сценарий проходит контроль первой детали, серию, финальную приёмку, аудит и демонстрационную передачу нормо-часов. Текущий checkout также пересобран и запущен локально; до закрытия этапа нужны зелёные jobs именно для будущего commit SHA.
+                  Полный браузерный процесс подтверждён для implementation SHA <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc"><code>3ee6570</code></a>. На этапе 10 Terraform описывает 166 resource changes; локальный hardening добавляет bounded shared demo, owner-only reset, узкий production IAM operator, отдельный deployer WIF и teardown guards. `apply` и workflows не запускались, поэтому registry и hosted IAM/reset/proxy/socket/logging evidence отсутствуют.
                 </p>
                 <div class="progress-labels">
-                  <span>7 этапов завершено</span>
-                  <span>1 проверяется</span>
-                  <span>5 впереди</span>
+                  <span>10 этапов завершено, включая этап 0</span>
+                  <span>Этап 10 — в работе, 4/7 задач</span>
+                  <span>2 после него</span>
                 </div>
-                <div class="segmented-progress" role="img" aria-label="Из 13 этапов 7 завершены, 1 на проверке, 5 не начаты">
-                  <span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment current"></span><span class="segment"></span><span class="segment"></span><span class="segment"></span><span class="segment"></span><span class="segment"></span>
+                <div class="segmented-progress" role="img" aria-label="Из 13 этапов завершены 10, включая этап 0; этап 10 в работе, этапы 11–12 не начаты">
+                  <span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment current"></span><span class="segment"></span><span class="segment"></span>
                 </div>
               </article>
 
               <aside class="next-gate">
-                <span class="gate-icon" aria-hidden="true">7→8</span>
+                <span class="gate-icon" aria-hidden="true">10</span>
                 <h3>Ближайшая контрольная точка</h3>
-                <p>Отправить текущую серверную ревизию в удалённый CI и подтвердить сборку и запуск всего контура с чистого окружения.</p>
-                <p class="small-note">После этого начинается браузерный интерфейс, связанный с реальным API.</p>
+                <p>Реализовать hosted smoke runner и получить clean staging evidence для одного exact digest.</p>
+                <p class="small-note">Runtime controls локально проверены, но фактические Cloud Run proxy chain, Cloud Logging ingestion и Cloud SQL socket connection ещё не квалифицированы.</p>
               </aside>
             </div>
 
             <div class="metrics-grid" aria-label="Ключевые показатели проекта">
-              <article class="metric-card"><strong class="accent">7</strong><span>этапов полностью завершены</span></article>
-              <article class="metric-card"><strong class="amber">1</strong><span>этап реализован и проходит проверку</span></article>
-              <article class="metric-card"><strong class="cyan">55</strong><span>документов прошли структурный аудит без ошибок</span></article>
+              <article class="metric-card"><strong class="accent">10</strong><span>этапов завершены, включая инициализацию 0</span></article>
+              <article class="metric-card"><strong class="amber">10</strong><span>этап релиза в работе</span></article>
+              <article class="metric-card"><strong class="cyan">56</strong><span>документов прошли строгий аудит без ошибок и предупреждений</span></article>
               <article class="metric-card"><strong class="blue">23</strong><span>маршрута серверного сценария и demo-сессии</span></article>
             </div>
           </section>
@@ -1548,7 +1548,7 @@
                 <h3>Что такое рабочая карточка в этом проекте?</h3>
               </div>
               <p>
-                Это цифровая запись конкретного объёма работы внутри производственной операции. Она знает свою операцию, норму, исполнителя и состояние, но не притворяется серийным номером физической детали. Несколько комплектов карточек могут относиться к одной партии, поэтому у партии из 112 изделий в демонстрации получается 250 карточек.
+                Это цифровая запись конкретного объёма работы внутри производственной операции. Она знает свою операцию, норму, исполнителя и состояние, но не притворяется серийным номером физической детали. Несколько комплектов карточек могут относиться к одной партии. В проекте это показано на условном синтетическом сценарии: партия из 112 изделий, три комплекта и 250 карточек. Это соотношение не является наблюдением реального производства.
               </p>
             </div>
 
@@ -1576,7 +1576,7 @@
             <div class="filters" role="group" aria-label="Фильтр этапов">
               <button class="filter-button" type="button" data-filter="all" aria-pressed="true">Все 13</button>
               <button class="filter-button" type="button" data-filter="done" aria-pressed="false">Завершены</button>
-              <button class="filter-button" type="button" data-filter="current" aria-pressed="false">Сейчас</button>
+              <button class="filter-button" type="button" data-filter="current" aria-pressed="false">Следующий</button>
               <button class="filter-button" type="button" data-filter="planned" aria-pressed="false">Впереди</button>
             </div>
 
@@ -1588,17 +1588,17 @@
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">4</span><div class="roadmap-body"><h3>Проектирование опыта</h3><p class="roadmap-question">Как человек пройдёт процесс в браузере?</p><p class="roadmap-result"><strong>Результат:</strong> карта 7 экранов и проходимый 14-шаговый интерактивный прототип.</p></div><span class="chip done">Завершено</span></article>
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">5</span><div class="roadmap-body"><h3>Техническая архитектура</h3><p class="roadmap-question">Как разделить интерфейс, правила, данные и доверие?</p><p class="roadmap-result"><strong>Результат:</strong> системный контекст, модель данных, API, безопасность, транзакции и 6 ADR.</p></div><span class="chip done">Завершено</span></article>
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">6</span><div class="roadmap-body"><h3>Инженерный фундамент</h3><p class="roadmap-question">Как сделать проект собираемым и воспроизводимым?</p><p class="roadmap-result"><strong>Результат:</strong> monorepo, React-оболочка, Fastify, PostgreSQL, миграции, Docker и CI.</p></div><span class="chip done">Завершено</span></article>
-              <article class="roadmap-card current" data-status="current"><span class="roadmap-no">7</span><div class="roadmap-body"><h3>Серверный вертикальный срез</h3><p class="roadmap-question">Работают ли ключевые правила независимо от интерфейса?</p><p class="roadmap-result"><strong>Результат:</strong> код, интеграционные тесты и local clean-container готовы; осталось получить CI для нового SHA.</p></div><span class="chip current">На проверке</span></article>
-              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">8</span><div class="roadmap-body"><h3>Браузерный вертикальный срез</h3><p class="roadmap-question">Может ли пользователь пройти сценарий через реальный API?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> роли, 7 экранов, таблицы, массовые действия, история и обработка конфликтов.</p></div><span class="chip planned">Не начато</span></article>
-              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">9</span><div class="roadmap-body"><h3>Качество</h3><p class="roadmap-question">Защищены ли критические правила на всех уровнях?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> браузерный E2E, проверки безопасности, миграций, производительности и мобильного интерфейса.</p></div><span class="chip planned">Не начато</span></article>
-              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">10</span><div class="roadmap-body"><h3>Релиз</h3><p class="roadmap-question">Можно ли воспроизводимо развернуть и наблюдать приложение?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> staging/production, health checks, логи, миграции и запуск с чистого окружения.</p></div><span class="chip planned">Не начато</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">7</span><div class="roadmap-body"><h3>Серверный вертикальный срез</h3><p class="roadmap-question">Работают ли ключевые правила независимо от интерфейса?</p><p class="roadmap-result"><strong>Результат:</strong> implementation SHA прошёл интеграционные тесты, local clean-container, push CI и PR CI.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">8</span><div class="roadmap-body"><h3>Браузерный вертикальный срез</h3><p class="roadmap-question">Может ли пользователь пройти сценарий через реальный API?</p><p class="roadmap-result"><strong>Результат:</strong> 7 ролевых экранов и полный процесс 250 карточек; <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf">b00ff294</a>, <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130">push</a> / <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414">PR CI</a> — 2/2.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">9</span><div class="roadmap-body"><h3>Качество</h3><p class="roadmap-question">Защищены ли критические правила на всех уровнях?</p><p class="roadmap-result"><strong>Результат:</strong> браузерные, PostgreSQL, security/performance проверки; <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc">3ee6570</a>, <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850">push</a> / <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850">PR CI</a> — 6/6.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card current" data-status="current"><span class="roadmap-no">10</span><div class="roadmap-body"><h3>Релиз</h3><p class="roadmap-question">Можно ли воспроизводимо развернуть и наблюдать приложение?</p><p class="roadmap-result"><strong>В работе:</strong> release design, reviewable Terraform, release-image workflow и runtime pre-deploy controls с IAM/demo hardening приняты локально; provisioning, staging/production и hosted evidence ещё впереди.</p></div><span class="chip current">В работе · 4/7 задач</span></article>
               <article class="roadmap-card" data-status="planned"><span class="roadmap-no">11</span><div class="roadmap-body"><h3>Упаковка портфолио</h3><p class="roadmap-question">Поймёт ли работодатель ценность и глубину работы?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> ясный README, демонстрационный сценарий, изображения, ограничения и ретроспектива.</p></div><span class="chip planned">Не начато</span></article>
               <article class="roadmap-card" data-status="planned"><span class="roadmap-no">12</span><div class="roadmap-body"><h3>Финальный аудит</h3><p class="roadmap-question">Соответствуют ли обещания реальному результату?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> проверены scope, документация, тесты, воспроизводимость и честность демонстрации.</p></div><span class="chip planned">Не начато</span></article>
             </div>
 
             <div class="checkpoint">
               <article class="panel checkpoint-card">
-                <p class="eyebrow">Что уже доказано на этапе 7</p>
+                <p class="eyebrow">Исторический результат этапа 7</p>
                 <h3>Сервер имеет два взаимодополняющих доказательства</h3>
                 <ul class="check-list">
                   <li>Доверенные demo-роли и права на все 9 команд.</li>
@@ -1609,12 +1609,12 @@
                 </ul>
               </article>
               <article class="panel checkpoint-card">
-                <p class="eyebrow">Что отделяет этап 7 от «готово»</p>
-                <h3>Один внешний gate для текущей ревизии</h3>
+                <p class="eyebrow">Историческое закрытие этапа 7 · 02.09.2026</p>
+                <h3>Один implementation SHA и два зелёных CI runs</h3>
                 <ul class="next-list">
-                  <li>Зафиксировать текущие локальные изменения в отдельной ревизии.</li>
-                  <li>Запустить удалённые code/database и clean-container jobs.</li>
-                  <li>Закрыть этап только после зелёного запуска контейнера и health checks.</li>
+                  <li><a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1">Implementation commit 17d2b04</a>.</li>
+                  <li><a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867">Push CI</a>: code/database quality и clean-container — success.</li>
+                  <li><a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041">PR CI</a>: code/database quality и clean-container — success.</li>
                 </ul>
               </article>
             </div>
@@ -1638,10 +1638,10 @@
               </article>
               <div class="flow-arrow" aria-hidden="true">→</div>
               <article class="architecture-card">
-                <span class="tag partial">Пока оболочка</span>
+                <span class="tag actual">Этап 8 завершён</span>
                 <h3>Браузерный интерфейс</h3>
-                <p>React SPA должна показать партии, комплекты, карточки, массовые действия, историю и восстановление после конфликта.</p>
-                <ul><li>Текущая реализация: health-экран</li><li>Целевой UI: 7 маршрутов</li><li>Полный этап начинается после этапа 7</li></ul>
+                <p>React SPA показывает партии, комплекты, карточки, массовые действия, историю и восстановление после конфликта.</p>
+                <ul><li>Реальный API и серверная сессия</li><li>7 ролевых маршрутов</li><li>250 карточек пройдены через UI</li></ul>
               </article>
               <div class="flow-arrow" aria-hidden="true">→</div>
               <article class="architecture-card">
@@ -1687,10 +1687,10 @@
                 <div class="tree" aria-label="Дерево каталогов"><span class="folder">WorkCard-Lifecycle/</span>
 ├─ <span class="folder">apps/</span>
 │  ├─ <span class="folder">api/</span>        <span class="done">● серверный срез</span>
-│  └─ <span class="folder">web/</span>        <span class="partial">● только оболочка</span>
+│  └─ <span class="folder">web/</span>        <span class="done">● браузерный срез</span>
 ├─ <span class="folder">packages/</span>
 │  └─ <span class="folder">contracts/</span>  <span class="done">● общие схемы</span>
-├─ <span class="folder">docs/</span>           <span class="done">● 55 документов</span>
+├─ <span class="folder">docs/</span>           <span class="done">● 56 документов</span>
 ├─ <span class="folder">scripts/</span>        <span class="done">● UX-аудит</span>
 ├─ <span class="file">compose.yaml</span>      <span class="done">● локальный контур</span>
 ├─ <span class="file">Dockerfile</span>        <span class="done">● production-образ</span>
@@ -1700,11 +1700,11 @@
               <article class="panel structure-notes">
                 <h3>Ответственность частей</h3>
                 <div class="structure-list">
-                  <div class="structure-item"><span class="structure-icon">WEB</span><div><strong>apps/web</strong><span>React + Vite. Сейчас проверяет готовность API; полный производственный интерфейс относится к этапу 8.</span></div><span class="chip current">Частично</span></div>
+                  <div class="structure-item"><span class="structure-icon">WEB</span><div><strong>apps/web</strong><span>React + Vite. Ролевые экраны, команды через реальный API, контрольное чтение и восстановление после конфликтов.</span></div><span class="chip done">Этап 8 закрыт</span></div>
                   <div class="structure-item"><span class="structure-icon">API</span><div><strong>apps/api</strong><span>HTTP-маршруты, demo-сессия, предметный сервис, миграции, seed и проверка базы.</span></div><span class="chip done">Готово локально</span></div>
                   <div class="structure-item"><span class="structure-icon">TYP</span><div><strong>packages/contracts</strong><span>TypeBox-схемы и TypeScript-типы, одинаково понимаемые интерфейсом и сервером.</span></div><span class="chip done">Реализовано</span></div>
                   <div class="structure-item"><span class="structure-icon">DOC</span><div><strong>docs</strong><span>Продукт, предметная область, требования, UX, архитектура, инженерия, тестирование и план.</span></div><span class="chip done">Принято</span></div>
-                  <div class="structure-item"><span class="structure-icon">OPS</span><div><strong>Docker + CI</strong><span>Чистый PostgreSQL, сборка приложения, health checks и автоматические проверки.</span></div><span class="chip current">Локально готово; ждёт CI</span></div>
+                  <div class="structure-item"><span class="structure-icon">OPS</span><div><strong>Docker + CI</strong><span>Чистый PostgreSQL, сборка приложения, health checks и автоматические проверки.</span></div><span class="chip done">CI подтверждён</span></div>
                 </div>
               </article>
             </div>
@@ -1737,17 +1737,19 @@
                 <p class="eyebrow">На чём основан статус</p>
                 <h2 id="quality-title">Доказательства готовности</h2>
               </div>
-              <p>Зелёный статус означает проверенный результат. Жёлтый — реализация есть, но финальное доказательство текущей ревизии ещё не получено. Серый — этап не начинался.</p>
+              <p>Зелёный статус означает проверенный результат. Жёлтый показывает следующий этап, который ещё не начат. Серый — последующие этапы дорожной карты.</p>
             </div>
 
             <div class="evidence-grid">
-              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено</span><span class="evidence-value">55 / 0 / 0</span></div><h3>Документация</h3><p>55 документов, 0 структурных ошибок и 0 предупреждений. Дополнительно выполнена смысловая сверка ключевых решений.</p></article>
-              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено локально</span><span class="evidence-value">11 + 5</span></div><h3>Автоматические тесты</h3><p>11 обычных и 5 PostgreSQL integration tests покрывают порядок защиты routes, роли, инварианты, конфликты, масштабный выпуск и компактный API-only workflow.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено</span><span class="evidence-value">56 / 0 / 0</span></div><h3>Документация</h3><p>56 документов, 0 структурных ошибок и 0 предупреждений. Дополнительно выполнена смысловая сверка runtime contracts и границы hosted evidence.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этап 7 · история</span><span class="evidence-value">11 + 5</span></div><h3>Серверные тесты на 02.09.2026</h3><p>11 обычных и 5 PostgreSQL integration tests покрывают порядок защиты routes, роли, инварианты, конфликты, масштабный выпуск и компактный API-only workflow. SHA и CI этапа 7 сохранены выше.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этап 9 · пройдено</span><span class="evidence-value">157 + 25</span></div><h3>Локальные тесты этапа 9</h3><p>157 frontend, 10 обычных API, 5 PostgreSQL integration и 10 новых PostgreSQL regression tests — PASS. Условия и границы результатов сохранены в <a href="engineering/quality-gates.md">проверках качества</a>.</p></article>
               <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено локально</span><span class="evidence-value">3</span></div><h3>Миграции базы</h3><p>Чистая база применяет миграции 0001–0003, повторный seed и runtime verification.</p></article>
-              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено локально</span><span class="evidence-value">Compose ✓</span></div><h3>Текущий checkout</h3><p>Основной стек пересобран с сохранением volume; отдельный clean-container smoke подтвердил образ, новую базу, SPA, health и API routes.</p></article>
-              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Зелёный baseline</span><span class="evidence-value">CI ✓</span></div><h3>Последняя отправленная ревизия</h3><p>Quality и clean-container jobs для commit d0ecc812 завершились успешно 2 сентября 2026 года.</p></article>
-              <article class="evidence-card pending"><div class="evidence-top"><span class="chip current">Нужна проверка</span><span class="evidence-value">CI ?</span></div><h3>Текущий серверный diff</h3><p>Локальная реализация этапа 7 новее зелёного baseline. Именно она ещё должна пройти удалённые quality/database и clean-container jobs.</p></article>
-              <article class="evidence-card future"><div class="evidence-top"><span class="chip planned">Впереди</span><span class="evidence-value">E2E —</span></div><h3>Браузерный сценарий</h3><p>Связанный интерфейс, desktop/mobile проверка и Playwright E2E относятся к этапам 8–9.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этап 7 · история</span><span class="evidence-value">Compose ✓</span></div><h3>Контейнер на 02.09.2026</h3><p>Основной стек пересобран с сохранением volume; отдельный clean-container smoke подтвердил образ, новую базу, SPA, health и API routes.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Push CI · этап 9</span><span class="evidence-value">6 / 6</span></div><h3>Проверка implementation SHA</h3><p><a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850">Run 33970654850</a>: quality, container с image scan, security, browser (compact), browser (canonical), performance — success для <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc">3ee6570</a>.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">PR CI · этап 9</span><span class="evidence-value">6 / 6</span></div><h3>Проверка pull request</h3><p><a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850">Run 33970656850</a>: quality, container с image scan, security, browser (compact), browser (canonical), performance — success для того же SHA <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc">3ee6570</a>.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этапы 8–9 · пройдено</span><span class="evidence-value">6 / 250</span></div><h3>Браузерный сценарий</h3><p>Compact Playwright: 6 карточек на desktop/mobile. Canonical: 250 закрытых карточек, отдельная финальная приёмка, audit 254, один payroll и восстановление после конфликтов/потери ответа.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этап 8 · история</span><span class="evidence-value">2 / 2</span></div><h3>Закрытие frontend на 05.09.2026</h3><p>SHA <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf">b00ff294a7b7ce1e09379c088969d9a02bd033bf</a>: <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130">push CI</a> и <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414">PR CI</a> подтвердили quality/container. Локально: 157 frontend, 9 API, 5 PostgreSQL integration tests, полный браузерный процесс и clean-container — PASS.</p></article>
             </div>
 
             <div class="analysis-grid">
@@ -1765,10 +1767,10 @@
                 <p class="eyebrow">Риски и разрывы</p>
                 <h3>Что важно не потерять дальше</h3>
                 <ul>
-                  <li><strong>Интерфейс пока не доказывает сценарий:</strong> apps/web остаётся health-оболочкой.</li>
+                  <li><strong>Релиз ещё не выполнен:</strong> design, Terraform plan и workflow code готовы, но `apply`, manual image publish и hosted smoke не запускались.</li>
                   <li><strong>Большой workflow-service:</strong> около 2,2 тыс. строк уже требуют дисциплины модульных границ при росте.</li>
-                  <li><strong>Целевая архитектура шире текущих зависимостей:</strong> Router, Query и ORM описаны, но пока не подключены.</li>
-                  <li><strong>Текущий код не прошёл удалённый контейнер:</strong> локальный Compose зелёный, но remote CI относится к baseline до серверного среза.</li>
+                  <li><strong>Граница performance-проверки:</strong> профиль 10 000 карточек пройден; длительная production-нагрузка и бизнес-SLA им не подтверждаются.</li>
+                  <li><strong>Runtime GitHub Actions:</strong> maintenance item для setup-node/pnpm закрыт в этапе 9; закреплённые actions с Node.js 24 подтверждены обоими CI runs.</li>
                 </ul>
               </article>
             </div>
@@ -1780,14 +1782,14 @@
                 <p class="eyebrow">Маршрут к готовому MVP</p>
                 <h2 id="next-title">Что делать дальше</h2>
               </div>
-              <p>Порядок сохраняет доказательность: сначала подтверждаем уже написанный сервер, затем строим пользовательский путь поверх стабильного API.</p>
+              <p>Этапы 1–9 закрыты. Этап 10 «Релиз» в работе на 4/7: завершены design, reviewable IaC, release-image workflow и runtime pre-deploy controls с локальным IAM/demo hardening; затем остаются provisioning/hosted evidence, production promotion и финальная синхронизация evidence.</p>
             </div>
 
             <div class="next-actions">
-              <article class="result-card"><span class="action-no">ШАГ 01</span><h3>Закрыть этап 7</h3><p>Отправить текущую ревизию и дождаться зелёных quality/database и clean-container jobs.</p><p class="definition">Готово, когда текущий commit запускается с чистого окружения.</p></article>
-              <article class="result-card"><span class="action-no">ШАГ 02</span><h3>Собрать интерфейс</h3><p>Связать 7 спроектированных экранов с реальным API и пройти основной сценарий по ролям.</p><p class="definition">Готово, когда процесс выполняется в браузере без ручной правки данных.</p></article>
-              <article class="result-card"><span class="action-no">ШАГ 03</span><h3>Защитить E2E</h3><p>Добавить браузерные проверки, конфликтные состояния, mobile layout и критические security/performance gates.</p><p class="definition">Готово, когда ключевые сбои воспроизводимо ловят тесты.</p></article>
-              <article class="result-card"><span class="action-no">ШАГ 04</span><h3>Развернуть и упаковать</h3><p>Подготовить release, demo script, изображения, ограничения и финальный честный аудит.</p><p class="definition">Готово, когда незнакомый человек понимает ценность и может повторить демонстрацию.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 01</span><h3>Квалифицировать staging</h3><p>Реализовать hosted smoke runner без DB/owner credentials и пройти clean staging для одного exact digest.</p><p class="definition">Готово, когда реальные proxy/socket/logging observations сохранены как staging evidence.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 02</span><h3>Подтвердить релизный контур</h3><p>После отдельного разрешения создать foundation, опубликовать exact digest и выполнить clean staging jobs/smoke.</p><p class="definition">Готово, когда фактические digest, revision и smoke evidence совпадают.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 03</span><h3>Упаковать портфолио · этап 11</h3><p>Подготовить README, диаграммы, demo script, изображения, ограничения и ретроспективу.</p><p class="definition">Статус: не начат; следует после релиза.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 04</span><h3>Финальный аудит · этап 12</h3><p>Сверить scope, критерии готовности, документацию и воспроизводимость демонстрации.</p><p class="definition">Статус: не начат; завершает дорожную карту.</p></article>
             </div>
 
             <div class="boundary-box">
@@ -1806,13 +1808,15 @@
               <a href="engineering/repository-structure.md">Структура репозитория</a>
               <a href="engineering/quality-gates.md">Проверки качества</a>
               <a href="ux/prototype.html">14-шаговый прототип</a>
-              <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33567116785">Последний зелёный CI baseline</a>
+              <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc">Implementation SHA этапа 9 · 3ee6570</a>
+              <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850">Push CI этапа 9 · 6/6</a>
+              <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850">PR CI этапа 9 · 6/6</a>
             </div>
           </section>
 
           <footer>
             <span>Production Work Card Workflow · независимый portfolio case study</span>
-            <span>Срез собран по рабочему дереву и документации на 02.09.2026</span>
+            <span>Срез на 05.09.2026: этап 9, implementation SHA 3ee6570, push/PR CI 6/6</span>
           </footer>
         </div>
       </main>
@@ -1865,11 +1869,13 @@
       });
 
       const summary = [
-        'Production Work Card Workflow — статус на 02.09.2026.',
-        'Завершены этапы 0–6.',
-        'Этап 7: серверный vertical slice реализован локально и находится на проверке.',
-        'Local clean-container текущего checkout прошёл; следующий gate — зелёные CI jobs для нового commit SHA.',
-        'После него: этап 8 — браузерный интерфейс, связанный с реальным API.',
+        'Production Work Card Workflow — статус на 05.09.2026.',
+        'Закрыты этапы 1–9 и инициализация 0.',
+        'Этап 9: implementation SHA 3ee65709966f5775928de87783fd2946d085e2bc подтверждён локально, push CI и PR CI.',
+        'Все 6 обязательных jobs успешны в каждом запуске: quality, container с image scan, security, browser (compact), browser (canonical), performance.',
+        'Push CI: https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850.',
+        'PR CI: https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850.',
+        'Этап 10 «Релиз» в работе на 4/7: release design, reviewable Terraform, release-image workflow и runtime pre-deploy controls готовы; apply, workflow run и hosted deployment не выполнялись.',
       ].join(' ');
 
       copyButton.addEventListener('click', async () => {

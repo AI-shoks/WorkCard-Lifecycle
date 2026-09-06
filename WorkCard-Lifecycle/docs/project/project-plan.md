@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 15
+version: 22
 owner: project
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Project Plan
@@ -19,6 +19,8 @@ updated: 2026-09-05
 
 ## Прогресс
 
+**На 2026-09-06 этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7: runtime pre-deploy controls и IAM/demo hardening реализованы и локально проверены после design/IaC/workflow, но фактического deployment и hosted qualification ещё нет.**
+
 | № | Этап | Статус | Результат |
 |---:|---|---|---|
 | 0 | Инициализация | `[x]` выполнено | Проект имеет управляемую структуру |
@@ -30,8 +32,8 @@ updated: 2026-09-05
 | 6 | Инженерный фундамент | `[x]` выполнено | Созданы monorepo, БД bootstrap, контейнерный runtime и CI |
 | 7 | Backend vertical slice | `[x]` выполнено | Код, DB integration, local clean-container и CI implementation SHA подтверждены |
 | 8 | Frontend vertical slice | `[x]` выполнено | Полный браузерный процесс, clean-container и CI подтверждены для `b00ff294…` |
-| 9 | Качество | `[-]` в работе | Реализация и локальные gates готовы; commit/push разрешены, ожидаются CI нового SHA |
-| 10 | Релиз | `[ ]` не начато | Проект воспроизводимо разворачивается |
+| 9 | Качество | `[x]` выполнено | SHA `3ee65709966f5775928de87783fd2946d085e2bc`: все 6 обязательных jobs успешны в push и PR; ссылки ниже |
+| 10 | Релиз | `[-]` в работе, 4/7 | Design, IaC, release-image workflow, runtime controls и локальный IAM/demo hardening приняты; provisioning/hosted evidence ещё нет |
 | 11 | Упаковка портфолио | `[ ]` не начато | Ценность и глубина проекта понятны работодателю |
 | 12 | Финальный аудит | `[ ]` не начато | Результат готов к честной демонстрации |
 
@@ -89,21 +91,23 @@ updated: 2026-09-05
 
 **Этап 8 закрыт, 2026-09-05:** implementation SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`; [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) имеют успешные `quality` и `container` для этого SHA. Локально подтверждены clean-container без кэша на новом томе, миграции/seed, healthy SPA/API/БД и HTTP 200. Ранее прошли 157 frontend, 9 API и 5 PostgreSQL integration tests, полный браузерный процесс `112 → 3 → 250`, отдельная финальная приёмка, audit `254/254`, единственный payroll, desktop/mobile и UX-copy. Старые отметки об отсутствии Docker и невыполненных commit/push сняты по подтверждённым результатам; они не являются ограничениями этапа 9.
 
-**Этап 9 в работе:** реализация и воспроизводимые проверки описаны в [[test-strategy]]. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review прошли; результаты текущего diff учитываются отдельно от этапа 8 в [[quality-gates]]. Пользователь разрешил scoped commit/push в `codex/portfolio` 2026-09-05. До закрытия нужны все обязательные CI jobs нового implementation SHA.
+**Этап 9 закрыт, 2026-09-05:** implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` — все 6/6 в каждом запуске. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review также пройдены; результаты этапа 9 и ссылки на каждую job сохранены отдельно от этапов 7–8 в [[quality-gates]]. Воспроизводимые проверки описаны в [[test-strategy]].
 
-- **Frontend vertical slice:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
-- **Качество:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
-- **Релиз:** staging/production, CI/CD, health checks, логи и запуск с чистого окружения.
-- **Упаковка портфолио:** README, диаграммы, demo script, скриншоты, ограничения и ретроспектива.
-- **Финальный аудит:** сверка scope, критериев готовности, документации и воспроизводимости.
+**Этап 10 «Релиз»: `[-]` в работе, ровно 4/7.** [[0007-cloud-run-and-cloud-sql-release|ADR-0007]], [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment]] фиксируют release/IAM/demo design; [infra/terraform](../../infra/terraform/README.md) описывает reviewable IaC, раздельные publisher/deployer WIF, reset и deletion guards; корневой `.github/workflows/release.yml` вручную собирает один full-SHA image и создаёт проверяемый manifest/evidence contract. Runtime controls включают sanitized health/logging/proxy/socket boundary, лимиты 20 партий/500 sessions, expired cleanup и owner-only reset. Local tests/plan не являются доказательством фактической IAM close/restore, reset cadence, Cloud Run chain, Cloud Logging ingestion или Cloud SQL connection: эти наблюдения остаются hosted evidence. `apply`, workflow и удалённый CI для текущих изменений не запускались, поэтому cloud resources, опубликованный image, фактический release SHA/digest manifest и hosted evidence отсутствуют; этап не закрыт.
 
-### Базовый прогноз
+- **Frontend vertical slice — выполнено:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
+- **Качество — выполнено:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
+- **Релиз — в работе, 4/7:** design, reviewable IaC, release-image workflow, runtime pre-deploy controls и локальный IAM/demo hardening приняты; provisioning, фактическая публикация image, staging/production orchestration и hosted evidence ещё предстоят.
+- **Упаковка портфолио — не начато:** README, диаграммы, demo script, скриншоты, ограничения и ретроспектива.
+- **Финальный аудит — не начато:** сверка scope, критериев готовности, документации и воспроизводимости.
+
+### Исходный прогноз и оставшаяся работа
 
 Это оценка сфокусированного труда, а не обещанная календарная дата:
 
-- этап 9 — 2–4 рабочих дня;
+- исходная оценка этапа 9 — 2–4 рабочих дня; этап закрыт 2026-09-05;
 - этапы 10–12 — 3–5 рабочих дней;
-- исходная оценка этапов 9–12 — 5–9 сфокусированных рабочих дней; она не заменяет фактические критерии закрытия и ожидание CI этапа 9.
+- исходная оценка этапов 9–12 — 5–9 сфокусированных рабочих дней; сохранена как история планирования и не заменяет фактические критерии закрытия.
 
 ## После базового MVP
 

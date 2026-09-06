@@ -17,6 +17,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from './app.js';
+import { resetDemoData } from './demo-maintenance.js';
 import { demoPassport, demoUsers } from './demo-fixtures.js';
 import type { ReadinessService } from './readiness.js';
 
@@ -1034,4 +1035,79 @@ describe.skipIf(!integrationEnabled).sequential('backend vertical slice', () => 
     expect(payrollReadBack.statusCode).toBe(200);
     expect(payrollReadBack.json<PayrollRecord>()).toEqual(payrollExportBody.payrollRecord);
   }, 30_000);
+
+  it('T-API-DEMO-RETENTION: отклоняет новую партию на лимите и сбрасывает только изменяемые demo-данные', async () => {
+    const batchCount = (
+      await ownerPool.query('SELECT COUNT(*)::integer AS count FROM production_batches')
+    ).rows[0].count as number;
+    expect(batchCount).toBeGreaterThan(0);
+
+    const cappedApp = await buildApp({
+      appVersion: 'integration-capacity',
+      demoCapacity: { maximumBatches: batchCount, maximumSessions: 500 },
+      pool: runtimePool,
+      readiness,
+      security: {
+        allowedOrigin: appOrigin,
+        cookieSecure: false,
+        signingSecret: 'integration-capacity-session-secret',
+      },
+    });
+    try {
+      const cappedSession = await cappedApp.inject({
+        method: 'POST',
+        url: '/api/v1/demo-session',
+        headers: { origin: appOrigin },
+        payload: { demoUserId: fixtureUser('PLANNER').id },
+      });
+      expect(cappedSession.statusCode).toBe(201);
+      const rejected = await cappedApp.inject({
+        method: 'POST',
+        url: '/api/v1/production-batches',
+        headers: {
+          cookie: String(cappedSession.headers['set-cookie']).split(';')[0],
+          origin: appOrigin,
+          'x-csrf-token': cappedSession.json<DemoSessionResponse>().csrfToken,
+        },
+        payload: {
+          commandId: randomUUID(),
+          productionPassportId: demoPassport.id,
+          quantity: 112,
+        },
+      });
+      expect(rejected.statusCode).toBe(409);
+      expect(rejected.json()).toMatchObject({ code: 'DEMO_CAPACITY_REACHED' });
+    } finally {
+      await cappedApp.close();
+    }
+
+    const resetClient = await ownerPool.connect();
+    try {
+      const removed = await resetDemoData(resetClient);
+      expect(removed.productionBatches).toBe(batchCount);
+      expect(removed.demoSessions).toBeGreaterThan(0);
+    } finally {
+      resetClient.release();
+    }
+
+    const remaining = await ownerPool.query<{
+      batches: number;
+      sessions: number;
+      users: number;
+    }>(
+      `SELECT
+         (SELECT COUNT(*)::integer FROM production_batches) AS batches,
+         (SELECT COUNT(*)::integer FROM demo_sessions) AS sessions,
+         (SELECT COUNT(*)::integer FROM demo_users WHERE enabled) AS users`,
+    );
+    expect(remaining.rows[0]).toEqual({
+      batches: 0,
+      sessions: 0,
+      users: demoUsers.length,
+    });
+    expect(
+      (await app.inject({ url: '/api/v1/demo-session', headers: { cookie: planner.cookie } }))
+        .statusCode,
+    ).toBe(401);
+  });
 });

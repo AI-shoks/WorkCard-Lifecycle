@@ -18,6 +18,10 @@ type Migration = {
   version: number;
 };
 
+type MigrationLogger = {
+  info(fields: Record<string, unknown>, message: string): void;
+};
+
 async function readMigrations(directory: string): Promise<Migration[]> {
   const names = (await readdir(directory))
     .filter((name) => migrationNamePattern.test(name))
@@ -108,6 +112,7 @@ async function applyRuntimeGrants(client: Client, roleIdentifier: string): Promi
 export async function runMigrations(
   config: MigrationConfig,
   directory = migrationsDirectory,
+  logger?: MigrationLogger,
 ): Promise<void> {
   const migrations = await readMigrations(directory);
   const client = new Client({ connectionString: config.migrationDatabaseUrl });
@@ -164,7 +169,15 @@ export async function runMigrations(
         if (existing.name !== migration.name || existing.checksum !== migration.checksum) {
           throw new Error(`Уже применённая миграция ${migration.version} была изменена.`);
         }
-        console.info(`Миграция ${migration.name} уже применена.`);
+        logger?.info(
+          {
+            migration: migration.name,
+            migrationVersion: migration.version,
+            outcome: 'already-applied',
+            phase: 'migration',
+          },
+          'migration already applied',
+        );
         continue;
       }
 
@@ -176,7 +189,15 @@ export async function runMigrations(
           [migration.version, migration.name, migration.checksum],
         );
         await client.query('COMMIT');
-        console.info(`Применена миграция ${migration.name}.`);
+        logger?.info(
+          {
+            migration: migration.name,
+            migrationVersion: migration.version,
+            outcome: 'applied',
+            phase: 'migration',
+          },
+          'migration applied',
+        );
       } catch (error) {
         await client.query('ROLLBACK');
         throw error;

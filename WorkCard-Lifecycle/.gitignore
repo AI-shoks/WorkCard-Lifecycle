@@ -27,3 +27,20 @@ logs/
 .pnpm-debug.log
 .DS_Store
 Thumbs.db
+
+# Terraform local state and generated plans (provider lock files stay tracked)
+**/.terraform/
+*.tfvars
+*.tfvars.json
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+# Defensive catch for an accidentally unexpanded PowerShell plan path variable.
+**/$planPath
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

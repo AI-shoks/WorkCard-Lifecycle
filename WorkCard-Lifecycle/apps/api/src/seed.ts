@@ -6,8 +6,12 @@ import { Client } from 'pg';
 
 import { loadMigrationConfig } from './config.js';
 import { demoOperations, demoPassport, demoUsers } from './demo-fixtures.js';
+import { createProcessLogger } from './runtime-protection.js';
+
+const logger = createProcessLogger('seed');
 
 async function main(): Promise<void> {
+  logger.info({ outcome: 'started', phase: 'seed' }, 'seed job started');
   const config = loadMigrationConfig();
   const client = new Client({ connectionString: config.migrationDatabaseUrl });
 
@@ -131,7 +135,7 @@ async function main(): Promise<void> {
     );
 
     await client.query('COMMIT');
-    console.info('Детерминированные синтетические demo-данные готовы.');
+    logger.info({ outcome: 'succeeded', phase: 'seed' }, 'seed job succeeded');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -140,8 +144,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : 'Неизвестная ошибка seed.';
-  console.error(message);
+main().catch(() => {
+  logger.error({ outcome: 'failed', phase: 'seed' }, 'seed job failed');
   process.exitCode = 1;
 });

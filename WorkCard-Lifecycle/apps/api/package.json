@@ -11,6 +11,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "db:migrate": "tsx src/migrate.ts",
+    "db:reset-demo": "tsx src/reset-demo.ts",
     "db:seed": "tsx src/seed.ts",
     "db:verify": "tsx src/verify-database.ts",
     "dev": "tsx watch src/server.ts",
@@ -28,7 +29,8 @@
     "@work-card/contracts": "workspace:*",
     "dotenv": "17.4.2",
     "fastify": "5.12.1",
-    "pg": "8.23.0"
+    "pg": "8.23.0",
+    "pino": "10.3.1"
   },
   "devDependencies": {
     "@types/pg": "8.23.1",

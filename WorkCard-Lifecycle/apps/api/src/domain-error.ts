@@ -89,6 +89,15 @@ export function gateClosed(): DomainError {
   });
 }
 
+export function demoCapacityReached(detail: string): DomainError {
+  return new DomainError({
+    code: 'DEMO_CAPACITY_REACHED',
+    detail,
+    status: 409,
+    title: 'Демонстрационный контур заполнен',
+  });
+}
+
 export function invalidBusinessInput(code: string, detail: string): DomainError {
   return new DomainError({
     code,

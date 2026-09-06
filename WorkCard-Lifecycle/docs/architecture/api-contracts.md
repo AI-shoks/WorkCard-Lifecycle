@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 3
+version: 5
 owner: architecture
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # API Contracts
@@ -30,7 +30,7 @@ HTTP/JSON контракт MVP v1. Каноническая machine-readable в�
 | `GET /demo-session` | текущий actor/role, CSRF token и permissions projection | authenticated |
 | `DELETE /demo-session` | завершить session | authenticated + CSRF |
 
-`POST /demo-session` принимает только `demoUserId`. Клиентские `actorId` и `role` игнорировать запрещено — такие поля не входят в schema. API загружает роль из `demo_users` и подписывает opaque session cookie.
+`POST /demo-session` принимает только `demoUserId`. Клиентские `actorId` и `role` игнорировать запрещено — такие поля не входят в schema. API загружает роль из `demo_users` и подписывает opaque session cookie. Перед вставкой он удаляет истёкшие/idle sessions и применяет hosted limit `500`; при capacity возвращает `409 DEMO_CAPACITY_REACHED`. Общий public demo не гарантирует сохранность session или state: owner-only daily reset инвалидирует все sessions.
 
 ## Read endpoints
 
@@ -245,7 +245,7 @@ Errors используют `application/problem+json` (RFC 9457):
 | `401` | нет/истекла session | `AUTHENTICATION_REQUIRED` |
 | `403` | trusted role не имеет права | `ACTION_FORBIDDEN`, без раскрытия закрытого состояния |
 | `404` | разрешённый caller не видит resource | `RESOURCE_NOT_FOUND` |
-| `409` | version/state/gate/idempotency conflict | `VERSION_CONFLICT`, `STATE_CONFLICT`, `GATE_CLOSED`, `COMMAND_ID_REUSED` |
+| `409` | version/state/gate/idempotency conflict либо достигнут лимит общей demo | `VERSION_CONFLICT`, `STATE_CONFLICT`, `GATE_CLOSED`, `COMMAND_ID_REUSED`, `DEMO_CAPACITY_REACHED` |
 | `422` | schema валидна, business input недопустим | `INVALID_QUANTITY`, `MIXED_WORK_CARD_SET`, `INVALID_ASSIGNEE` |
 | `429` | превышен лимит запросов IP/категории; `Retry-After` задаёт паузу в секундах | `TOO_MANY_REQUESTS` |
 | `500` | непредвиденная ошибка | `INTERNAL_ERROR`, без stack/SQL detail |
@@ -257,8 +257,9 @@ Errors используют `application/problem+json` (RFC 9457):
 
 ## Health и OpenAPI
 
-- `GET /health/live` — процесс отвечает, без DB dependency.
-- `GET /health/ready` — короткий `SELECT 1` и migration version; `503`, если БД не готова.
+- `GET /health/live` — процесс отвечает `200 {"status":"ok"}` без DB dependency.
+- `GET /health/ready` — проверяет доступность БД и ожидаемую migration version; отвечает только `200 {"status":"ok"}` либо `503 {"status":"unavailable"}`.
+- Public health payload не содержит `APP_VERSION`, service/revision, состояние БД или номера migration. Эти детали доступны только в безопасном operator log и release metadata.
 - `GET /api/openapi.json` — contract для разработки; в public demo read-only.
 - Swagger UI не подключён; доступен только generated OpenAPI JSON для разработки.
 

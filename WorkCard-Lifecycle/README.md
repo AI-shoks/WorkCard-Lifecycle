@@ -4,6 +4,8 @@
 
 ## Текущий статус
 
+**На 6 сентября 2026 года этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7: runtime pre-deploy controls реализованы и локально проверены после design/IaC/workflow, но фактического deployment и hosted qualification ещё нет.**
+
 - Этапы 1–4 завершены: product scope, доменная модель, требования и 14-шаговый UX-прототип согласованы.
 - Этап 5 завершён: приняты архитектурные артефакты и ADR-0001–ADR-0006.
 - Этап 6 завершён: создан воспроизводимый инженерный фундамент с pnpm workspace, Fastify, React, PostgreSQL bootstrap, Docker Compose и CI.
@@ -11,11 +13,16 @@
 - Для implementation SHA этапа 7 локально подтверждены format, lint, typecheck, 11 обычных тестов, 5 PostgreSQL integration tests, production build, миграции `0001`–`0003`, повторный seed/runtime verification и clean-container.
 - [Push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041) этого SHA полностью зелёные: `Code and database quality` и `Clean container startup` завершены успешно.
 - В текущем checkout реализован frontend vertical slice этапа 8: русские ролевые экраны `S-01`–`S-07`, серверная demo-session, создание и выпуск, назначение и ведение карточек, БТК, журнал действий и тестовый учёт нормо-часов. Команды проходят через реальный API, а успех требует ответа сервера и полного контрольного чтения.
-- На 5 сентября 2026 года текущая реализация прошла `pnpm check` с production build: `157` frontend tests и `9` обычных API tests; отдельно прошли `5/5` реальных PostgreSQL integration tests. Установка с frozen lockfile и dependency audit успешны; после заключительной установки frontend suite повторно дал `157/157`.
+- Исторический результат этапа 8 на 5 сентября 2026 года: реализация прошла `pnpm check` с production build, `157` frontend tests и `9` обычных API tests; отдельно прошли `5/5` реальных PostgreSQL integration tests. Установка с frozen lockfile и dependency audit успешны; после заключительной установки frontend suite повторно дал `157/157`.
 - Полный браузерный процесс выполнен на итоговой production SPA и новой чистой PostgreSQL `18.6`: выпуск `3/250`, все `250` lifecycle, отдельная финальная приёмка, полный audit выпуска `254` и единственная payroll-запись с read-back после обновления. Производственные состояния не подставлялись через mocks, API shortcuts или SQL.
 - Runtime UI проверен на desktop/mobile: `16` проверок экранов и защищённого доступа, без утечек технических кодов, сломанных accessibility-ссылок и горизонтальных переполнений.
 - Этап 8 завершён implementation SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`: локальный clean-container без кэша с новым томом и [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) / [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) подтвердили `quality` и `container`. Docker установлен и доступен; прежние отметки об отсутствии Docker и commit/push устарели.
-- Этап 9 в работе: добавлены реальные Playwright/SPA/API/PostgreSQL проверки, fault injection транзакций и миграций, security gates и воспроизводимый performance profile. Compact (6 карточек) и canonical (250 карточек) проверяются отдельно. Локальные результаты текущего diff и оставшиеся обязательства нового implementation SHA — в [Quality gates](docs/engineering/quality-gates.md), [backlog](docs/project/backlog.md) и [Definition of Done](docs/project/definition-of-done.md).
+- Этап 9 завершён implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc): реальные Playwright/SPA/API/PostgreSQL проверки, fault injection транзакций и миграций, security gates и воспроизводимый performance profile. Compact (6 карточек) и canonical (250 карточек) проверяются отдельно. Через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)`, `performance` — 6/6 успешных jobs в каждом запуске для этого SHA. Локальные результаты этапа 9: `157` frontend, `10` обычных API, `5` PostgreSQL integration и `10` новых PostgreSQL regression tests — PASS. Подробности — в [Quality gates](docs/engineering/quality-gates.md), [backlog](docs/project/backlog.md) и [Definition of Done](docs/project/definition-of-done.md).
+- Первая задача этапа 10 завершена как планирование: [ADR-0007](docs/architecture/adr/0007-cloud-run-and-cloud-sql-release.md) выбирает Cloud Run/Artifact Registry/Cloud SQL PostgreSQL 18, а [Deployment](docs/release/deployment.md) определяет build-once image по full commit SHA + digest, owner-only jobs, secrets/`APP_ORIGIN`, health/logs, staging smoke, production promotion и rollback. Никаких cloud resources, release image/digest или hosted запусков пока не создано.
+- Вторая задача этапа 10 завершена как reviewable IaC: [Terraform root](infra/terraform/README.md) описывает release/staging/production projects, IAM, registry, две Cloud SQL, Secret Manager, services/jobs, probes, logs/alerts, production PITR, budgets и раздельные GitHub WIF. `terraform fmt -check -recursive`, `terraform validate` и локальный review plan `166 to add / 0 to change / 0 to destroy` прошли; strict assertion подтвердил critical IAM/WIF/capacity/deletion guards и отсутствие secret payloads/credential URLs. `terraform apply` не запускался.
+- Третья задача этапа 10 реализована в `.github/workflows/release.yml`: только ручной запуск из `main` после полного успешного push-CI того же SHA; один `linux/amd64` build получает immutable full-SHA tag, публикуется через short-lived WIF, перечитывается по registry digest, сканируется Trivy и формирует schema-validated `docs/release/manifests/<SHA>.json`. Manifest хранит только build/scan факты; будущие staging/production/smoke/promotion/rollback факты добавляются отдельными append-only hash-chained records без placeholders. Новый обязательный CI gate локально проверяет оба workflows, manifest/Trivy/evidence tests и secret/WIF-safe Terraform plan. Ни workflow, ни новая удалённая CI job не запускались, поэтому cloud resources, release image/digest, фактический manifest и hosted evidence по-прежнему отсутствуют.
+- Локальный hardening этапа 10 сохраняет публичный interactive demo, но ограничивает общую synthetic DB 20 партиями/500 sessions, очищает истёкшие sessions и добавляет owner-only daily reset. [ADR-0008](docs/architecture/adr/0008-bounded-public-demo-operations.md) и [Deployment](docs/release/deployment.md) фиксируют `work-card-deployer` как единственного исполнителя public-IAM toggle, custom role из двух permissions вместо `roles/run.admin`, keyless future WIF, обязательный restore, 7/30-дневный lifetime и двухфазный teardown. Budget alerts прямо не считаются hard spending cap. Это code/plan/runbook evidence, не hosted staging или production evidence.
+- Четвёртая задача этапа 10 закрыта на уровне кода/config: `/health/live` и `/health/ready` публикуют только status при сохранении `200/503`; Pino JSON содержит Cloud Logging `severity`, безопасный release/request/job context и redaction; local/test игнорируют `X-Forwarded-For`, а Cloud Run mode доверяет одному platform hop и имеет spoof/rate-limit tests; hosted URL обязан разрешаться `pg@8.23.0` в percent-encoded `/cloudsql/<project>:<region>:<instance>`. Реальная Cloud Run chain, Cloud Logging ingestion и Cloud SQL connection не проверялись и остаются staging evidence.
 
 ## Локальный запуск и браузерный сценарий
 
@@ -37,6 +44,7 @@
 - [Backlog](docs/project/backlog.md)
 - [Decision log](docs/project/decision-log.md)
 - [Architecture](docs/architecture/technology-stack.md)
+- [Reviewable Terraform](infra/terraform/README.md)
 - [Local development](docs/engineering/local-development.md)
 - [[00 Home|Vault index]], [[mvp-scope|scope]], [[decision-provenance|происхождение решений]], [[documentation-index|индекс материалов]]
 
@@ -52,6 +60,8 @@
 - отрицательный контроль, доработка, переназначение и повторный выпуск вне MVP.
 
 ## Канонический demo-fixture
+
+Точное соотношение `112 → 112 + 112 + 26 = 250` выбрано как синтетический demo-сценарий для воспроизводимой проверки. Оно иллюстрирует связь «одна партия → несколько комплектов», но не выдаётся за наблюдавшийся пример реального производства.
 
 1. `PLANNER` как ПДБ выбирает подготовленный паспорт и создаёт партию `112`.
 2. Один выпуск создаёт три operation-scoped комплекта `112 + 112 + 26 = 250` карточек.

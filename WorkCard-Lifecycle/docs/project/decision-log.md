@@ -1,9 +1,9 @@
 ---
 artifact_id: project.decision-log
 status: active
-version: 10
+version: 13
 owner: project
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Decision Log
@@ -34,3 +34,6 @@ updated: 2026-09-05
 | D-020 | 2026-07-17 | Разделить подтверждённые самоконтроль/финальную приёмку и синтетическое per-card закрытие WorkCard | принято | Самоконтроль рабочего не получает отдельной команды; `FinalBatchAcceptance` всей партии и подписи БТК остаются фактами `CONFIRMED_AS_IS`; `ConfirmWorkCardQuality` сохраняет выбранную per-card гранулярность MVP, но не считается записью финальной приёмки или цифровой подписью |
 | D-021 | 2026-07-17 | Включить в MVP v1 отдельную цифровую финальную приёмку всей завершённой партии | принято | `QUALITY_CONTROLLER` выполняет `RecordFinalBatchAcceptance` только после first-article gates и закрытия всех обязательных WorkCard; создаются одна неизменяемая `FinalBatchAcceptance` и `FinalBatchAccepted` в одной транзакции, но цифровая запись не заменяет подписи БТК на физических карточках |
 | D-022 | 2026-09-05 | Автоматизировать качество этапа 9 без расширения MVP | принято | Compact 6-card desktop/mobile и отдельный полный 250-card UI процесс; реальный PostgreSQL fault injection, resource budgets, dependency/secret/image CI gates. Performance profile 10 000 карточек не объявляется production SLA; завершение требует CI нового implementation SHA. Основания и текущие результаты — [[test-strategy]], [[security-baseline]], [[quality-gates]] |
+| D-023 | 2026-09-05 | Выбрать Cloud Run service/jobs, Artifact Registry и отдельные Cloud SQL PostgreSQL 18 для staging/production release | принято | Один image фиксируется full commit SHA + registry digest и без rebuild продвигается после hosted staging smoke; owner migrate/seed изолированы от runtime, rollback возвращает traffic на совместимую revision. Решение и отсутствие фактического deployment — [[0007-cloud-run-and-cloud-sql-release|ADR-0007]] и [[deployment]] |
+| D-024 | 2026-09-05 | Не считать точное соотношение `112 изделий → 250 карточек` подтверждённым примером AS-IS | принято | Подтверждённым остаётся общий принцип `ProductionBatch 1 → many WorkCardSet`; связка `112 → 112 + 112 + 26 = 250` сохраняется только как синтетический канонический demo-fixture и не приписывается реальному предприятию. Распределение `60 + 52 = 112` сохраняет отдельное происхождение `ASIS-008`; реестр уточнён в [[decision-provenance]] |
+| D-025 | 2026-09-06 | Сохранить общий публичный interactive demo с ограниченными live data/sessions, ежедневным reset и конечным сроком cloud-размещения | принято | Tenant isolation не добавляется; посетители предупреждены об общей БД. Лимиты `20` партий/`500` sessions, reset каждые 24 часа, fail-closed после 26 часов и абсолютный lifetime 30 дней закреплены в [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment]] |

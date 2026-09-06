@@ -7,7 +7,14 @@ import { Pool } from 'pg';
 import { buildApp } from './app.js';
 import { loadAppConfig } from './config.js';
 import { createDatabaseReadiness } from './readiness.js';
-import { databaseBudgets, safeLogger } from './runtime-protection.js';
+import {
+  createProcessLogger,
+  databaseBudgets,
+  proxyTrustPolicy,
+  safeLogger,
+} from './runtime-protection.js';
+
+const processLogger = createProcessLogger('serve');
 
 async function main(): Promise<void> {
   const config = loadAppConfig();
@@ -17,7 +24,15 @@ async function main(): Promise<void> {
   });
   const app = await buildApp({
     appVersion: config.appVersion,
-    logger: safeLogger(config.logLevel),
+    demoCapacity: {
+      maximumBatches: config.maximumDemoBatches,
+      maximumSessions: config.maximumDemoSessions,
+    },
+    logger: safeLogger(config.logLevel, {
+      appVersion: config.appVersion,
+      revision: config.revision,
+      service: config.serviceName,
+    }),
     pool,
     readiness: createDatabaseReadiness(pool),
     security: {
@@ -25,6 +40,7 @@ async function main(): Promise<void> {
       cookieSecure: config.cookieSecure,
       signingSecret: config.sessionSigningSecret,
     },
+    trustProxy: proxyTrustPolicy(config.proxyTrustMode),
     ...(config.webDistPath ? { webDistPath: resolve(config.webDistPath) } : {}),
   });
 
@@ -44,9 +60,13 @@ async function main(): Promise<void> {
   process.once('SIGTERM', () => void close('SIGTERM'));
 
   await app.listen({ host: config.host, port: config.port });
+  app.log.info(
+    { event: 'service.started', host: config.host, port: config.port },
+    'service started',
+  );
 }
 
 main().catch(() => {
-  console.error('Запуск не выполнен. Проверьте конфигурацию и доступность БД.');
+  processLogger.fatal({ event: 'service.startup', outcome: 'failed' }, 'service startup failed');
   process.exitCode = 1;
 });

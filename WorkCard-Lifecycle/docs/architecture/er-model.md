@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.er-model
 status: accepted
-version: 1
+version: 2
 owner: architecture
-updated: 2026-09-01
+updated: 2026-09-06
 ---
 
 # ER Model
@@ -61,7 +61,7 @@ erDiagram
 | `csrf_token_hash` | `bytea not null` |
 | `created_at`, `expires_at`, `last_seen_at` | `timestamptz not null` |
 
-Индексы: `(expires_at)`, `(demo_user_id)`. Истёкшие session удаляются только технической maintenance-командой, не предметным API.
+Индексы: `(expires_at)`, `(demo_user_id)`. Истёкшая/idle/disabled session удаляется при неуспешной аутентификации; создание новой session очищает все истёкшие rows под общим advisory lock и применяет лимит 500. Owner-only daily reset удаляет оставшиеся sessions вместе с mutable demo aggregates; предметные команды sessions не создают.
 
 ### `production_passports`
 

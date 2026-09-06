@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 7
+version: 14
 owner: engineering
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Quality Gates
@@ -109,9 +109,9 @@ Frontend coverage включает типизированные ответы и 
 
 Для SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf` прошли [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414): `quality` и `container` успешны в обоих runs. Локальный clean-container выполнен без кэша на новом томе: миграции/seed, healthy приложение/БД, HTTP 200 для SPA и обоих health endpoints. Статусы runs и SHA повторно прочитаны через GitHub API при начале этапа 9. Старые отметки об отсутствии Docker и невыполненных commit/push устарели.
 
-## Проверки этапа 9
+## Результаты этапа 9 — 5 сентября 2026 года
 
-Результаты относятся к незакоммиченному scoped diff поверх `b00ff294…`, а не к этому SHA самому по себе. Состав воспроизводимых команд и точные границы fixture — [[test-strategy]].
+Локальные результаты ниже получены для реализации, зафиксированной implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc), поверх этапа 8 `b00ff294…`. Состав воспроизводимых команд и точные границы fixture — [[test-strategy]]. При синхронизации статусов тяжёлые проверки повторно не запускались; удалённые результаты этого SHA подтверждены отдельно в разделе закрытия ниже.
 
 | Проверка | Фактическое состояние локально |
 |---|---|
@@ -122,7 +122,7 @@ Frontend coverage включает типизированные ответы и 
 | Secret scan | PASS: 40 Git commits и текущий исходный код; шесть узких исторических fixture fingerprints описаны в [[security-baseline]] |
 | Production build и clean-container | PASS окончательного кода: no-cache build, новый том `wcl-quality-0905-verified-postgres`, БД `55479`, HTTP `35539`; migrate/seed exit 0, runtime grants, healthy app/DB, SPA/live/ready 200, UID 65532, read-only/cap-drop/no-new-privileges |
 | Image vulnerabilities | PASS окончательного образа `sha256:855c8bfb1e5a2803bc06d2dca3b39915baf74667a5f6814178bb464695580f1f`: Trivy 0.74.0 проверил 14 OS и 100 Node packages, HIGH/CRITICAL 0, включая unfixed; JSON `.quality-results/image-vulnerabilities-verified.json` |
-| Workflow syntax/expressions | PASS: actionlint 1.7.12; удалённый CI ещё не запускался |
+| Workflow syntax/expressions | PASS локально: actionlint 1.7.12; последующий CI implementation SHA подтверждён в разделе закрытия ниже |
 | Итоговый `pnpm check` | PASS: format, lint, strict types (включая `quality/`), production build, `157` frontend и `15` API тестов (`10` обычных + `5` реальных PostgreSQL integration); integration URL явно направлены в тестовый Compose |
 | Strict docs | PASS: `project-docs-auditor --fail-on-warning`, 55 документов, 0 ошибок, 0 предупреждений |
 | Документационный prototype UX audit | PASS: desktop `1440×1000` и mobile `390×844`, в каждом 14 шагов, 70 ролевых вариантов, 7 системных состояний, 0 нарушений/переполнений/browser errors. Desktop canonical и mobile compact snapshots финальной приёмки также визуально просмотрены |
@@ -149,9 +149,45 @@ Frontend coverage включает типизированные ответы и 
 
 Сопоставлены diff и тесты с [[acceptance-criteria]], [[mvp-scope]], [[roles-permissions]], [[glossary]], [[transactions-concurrency]], [[api-contracts]] и [[definition-of-done]]. Подтверждены отдельные first-article / per-card / final-batch действия, `112 → 3 → 250`, operation-scoped нормы, UUID без идентичности физической детали, backend permissions, атомарные audit/receipts и синтетический payroll без денег. Browser setup содержит только справочники; production mutations идут через UI. Новые fault fixtures не подменяют результат browser flow. Успешные API схемы сохранены, ответ 429 использует ранее принятый `TOO_MANY_REQUESTS`.
 
-Проверено различение прежних 5 integration tests, новых PostgreSQL и browser suites, compact и canonical, локальных результатов и будущего CI SHA. Негативная приёмка, переделка, переназначение, deployment и этапы 10–12 не добавлены. Соседние пользовательские dashboard/Home/Obsidian/site изменения не входят в scoped diff. Семантических противоречий в затронутых канонических документах не найдено; структурный audit учитывается отдельно.
+При проверке реализации различались прежние 5 integration tests, новые PostgreSQL и browser suites, compact и canonical, локальные результаты и последующий CI implementation SHA. Негативная приёмка, переделка, переназначение, deployment и этапы 10–12 не добавлены. Соседние пользовательские dashboard/Home/Obsidian/site изменения не входили в implementation commit этапа 9. Семантических противоречий в затронутых канонических документах не найдено; структурный audit учитывается отдельно.
 
-Локальные gates пройдены; пользователь разрешил scoped commit/push в `codex/portfolio` 2026-09-05. Этап 9 остаётся открытым до успешных обязательных jobs нового implementation SHA: `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)`, `performance`. Зелёные runs этапа 8 этого не доказывают.
+## Локальные проверки укрепления этапа 10 — 2026-09-06
+
+Текущие незакоммиченные изменения сохраняют прогресс этапа 10 ровно `4/7`. Четвёртая задача закрыта как runtime pre-deploy implementation с локальной детерминированной проверкой, но не как hosted qualification. Выполнились следующие локальные gates:
+
+| Проверка | Результат текущего checkout |
+|---|---|
+| `pnpm check` | PASS на Node `24.18.0` / pnpm `11.19.0`: Prettier, ESLint, strict typecheck, `158/158` frontend tests, `24/24` обычных API tests (`6` PostgreSQL integration корректно skipped без URL), `34/34` release tests и production build |
+| Focused runtime contracts | PASS: `22/22` в `app`, `config`, `runtime-protection` и web health tests; проверены exact sanitized payloads/status codes, все Pino severity mappings, safe structured logs, server-generated request ID, local XFF spoof rejection, one-hop client IP/rate-limit key и разбор encoded socket URL самим `pg` |
+| Release contract | PASS: JSON Schema и cross-field bindings manifest, semantic Trivy validation, exclusive manifest write, append-only evidence sequence/hash chain и негативные сценарии |
+| Workflow syntax | PASS: actionlint `1.7.12` для `ci.yml` и `release.yml`; Windows archive SHA-256 проверен |
+| IAM/demo hardening | PASS runnable checks: `17/17` focused API tests для config/app/reset transaction flow, `18/18` focused interactive UI tests; capacity/session cleanup и transactional reset также имеют PostgreSQL tests, но они не исполнились без БД |
+| UX-copy audit | PASS read-only `window.runUxCopyAudit()` в desktop `1440×1000` и mobile `390×844`: по `14` шагов, `70` role variants, `7` system states, `0` production violations в каждом viewport |
+| Terraform contract | PASS на Terraform `1.16.1`: recursive `fmt -check`, `validate`, локальный `plan -refresh=false` `166 to add / 0 to change / 0 to destroy`; safety checker подтвердил exact IAM/actAs/job/secret matrices, единственный `allUsers`, две WIF-границы, восемь jobs, demo limits, reset и deletion guards, а также отсутствие broad roles/secret payloads/credential URLs |
+| Strict docs | PASS: финальный повторный `project-docs-auditor --fail-on-warning`, `57` документов, `0` ошибок, `0` предупреждений |
+
+Новая `Release and IaC contract` job добавлена как седьмой обязательный CI gate и включена в release preflight, но удалённо не запускалась. Plan использовал только example inputs, фиктивный локальный token и `-refresh=false`; это не обращение к GCP и не проверка существования ресурсов. В текущем shell отсутствуют Docker/PostgreSQL и `QUALITY_OWNER_URL`/integration URLs, поэтому новые реальные DB проверки reset/capacity не выдаются за успешные. `terraform apply`, `workflow_dispatch`, build/push image и deployment не выполнялись; manifest/evidence records и hosted evidence не создавались.
+
+Смысловая сверка `backlog`/`deployment`/ADR/security/environment/API/audit contracts не нашла конфликтов: public interactive scope сохранён без tenant isolation; live retention, backup/PITR и log retention разделены; deployer indirect workload-identity risk оговорён; budget alerts не названы spending cap. Фактические IAM close/restore, daily reset, Cloud Logging ingestion, Cloud Run header chain и Cloud SQL socket mount/connection явно оставлены обязательным hosted evidence.
+
+Отдельный локальный `pnpm security:secrets` текущего diff не стартовал: Docker CLI отсутствует в данном shell, поэтому дочерний Gitleaks вернул `status=null`. Это не трактуется ни как находка, ни как успешный scan; прежние подтверждённые результаты этапа 9 остаются историческими, а новая версия всё ещё должна пройти обязательную удалённую `security` job.
+
+## Закрытие этапа 9 — 2026-09-05
+
+Implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head [PR #1](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/1) в `codex/portfolio`. GitHub API подтвердил `head_sha`, событие, `completed/success` обоих исторических runs и каждой обязательной на том SHA job: [push CI 33970654850](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI 33970656850](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850), attempt 1.
+
+| Обязательная job | Push | PR |
+|---|---|---|
+| `quality` — Code and database quality | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850/job/101318449484) | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850/job/101318454526) |
+| `container` — Clean container startup, включая image scan | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850/job/101318641884) | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850/job/101318638566) |
+| `security` — Dependency and secret security | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850/job/101318449620) | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850/job/101318454641) |
+| `browser (compact)` — Browser (compact) | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850/job/101318641905) | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850/job/101318638658) |
+| `browser (canonical)` — Browser (canonical) | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850/job/101318641863) | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850/job/101318638591) |
+| `performance` — Representative performance profile | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850/job/101318641906) | [success](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850/job/101318638598) |
+
+Итого 6/6 обязательных jobs успешны в каждом запуске, 12/12 суммарно; обязательный шаг сканирования образа также завершён успешно в обоих runs. Результаты прежних этапов сохранены выше со своими SHA и CI. Эти runs проверяют implementation commit этапа 9; текущая синхронизация документации в них не входила.
+
+Синхронизация статусов после закрытия прошла `project-docs-auditor --fail-on-warning`: 55 документов, 0 ошибок, 0 предупреждений. Отдельная смысловая сверка не нашла конфликтов статусов, `git diff --check` — PASS. Тяжёлые тесты повторно не запускались.
 
 ## Правило слияния
 
