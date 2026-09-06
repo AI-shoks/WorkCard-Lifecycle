@@ -6,7 +6,7 @@ tags:
   - case-study
   - workcard
 status: active
-version: 17
+version: 18
 owner: navigation
 updated: 2026-09-06
 ---
@@ -17,7 +17,7 @@ updated: 2026-09-06
 
 ## Сейчас
 
-**Этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7:** [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment|релизный runbook]] дополнили прежний release design локальным IAM/demo hardening: общий public interactive режим ограничен 20 партиями/500 sessions, получил owner-only reset, узкий deployer IAM/WIF и 7/30-дневный lifetime с двухфазным teardown. Terraform review-plan содержит `166/0/0`. Это локальная code/config/plan проверка, а не hosted qualification: `apply`/workflows не запускались, cloud resources, image/manifest, реальные IAM/reset/proxy/socket/logging observations и staging evidence отсутствуют. Implementation SHA этапа 9 [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) подтверждён только прежними [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850); текущие незакоммиченные изменения удалённо не запускались. Локальные результаты и ограничения — [[quality-gates]].
+**Этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7:** [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment|релизный runbook]] дополнили release design ограниченным public demo, owner-only reset и раздельными publisher/deployment WIF. В текущей ветке подготовлены `deploy.yml`, exact-digest staging validators и HTTPS-only hosted smoke без DB/owner credentials; Terraform review-plan содержит `167/0/0`. Это локальная code/config/plan проверка, а не hosted qualification: `apply`/workflows не запускались, cloud resources, image/manifest, реальные IAM/reset/proxy/socket/logging observations и staging evidence отсутствуют. Implementation SHA этапа 9 [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) подтверждён только прежними [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850); текущие изменения удалённо не запускались. Локальные результаты и ограничения — [[quality-gates]].
 
 ### Подтверждения предыдущих этапов
 

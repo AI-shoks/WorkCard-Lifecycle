@@ -1,0 +1,646 @@
+name: Staging exact-digest deployment
+
+run-name: Staging ${{ github.sha }} (explicit approval)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY EXACT DIGEST TO STAGING
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: work-card-staging-deployment
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+    working-directory: WorkCard-Lifecycle
+
+jobs:
+  preflight:
+    name: Verify published candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      release-run-id: ${{ steps.release.outputs.release-run-id }}
+      source-sha: ${{ steps.source.outputs.source-sha }}
+    steps:
+      - name: Checkout the dispatched main revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Validate explicit staging authorization and source
+        id: source
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || {
+            echo "Staging orchestration accepts only workflow_dispatch." >&2
+            exit 1
+          }
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || {
+            echo "Staging orchestration must run from refs/heads/main." >&2
+            exit 1
+          }
+          [[ "$CONFIRMATION" == "DEPLOY EXACT DIGEST TO STAGING" ]] || {
+            echo "The exact staging confirmation phrase is required." >&2
+            exit 1
+          }
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "github.sha is not a full lowercase commit SHA." >&2
+            exit 1
+          }
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]] || {
+            echo "The checkout does not match github.sha." >&2
+            exit 1
+          }
+          [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
+            echo "Staging orchestration requires a clean checkout." >&2
+            exit 1
+          }
+          echo "source-sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Find the successful release-image run for the same SHA
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+        run: |
+          set -euo pipefail
+
+          runs_json="$(gh api --method GET \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/release.yml/runs" \
+            -f branch=main \
+            -f event=workflow_dispatch \
+            -f status=success \
+            -f head_sha="$SOURCE_SHA" \
+            -f per_page=20)"
+
+          release_run_id="$(jq -er --arg sha "$SOURCE_SHA" \
+            '[.workflow_runs[] | select(.head_sha == $sha and .head_branch == "main" and .event == "workflow_dispatch" and .conclusion == "success")][0].id' \
+            <<<"$runs_json")"
+          release_run_url="$(jq -er --argjson id "$release_run_id" \
+            '.workflow_runs[] | select(.id == $id) | .html_url' <<<"$runs_json")"
+          release_run_attempt="$(jq -er --argjson id "$release_run_id" \
+            '.workflow_runs[] | select(.id == $id) | .run_attempt' <<<"$runs_json")"
+          [[ "$release_run_attempt" =~ ^[1-9][0-9]*$ ]]
+          release_run_url="${release_run_url}/attempts/${release_run_attempt}"
+          [[ "$release_run_url" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/[1-9][0-9]*/attempts/[1-9][0-9]*$ ]]
+          echo "release-run-id=$release_run_id" >> "$GITHUB_OUTPUT"
+          echo "release-run-url=$release_run_url" >> "$GITHUB_OUTPUT"
+
+      - name: Download immutable manifest and scan from the release run
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release-image-${{ steps.source.outputs.source-sha }}
+          path: WorkCard-Lifecycle
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.release.outputs.release-run-id }}
+
+      - name: Revalidate the downloaded release evidence
+        env:
+          RELEASE_RUN_URL: ${{ steps.release.outputs.release-run-url }}
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+        run: |
+          set -euo pipefail
+
+          manifest="docs/release/manifests/${SOURCE_SHA}.json"
+          node scripts/release/validate-release-manifest.mjs \
+            --manifest "$manifest" \
+            --scan-report .quality-results/release/image-vulnerabilities.json
+          jq -e --arg sha "$SOURCE_SHA" --arg release_run_url "$RELEASE_RUN_URL" \
+            '.sourceSha == $sha and .ociRevisionLabel == $sha and .scan.status == "passed" and .buildScanRunUrl == $release_run_url' \
+            "$manifest" >/dev/null
+
+      - name: Preserve the verified candidate between isolated jobs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-input-${{ steps.source.outputs.source-sha }}
+          path: |
+            WorkCard-Lifecycle/docs/release/manifests/${{ steps.source.outputs.source-sha }}.json
+            WorkCard-Lifecycle/docs/release/release-evidence.schema.json
+            WorkCard-Lifecycle/docs/release/release-manifest.schema.json
+            WorkCard-Lifecycle/.quality-results/release/image-vulnerabilities.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  deploy:
+    name: Migrate, seed, verify, and deploy staging
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      candidate-revision: ${{ steps.rollout.outputs.candidate-revision }}
+      previous-revision: ${{ steps.rollout.outputs.previous-revision }}
+      rollback-required: ${{ steps.rollout.outputs.rollback-required }}
+    env:
+      GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT }}
+      GCP_RELEASE_PROJECT_ID: ${{ vars.GCP_RELEASE_PROJECT_ID }}
+      GCP_STAGING_ORIGIN: ${{ vars.GCP_STAGING_ORIGIN }}
+      GCP_STAGING_PROJECT_ID: ${{ vars.GCP_STAGING_PROJECT_ID }}
+      GCP_STAGING_SECRET_VERSIONS: ${{ vars.GCP_STAGING_SECRET_VERSIONS }}
+      REGION: europe-west1
+      SERVICE: work-card-app
+      SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
+    steps:
+      - name: Checkout the verified source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.preflight.outputs.source-sha }}
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Download the verified release candidate
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: staging-input-${{ needs.preflight.outputs.source-sha }}
+          path: WorkCard-Lifecycle
+
+      - name: Validate non-secret deployment configuration
+        run: |
+          set -euo pipefail
+
+          [[ "$GCP_RELEASE_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          [[ "$GCP_STAGING_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          [[ "$GCP_RELEASE_PROJECT_ID" != "$GCP_STAGING_PROJECT_ID" ]]
+          [[ "$GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT" == "work-card-deployer@${GCP_RELEASE_PROJECT_ID}.iam.gserviceaccount.com" ]]
+          [[ "$GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER" =~ ^projects/[1-9][0-9]*/locations/global/workloadIdentityPools/github-deployment/providers/work-card-deploy$ ]]
+          [[ "$GCP_STAGING_ORIGIN" =~ ^https://[a-z0-9.-]+\.run\.app$ ]]
+
+          mkdir -p .quality-results/staging
+          printf '%s' "$GCP_STAGING_SECRET_VERSIONS" > .quality-results/staging/secret-versions-raw.json
+          jq -e '
+            (keys | sort) == ["app_database_password", "database_url", "migration_database_url", "owner_database_password", "session_signing_secret"] and
+            all(.[]; type == "number" and floor == . and . >= 1)
+          ' .quality-results/staging/secret-versions-raw.json >/dev/null
+          jq '{
+            ownerDatabasePassword: .owner_database_password,
+            databaseUrl: .database_url,
+            migrationDatabaseUrl: .migration_database_url,
+            appDatabasePassword: .app_database_password,
+            sessionSigningSecret: .session_signing_secret
+          }' .quality-results/staging/secret-versions-raw.json \
+            > .quality-results/staging/secret-versions.json
+
+          manifest="docs/release/manifests/${SOURCE_SHA}.json"
+          immutable_image="$(jq -er '.immutableImage' "$manifest")"
+          [[ "$immutable_image" =~ ^europe-west1-docker\.pkg\.dev/${GCP_RELEASE_PROJECT_ID}/work-card/work-card@sha256:[0-9a-f]{64}$ ]]
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
+          {
+            echo "IMMUTABLE_IMAGE=$immutable_image"
+            echo "MANIFEST=$manifest"
+            echo "RUN_URL=$run_url"
+          } >> "$GITHUB_ENV"
+
+      - name: Authenticate as the isolated release deployer
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          create_credentials_file: true
+          project_id: ${{ env.GCP_STAGING_PROJECT_ID }}
+          service_account: ${{ env.GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set up the pinned Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ env.GCP_STAGING_PROJECT_ID }}
+          version: 582.0.0
+
+      - name: Verify deployer identity and registry digest
+        run: |
+          set -euo pipefail
+
+          active_account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | tr -d '\r')"
+          [[ "$active_account" == "$GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT" ]]
+          registry_digest="$(gcloud artifacts docker images describe "$IMMUTABLE_IMAGE" \
+            --project "$GCP_RELEASE_PROJECT_ID" \
+            --format='value(image_summary.digest)')"
+          [[ "$IMMUTABLE_IMAGE" == *@"$registry_digest" ]]
+
+      - name: Verify exact job boundaries and execute twice
+        run: |
+          set -euo pipefail
+
+          verify_job() {
+            local job="$1"
+            local ordinal="$2"
+            local metadata=".quality-results/staging/${job}-job-${ordinal}.json"
+            gcloud run jobs describe "work-card-${job}" \
+              --project "$GCP_STAGING_PROJECT_ID" \
+              --region "$REGION" \
+              --format=json > "$metadata"
+            node scripts/release/verify-staging-job.mjs \
+              --job "$job" \
+              --manifest "$MANIFEST" \
+              --metadata "$metadata" \
+              --project "$GCP_STAGING_PROJECT_ID" \
+              --secret-versions .quality-results/staging/secret-versions.json
+          }
+
+          execute_job() {
+            local job="$1"
+            local ordinal="$2"
+            local output=".quality-results/staging/${job}-execution-${ordinal}.json"
+            verify_job "$job" "$ordinal" >/dev/null
+            gcloud run jobs execute "work-card-${job}" \
+              --project "$GCP_STAGING_PROJECT_ID" \
+              --region "$REGION" \
+              --wait \
+              --format=json > "$output"
+            local raw_name
+            raw_name="$(jq -er '.metadata.name // .name' "$output")"
+            local execution="${raw_name##*/}"
+            [[ "$execution" =~ ^work-card-${job}-[a-z0-9-]+$ ]]
+            printf '%s' "$execution"
+          }
+
+          migrate_one="$(execute_job migrate 1)"
+          seed_one="$(execute_job seed 1)"
+          verify_one="$(execute_job verify 1)"
+          migrate_two="$(execute_job migrate 2)"
+          seed_two="$(execute_job seed 2)"
+          verify_two="$(execute_job verify 2)"
+
+          jq -n \
+            --arg migrate_one "$migrate_one" --arg migrate_two "$migrate_two" \
+            --arg seed_one "$seed_one" --arg seed_two "$seed_two" \
+            --arg verify_one "$verify_one" --arg verify_two "$verify_two" \
+            '{
+              migrate: [$migrate_one, $migrate_two],
+              seed: [$seed_one, $seed_two],
+              verify: [$verify_one, $verify_two]
+            }' > .quality-results/staging/job-executions.json
+
+      - name: Create and verify a no-traffic revision
+        id: rollout
+        run: |
+          set -euo pipefail
+
+          gcloud run services describe "$SERVICE" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --format=json > .quality-results/staging/service-before.json
+          mapfile -t previous_revisions < <(jq -r \
+            '[.status.traffic[]? | select((.percent // 0) == 100) | (.revisionName // .revision)] | unique[]' \
+            .quality-results/staging/service-before.json)
+          [[ "${#previous_revisions[@]}" -eq 1 ]]
+          previous_revision="${previous_revisions[0]}"
+          [[ "$previous_revision" =~ ^[a-z][a-z0-9-]{0,62}$ ]]
+          gcloud run revisions describe "$previous_revision" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --format=json > .quality-results/staging/previous-revision.json
+          jq -e '
+            ((.status.conditions // .conditions // []) |
+              any(.type == "Ready" and (.status == "True" or .state == "CONDITION_SUCCEEDED"))) and
+            ((.status.reconciling // .reconciling // false) != true)
+          ' .quality-results/staging/previous-revision.json >/dev/null
+
+          suffix="s${SOURCE_SHA:0:8}-r${GITHUB_RUN_ID}-a${GITHUB_RUN_ATTEMPT}"
+          candidate_revision="${SERVICE}-${suffix}"
+          [[ "$candidate_revision" =~ ^[a-z][a-z0-9-]{0,62}$ ]]
+          [[ "$candidate_revision" != "$previous_revision" ]]
+          {
+            echo "candidate-revision=$candidate_revision"
+            echo "previous-revision=$previous_revision"
+          } >> "$GITHUB_OUTPUT"
+
+          gcloud run services update "$SERVICE" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --image "$IMMUTABLE_IMAGE" \
+            --update-env-vars "APP_VERSION=$SOURCE_SHA" \
+            --update-labels "source-sha=$SOURCE_SHA" \
+            --revision-suffix "$suffix" \
+            --no-traffic \
+            --quiet
+          gcloud run revisions describe "$candidate_revision" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --format=json > .quality-results/staging/revision.json
+
+          node scripts/release/verify-staging-revision.mjs \
+            --manifest "$MANIFEST" \
+            --metadata .quality-results/staging/revision.json \
+            --origin "$GCP_STAGING_ORIGIN" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --revision "$candidate_revision" \
+            --secret-versions .quality-results/staging/secret-versions.json
+
+          echo "rollback-required=true" >> "$GITHUB_OUTPUT"
+
+      - name: Switch staging traffic and append deployment evidence
+        env:
+          CANDIDATE_REVISION: ${{ steps.rollout.outputs.candidate-revision }}
+          PREVIOUS_REVISION: ${{ steps.rollout.outputs.previous-revision }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_REVISION" =~ ^[a-z][a-z0-9-]{0,62}$ ]]
+          [[ "$PREVIOUS_REVISION" =~ ^[a-z][a-z0-9-]{0,62}$ ]]
+
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions "${CANDIDATE_REVISION}=100" \
+            --quiet
+
+          gcloud run services describe "$SERVICE" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --format=json > .quality-results/staging/service-after.json
+          jq -e --arg revision "$CANDIDATE_REVISION" '
+            [.status.traffic[]? | select((.percent // 0) == 100) | (.revisionName // .revision)] == [$revision]
+          ' .quality-results/staging/service-after.json >/dev/null
+          [[ "$(jq -er '.status.url // .uri' .quality-results/staging/service-after.json)" == "$GCP_STAGING_ORIGIN" ]]
+
+          recorded_at="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
+          node scripts/release/create-staging-evidence.mjs \
+            --kind deployment \
+            --manifest "$MANIFEST" \
+            --revision-metadata .quality-results/staging/revision.json \
+            --revision "$CANDIDATE_REVISION" \
+            --previous-revision "$PREVIOUS_REVISION" \
+            --executions .quality-results/staging/job-executions.json \
+            --secret-versions .quality-results/staging/secret-versions.json \
+            --run-url "$RUN_URL" \
+            --recorded-at "$recorded_at" \
+            --output .quality-results/staging/deployment-candidate.json
+          node scripts/release/append-release-evidence.mjs \
+            --record .quality-results/staging/deployment-candidate.json
+
+      - name: Upload non-secret deployment evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-deployment-${{ needs.preflight.outputs.source-sha }}
+          path: |
+            WorkCard-Lifecycle/docs/release/manifests/${{ needs.preflight.outputs.source-sha }}.json
+            WorkCard-Lifecycle/docs/release/evidence/${{ needs.preflight.outputs.source-sha }}
+            WorkCard-Lifecycle/docs/release/release-evidence.schema.json
+            WorkCard-Lifecycle/.quality-results/staging
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 30
+
+  smoke:
+    name: Hosted smoke without DB credentials
+    needs: [preflight, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_RELEASE_PROJECT_ID: ${{ vars.GCP_RELEASE_PROJECT_ID }}
+      GCP_STAGING_ORIGIN: ${{ vars.GCP_STAGING_ORIGIN }}
+      GCP_STAGING_SMOKE_SERVICE_ACCOUNT: ${{ vars.GCP_STAGING_SMOKE_SERVICE_ACCOUNT }}
+      REVISION: ${{ needs.deploy.outputs.candidate-revision }}
+      SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
+    steps:
+      - name: Checkout the verified source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.preflight.outputs.source-sha }}
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Download deployment metadata and hash-chain head
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: staging-deployment-${{ needs.preflight.outputs.source-sha }}
+          path: WorkCard-Lifecycle
+
+      - name: Validate the restricted smoke identity
+        run: |
+          set -euo pipefail
+          [[ "$GCP_STAGING_SMOKE_SERVICE_ACCOUNT" == "work-card-smoke@${GCP_RELEASE_PROJECT_ID}.iam.gserviceaccount.com" ]]
+          [[ "$GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER" =~ ^projects/[1-9][0-9]*/locations/global/workloadIdentityPools/github-deployment/providers/work-card-deploy$ ]]
+          [[ "$REVISION" =~ ^[a-z][a-z0-9-]{0,62}$ ]]
+
+      - name: Install Chromium for the canonical hosted lifecycle
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run exact-digest HTTPS and browser smoke with renewable smoke identity
+        run: |
+          set -euo pipefail
+          node scripts/release/hosted-smoke.mjs \
+            --manifest "docs/release/manifests/${SOURCE_SHA}.json" \
+            --revision-metadata .quality-results/staging/revision.json \
+            --revision "$REVISION" \
+            --origin "$GCP_STAGING_ORIGIN" \
+            --service-account "$GCP_STAGING_SMOKE_SERVICE_ACCOUNT" \
+            --workload-identity-provider "$GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER" \
+            --output .quality-results/staging/hosted-smoke.json
+
+      - name: Upload smoke output without credentials or traces
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-smoke-${{ needs.preflight.outputs.source-sha }}
+          path: |
+            WorkCard-Lifecycle/docs/release/manifests/${{ needs.preflight.outputs.source-sha }}.json
+            WorkCard-Lifecycle/docs/release/evidence/${{ needs.preflight.outputs.source-sha }}
+            WorkCard-Lifecycle/scripts/release/hosted-smoke-report.schema.json
+            WorkCard-Lifecycle/.quality-results/staging
+            WorkCard-Lifecycle/playwright-report/hosted-smoke
+            WorkCard-Lifecycle/test-results/hosted-smoke
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 30
+
+  observe:
+    name: Verify hosted logs and finalize evidence
+    needs: [preflight, deploy, smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT }}
+      GCP_STAGING_PROJECT_ID: ${{ vars.GCP_STAGING_PROJECT_ID }}
+      REVISION: ${{ needs.deploy.outputs.candidate-revision }}
+      SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
+    steps:
+      - name: Checkout the verified source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.preflight.outputs.source-sha }}
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Download successful smoke output
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: staging-smoke-${{ needs.preflight.outputs.source-sha }}
+          path: WorkCard-Lifecycle
+
+      - name: Authenticate as the read-only log observer and deployer
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          create_credentials_file: true
+          project_id: ${{ env.GCP_STAGING_PROJECT_ID }}
+          service_account: ${{ env.GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set up the pinned Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ env.GCP_STAGING_PROJECT_ID }}
+          version: 582.0.0
+
+      - name: Correlate application logs with Cloud Run request logs
+        run: |
+          set -euo pipefail
+
+          report=.quality-results/staging/hosted-smoke.json
+          started_at="$(jq -er '.startedAt' "$report")"
+          container_filter="resource.type=\"cloud_run_revision\" AND resource.labels.revision_name=\"${REVISION}\" AND (logName:\"run.googleapis.com%2Fstdout\" OR logName:\"run.googleapis.com%2Fstderr\") AND timestamp>=\"${started_at}\""
+          request_filter="resource.type=\"cloud_run_revision\" AND resource.labels.revision_name=\"${REVISION}\" AND logName:\"run.googleapis.com%2Frequests\" AND timestamp>=\"${started_at}\""
+
+          validated=false
+          for attempt in 1 2 3 4 5 6; do
+            gcloud logging read "$container_filter" \
+              --project "$GCP_STAGING_PROJECT_ID" --order=asc --limit=10000 --format=json \
+              > .quality-results/staging/container-logs.json
+            gcloud logging read "$request_filter" \
+              --project "$GCP_STAGING_PROJECT_ID" --order=asc --limit=10000 --format=json \
+              > .quality-results/staging/request-logs.json
+            if node scripts/release/validate-hosted-observations.mjs \
+              --smoke-report "$report" \
+              --container-logs .quality-results/staging/container-logs.json \
+              --request-logs .quality-results/staging/request-logs.json \
+              --output .quality-results/staging/hosted-observations.json; then
+              validated=true
+              break
+            fi
+            [[ "$attempt" -lt 6 ]] && sleep 10
+          done
+          [[ "$validated" == true ]]
+
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
+          recorded_at="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
+          node scripts/release/create-staging-evidence.mjs \
+            --kind smoke \
+            --manifest "docs/release/manifests/${SOURCE_SHA}.json" \
+            --smoke-report "$report" \
+            --observations .quality-results/staging/hosted-observations.json \
+            --run-url "$run_url" \
+            --recorded-at "$recorded_at" \
+            --output .quality-results/staging/smoke-candidate.json
+          node scripts/release/append-release-evidence.mjs \
+            --record .quality-results/staging/smoke-candidate.json
+
+      - name: Upload finalized append-only staging evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-evidence-${{ needs.preflight.outputs.source-sha }}
+          path: |
+            WorkCard-Lifecycle/docs/release/manifests/${{ needs.preflight.outputs.source-sha }}.json
+            WorkCard-Lifecycle/docs/release/evidence/${{ needs.preflight.outputs.source-sha }}
+            WorkCard-Lifecycle/docs/release/release-evidence.schema.json
+            WorkCard-Lifecycle/scripts/release/hosted-smoke-report.schema.json
+            WorkCard-Lifecycle/.quality-results/staging/hosted-smoke.json
+            WorkCard-Lifecycle/.quality-results/staging/hosted-observations.json
+            WorkCard-Lifecycle/playwright-report/hosted-smoke
+            WorkCard-Lifecycle/test-results/hosted-smoke
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
+
+  rollback_failed_staging:
+    name: Restore prior staging traffic after failure
+    needs: [preflight, deploy, smoke, observe]
+    if: >-
+      ${{ always() && needs.deploy.outputs.rollback-required == 'true' &&
+          (needs.deploy.result != 'success' || needs.smoke.result != 'success' || needs.observe.result != 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT: ${{ vars.GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT }}
+      GCP_STAGING_PROJECT_ID: ${{ vars.GCP_STAGING_PROJECT_ID }}
+      PREVIOUS_REVISION: ${{ needs.deploy.outputs.previous-revision }}
+      REGION: europe-west1
+      SERVICE: work-card-app
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Authenticate as the isolated release deployer
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          create_credentials_file: true
+          project_id: ${{ env.GCP_STAGING_PROJECT_ID }}
+          service_account: ${{ env.GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set up the pinned Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ env.GCP_STAGING_PROJECT_ID }}
+          version: 582.0.0
+
+      - name: Restore 100 percent traffic to the recorded prior revision
+        run: |
+          set -euo pipefail
+          [[ "$PREVIOUS_REVISION" =~ ^[a-z][a-z0-9-]{0,62}$ ]]
+          active_account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | tr -d '\r')"
+          [[ "$active_account" == "$GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT" ]]
+          gcloud run revisions describe "$PREVIOUS_REVISION" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --format=json > rollback-previous-revision.json
+          jq -e '
+            ((.status.conditions // .conditions // []) |
+              any(.type == "Ready" and (.status == "True" or .state == "CONDITION_SUCCEEDED"))) and
+            ((.status.reconciling // .reconciling // false) != true)
+          ' rollback-previous-revision.json >/dev/null
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions "${PREVIOUS_REVISION}=100" \
+            --quiet
+          gcloud run services describe "$SERVICE" \
+            --project "$GCP_STAGING_PROJECT_ID" \
+            --region "$REGION" \
+            --format=json > rollback-service.json
+          jq -e --arg revision "$PREVIOUS_REVISION" '
+            [.status.traffic[]? | select((.percent // 0) == 100) | (.revisionName // .revision)] == [$revision]
+          ' rollback-service.json >/dev/null
+
+      - name: Upload rollback metadata
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-rollback-${{ needs.preflight.outputs.source-sha }}
+          path: |
+            WorkCard-Lifecycle/rollback-previous-revision.json
+            WorkCard-Lifecycle/rollback-service.json
+          if-no-files-found: warn
+          retention-days: 30

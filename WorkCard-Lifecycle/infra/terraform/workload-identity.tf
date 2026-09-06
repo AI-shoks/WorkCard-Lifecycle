@@ -50,7 +50,7 @@ resource "google_iam_workload_identity_pool" "github_deployment" {
   project                   = google_project.environment["release"].project_id
   workload_identity_pool_id = "github-deployment"
   display_name              = "GitHub deployment"
-  description               = "Isolated short-lived identities for the future Work Card deployment workflow."
+  description               = "Isolated short-lived identities for the manual Work Card deployment workflow."
   disabled                  = false
   deletion_policy           = var.teardown_mode ? "DELETE" : "PREVENT"
 
@@ -62,7 +62,7 @@ resource "google_iam_workload_identity_pool_provider" "github_deployment" {
   workload_identity_pool_id          = google_iam_workload_identity_pool.github_deployment.workload_identity_pool_id
   workload_identity_pool_provider_id = "work-card-deploy"
   display_name                       = "Work Card deployment"
-  description                        = "Trusts only future manual main-branch deploy.yml runs from the configured immutable GitHub repository IDs."
+  description                        = "Trusts only manual main-branch deploy.yml runs from the configured immutable GitHub repository IDs."
   deletion_policy                    = var.teardown_mode ? "DELETE" : "PREVENT"
 
   attribute_mapping = {
@@ -88,6 +88,14 @@ resource "google_iam_workload_identity_pool_provider" "github_deployment" {
 
 resource "google_service_account_iam_member" "release_deployer_workload_identity" {
   service_account_id = google_service_account.release_deployer.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_deployment.name}/attribute.repository_id/${var.github_repository_id}"
+
+  depends_on = [google_iam_workload_identity_pool_provider.github_deployment]
+}
+
+resource "google_service_account_iam_member" "smoke_runner_workload_identity" {
+  service_account_id = google_service_account.smoke_runner.name
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_deployment.name}/attribute.repository_id/${var.github_repository_id}"
 

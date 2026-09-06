@@ -74,7 +74,7 @@ jobs:
             | jq -e --arg version "$TERRAFORM_VERSION" '.terraform_version == $version' >/dev/null
 
       - name: Lint CI and release workflows
-        run: actionlint ../.github/workflows/ci.yml ../.github/workflows/release.yml
+        run: actionlint ../.github/workflows/ci.yml ../.github/workflows/release.yml ../.github/workflows/deploy.yml
 
       - name: Validate release manifests, schemas, and append-only evidence
         run: pnpm test:release

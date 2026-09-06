@@ -1,7 +1,7 @@
 ---
 artifact_id: release.deployment
 status: accepted
-version: 6
+version: 7
 owner: release
 updated: 2026-09-06
 ---
@@ -16,13 +16,14 @@ updated: 2026-09-06
 |---|---|
 | Hosting и managed PostgreSQL выбраны | принято: Google Cloud Run + Cloud SQL for PostgreSQL 18 по [[0007-cloud-run-and-cloud-sql-release|ADR-0007]] |
 | Правило source SHA + image digest | принято; формат release record определён ниже |
-| Reviewable IaC | [Terraform root](../../infra/terraform/README.md) описывает 166 resource changes, включая две изолированные WIF-границы, reset и узкий production IAM operator; `fmt`, `validate` и strict plan-safety проходят локально, обязательный удалённый gate добавлен в CI, но ещё не запускался |
+| Reviewable IaC | [Terraform root](../../infra/terraform/README.md) описывает 167 resource changes, включая две изолированные WIF-границы, отдельные deployer/smoke impersonation targets, reset и узкий production IAM operator; `fmt`, `validate` и strict plan-safety проходят локально, обязательный удалённый gate добавлен в CI, но ещё не запускался |
 | Release image workflow | реализован как ручной `main`-only `workflow_dispatch`; локально проверен, но не запускался |
+| Staging orchestration и smoke runner | `deploy.yml`, exact-digest job/revision validators, HTTPS/browser smoke, log correlation и append-only evidence реализованы и локально проверены; provisioning и hosted run отсутствуют |
 | Runtime pre-deploy controls | sanitized health, structured Pino, bounded Cloud Run proxy mode и fail-fast Unix-socket URL реализованы и локально проверены; hosted qualification отсутствует |
 | IAM/demo operations hardening | локально реализованы capacity/session cleanup, owner-only reset, deletion guards и runbooks; WIF, IAM, reset cadence и teardown в GCP не исполнялись и hosted evidence отсутствует |
 | Конкретный release image | не создан и не опубликован; source SHA и registry digest ещё не присвоены |
 | Cloud resources, DNS, secrets и базы | не создавались; `terraform apply` не запускался |
-| Staging smoke и production promotion | только критерии; запусков и evidence URL пока нет |
+| Staging smoke и production promotion | staging implementation готова к review, production пока только критерии; запусков и evidence URL нет |
 
 Нельзя подставлять локальный Docker image ID вместо registry digest или объявлять SHA этапа 9 релизным образом. Фактические значения появляются только после отдельного воспроизводимого build/push и проверки registry metadata.
 
@@ -98,6 +99,20 @@ Publish job собирает `linux/amd64` image ровно один раз до
 
 До отдельного разрешения WIF/registry не создаются и workflow не запускается. Поэтому реализация pipeline не является свидетельством опубликованного образа; фактический `<SHA>.json` появится только после успешного разрешённого run и затем может быть отдельно просмотрен и добавлен в Git.
 
+## Staging orchestration без выполненного deployment
+
+Корневой `.github/workflows/deploy.yml` реализует кодовую часть пятой задачи этапа 10. Он имеет только ручной trigger из `main`, требует точную фразу `DEPLOY EXACT DIGEST TO STAGING`, serializes staging runs и использует GitHub Environment `staging`. Preflight принимает лишь успешный `release.yml` run того же SHA, скачивает artifact по конкретному run ID и заново валидирует manifest, Trivy report, `sourceSha`, OCI label и `buildScanRunUrl`. Ни build, ни tag deployment, ни Terraform внутри workflow нет.
+
+Привилегированная deployment job получает short-lived WIF credential `work-card-deployer`. До исполнения она сравнивает manifest digest с Artifact Registry и проверяет существующие Cloud Run jobs `migrate`, `seed`, `verify`: exact image, отдельную workload service account, фиксированные command/args, ровно один task/parallelism, нулевые retries, exact env boundary, numeric Secret Manager versions и один staging Cloud SQL mount. Execution overrides запрещены; порядок — `migrate → seed → verify`, затем тот же цикл ещё раз для idempotence/history evidence. После jobs workflow требует существующий healthy staging service с одной 100%-revision для rollback, создаёт candidate с `--no-traffic`, до переключения проверяет Ready/exact digest/source label/runtime-only secrets/app identity/socket mount, фиксирует previous revision и только затем переводит 100% traffic. Rollback output фиксируется завершившимся no-traffic step; при любой последующей ошибке restore повторно читает previous revision и переключает traffic только если она всё ещё Ready и не reconciling.
+
+Hosted job не наследует deployer credential. Тот же workflow-bound WIF provider может impersonate отдельную `work-card-smoke`, но её единственная ресурсная роль — `roles/run.invoker` на private staging service; JSON key, Secret Manager и Cloud SQL access не выдаются. Узкий broker в родительском smoke process обменивает GitHub OIDC только на audience-bound ID token этой service account, проверяет issuer/audience/email/lifetime и обновляет token до истечения. Browser process не получает GitHub OIDC, Google credential env, DB/owner credentials или deployer identity; он читает только текущий ID token из режимного temporary file, который удаляется после запуска и не попадает в artifacts/trace.
+
+Smoke проверяет IAM denial без token, sanitized live/ready, SPA/JS/CSS MIME и security headers, обязательную app-auth, Origin/CSRF/role rejections без side effect, Cloud Run proxy/rate-limit key и канонический browser lifecycle `112 → 3 → 250`, три first-article gates, `250/250 CLOSED`, финальную приёмку, audit `254/254` и payroll read-back. Установка Chromium предшествует первому token exchange; browser lifecycle выполняется до намеренного исчерпания rate-limit bucket, имеет zero retries и 25-минутный safety timeout при обновлении короткоживущего token за две минты до expiry. Playwright добавляет token через one-hop fetch только к точному staging origin и блокирует внешние запросы, поэтому header не переносится на redirect origin. Прямой DB read-back в hosted mode отсутствует.
+
+После успешного smoke deployer используется отдельно и только как уже описанный log viewer: validator находит allowlisted completion logs по server-generated request IDs, сопоставляет Cloud Trace с platform request logs, сравнивает status/client IP, требует распознанные INFO/WARNING и отвергает заранее внедрённые query/header/body/DB markers. Deployment и smoke candidates проходят [release evidence schema](release-evidence.schema.json), после чего exclusive appender формирует два последовательных hash-chained records с job execution IDs, revision/digest, numeric versions и SHA-256 smoke/observation reports. Это workflow artifacts, а не автоматический commit.
+
+Неисполненный workflow не является provisioning runbook для первой service resource: до запуска должны существовать проверенные jobs, private staging service и previous 100%-revision из отдельно одобренных Terraform phases. Для первого clean staging операторская последовательность всё ещё включает отдельные plan/apply approvals и обязана сохранить общий порядок `migrate → seed → verify → deploy → smoke`; точная разбивка initial service phase проверяется перед разрешением реального прохода. Сейчас repository variables/outputs не назначены, `terraform apply`, `release.yml`, `deploy.yml` и hosted запросы не выполнялись.
+
 ## Отдельные DB jobs и owner boundary
 
 Один image используется с разными командами. Каждая job имеет `tasks=1`, `parallelism=1`, `maxRetries=0`, конечный timeout и exact digest. Автоматический schedule отсутствует.
@@ -138,13 +153,13 @@ Migration failure останавливает выпуск до rollout. Down mig
 
 `roles/run.developer` умеет читать service IAM policy, но не даёт `run.services.setIamPolicy`; поэтому одного его недостаточно для maintenance runbook. Project-wide `roles/run.admin` не выдаётся. Custom permission `setIamPolicy` всё же позволяет изменить любую binding policy конкретного сервиса, поэтому orchestration обязана принимать только точный toggle `allUsers roles/run.invoker`, сравнивать остальной policy и завершаться ошибкой при любом другом diff.
 
-Future deployment orchestration аутентифицируется без JSON key через отдельный `github-deployment` WIF pool/provider. Trust принимает только настроенные immutable GitHub repository/owner IDs, `refs/heads/main`, `workflow_dispatch` и точный `AI-shoks/WorkCard-Lifecycle/.github/workflows/deploy.yml@refs/heads/main`; `roles/iam.workloadIdentityUser` связывает его только с `work-card-deployer`. Publisher workflow `release.yml` использует другой pool и другую service account. Файл `deploy.yml` пока не создан, outputs не назначены, WIF не provisioned и эта дорожка не является работающей automation.
+Deployment orchestration аутентифицируется без JSON key через отдельный `github-deployment` WIF pool/provider. Trust принимает только настроенные immutable GitHub repository/owner IDs, `refs/heads/main`, `workflow_dispatch` и точный `AI-shoks/WorkCard-Lifecycle/.github/workflows/deploy.yml@refs/heads/main`; два отдельных `roles/iam.workloadIdentityUser` binding ведут к `work-card-deployer` и `work-card-smoke`. Publisher workflow `release.yml` использует другой pool и другую service account. Deployer сохраняет привилегированную deploy/actAs boundary, а smoke identity имеет только staging invocation; outputs пока не назначены, WIF не provisioned и локально проверенный `deploy.yml` ещё не является работающей hosted automation.
 
 У deployer нет прямой роли `roles/secretmanager.secretAccessor`. Это не означает принципиальной невозможности получить payload: сочетание deploy permission и `roles/iam.serviceAccountUser` позволяет присоединять workload identity к Cloud Run workload и тем самым косвенно выполнять код с её разрешениями. Поэтому доступ к deployer WIF, изменение workflow, неожиданный revision/job execution и secret-access audit от workload identity входят в одну привилегированную threat boundary и требуют incident response/rotation.
 
 ## Production public-IAM maintenance runbook
 
-Runbook применяется только к `migrate` и ежедневному `reset`. Он выполняется в будущей `deploy.yml` job под WIF-authenticated `work-card-deployer`; использование личного `gcloud` login или service-account key запрещено. Перед запуском оператор фиксирует production project/service/origin, execution purpose, approver и каталог временных evidence-файлов. `OPERATION` допускает только `migrate` или `reset`; параметры/secret overrides запрещены.
+Runbook применяется только к `migrate` и ежедневному `reset`. Его production-вариант ещё не автоматизирован; будущая production job должна работать под WIF-authenticated `work-card-deployer`, как реализованная staging job в `deploy.yml`. Использование личного `gcloud` login или service-account key запрещено. Перед запуском оператор фиксирует production project/service/origin, execution purpose, approver и каталог временных evidence-файлов. `OPERATION` допускает только `migrate` или `reset`; параметры/secret overrides запрещены.
 
 Ниже обязательный алгоритм для Linux runner. Placeholder-значения нельзя выполнять; реальные значения берутся только из просмотренных Terraform outputs.
 
@@ -293,7 +308,7 @@ Cloud Run получает явные HTTP/1 probes: startup `period=5s`, `timeo
 
 ## Staging smoke
 
-Staging qualification обязательна для exact digest и проходит на отдельной чистой БД. Smoke runner не получает owner URL и взаимодействует с приложением только по HTTPS; короткоживущий IAM token даёт доступ к приватному staging service.
+Staging qualification обязательна для exact digest и проходит на отдельной чистой БД. Реализованный smoke runner не получает owner/runtime DB URL и взаимодействует с приложением только по HTTPS; короткоживущий IAM token даёт доступ к приватному staging service. Ни одного hosted запуска ещё не было.
 
 Promotion gate требует:
 
@@ -346,7 +361,7 @@ Public interactive остаётся режимом доступа на всём 
 3. создаёт обычный `terraform plan` с текущими inputs и `teardown_mode=false`; неожиданный drift, replacement или destroy сначала расследуется;
 4. получает отдельное явное разрешение на **phase A**, меняет только `teardown_mode=true` и строит новый plan. Допустимы только снятие `deletion_policy=PREVENT`, `deletion_protection`, SQL `deletion_protection_enabled` и `retain_backups_on_delete`; любой create/replace/delete останавливает phase A;
 5. выполняет одобренный phase-A `terraform apply`, затем сразу строит отдельный `terraform plan -destroy` с теми же reviewed inputs и `teardown_mode=true`;
-6. сверяет destroy inventory со всеми 166 управляемыми ресурсами и получает второе, отдельное разрешение на **phase B**. Частичный `-target` teardown запрещён;
+6. сверяет destroy inventory со всеми 167 управляемыми ресурсами и получает второе, отдельное разрешение на **phase B**. Частичный `-target` teardown запрещён;
 7. выполняет `terraform destroy` только после phase-B approval, затем независимо проверяет удаление трёх projects, Cloud SQL/backups, Secret Manager, Cloud Run, registry, WIF и billing linkage; remote state/evidence сохраняется по отдельной retention policy без secret payloads.
 
 Terraform по умолчанию фиксирует `teardown_mode=false`: projects, registry, service accounts, WIF, Cloud SQL/database, secret containers, services и jobs имеют `deletion_policy=PREVENT`, а поддерживаемые ресурсы — дополнительный `deletion_protection=true`. Strict plan-safety отклоняет release review с `teardown_mode=true` или отсутствующим guard. Поэтому обычный `terraform destroy` должен безопасно остановиться; обходить защиту state editing, `-target`, console deletion или ручным изменением policy нельзя.
@@ -367,12 +382,12 @@ Phase A и phase B никогда не объединяются в один не
 
 Вторая задача этапа 10 реализована в [infra/terraform](../../infra/terraform/README.md). Конфигурация фиксирует provider в lockfile и описывает:
 
-- release/staging/production projects, необходимые APIs, least-privilege IAM, immutable Artifact Registry и отдельные GitHub WIF trust boundaries для publisher и future deployer workflows;
+- release/staging/production projects, необходимые APIs, least-privilege IAM, immutable Artifact Registry и отдельные GitHub WIF trust boundaries для publisher и deployment workflow с разными deployer/smoke targets;
 - отдельные Cloud SQL/Secret Manager/runtime identities контуров, числовые secret versions и owner/runtime boundary;
 - Cloud Run services и отдельные `migrate`/`reset`/`seed`/`verify` jobs на одном exact image digest;
 - узкий custom role для production public-IAM toggle, demo capacity, startup/liveness probes, log retention/audit config, alerts, production uptime checks, backups/PITR, budgets и teardown guards.
 
-`terraform fmt -check -recursive` и `terraform validate` проходят. Локальный review plan по example inputs даёт `166 to add / 0 to change / 0 to destroy`; strict JSON-проверка подтверждает точные deployer roles, actAs/job/secret matrices, единственный production `allUsers`, custom role из двух permissions, раздельные WIF providers, reset secret/identity, capacity и deletion guards. Она также не находит materialized secret payloads, root passwords, credential URLs или service-account keys. Сами значения secrets передаются как ephemeral inputs в write-only provider fields и не сохраняются в plan/state.
+`terraform fmt -check -recursive` и `terraform validate` проходят. Локальный review plan по example inputs даёт `167 to add / 0 to change / 0 to destroy`; strict JSON-проверка подтверждает точные deployer roles, actAs/job/secret matrices, единственный production `allUsers`, custom role из двух permissions, раздельные WIF providers и точные deployer/smoke impersonation targets, reset secret/identity, capacity и deletion guards. Она также не находит materialized secret payloads, root passwords, credential URLs или service-account keys. Сами значения secrets передаются как ephemeral inputs в write-only provider fields и не сохраняются в plan/state.
 
 Это только review plan: remote encrypted/versioned backend ещё не настроен, реальные tfvars/secrets не созданы, cloud credentials не использовались и `terraform apply` не запускался.
 
@@ -380,10 +395,10 @@ Phase A и phase B никогда не объединяются в один не
 
 - IaC локально проверен, но real inputs, remote backend, billing eligibility/смета и разрешение на `apply` отсутствуют; ни один cloud resource не создан;
 - WIF/registry ещё не созданы, три несекретные GitHub variables не назначены и ручной release workflow не запускался; опубликованный image и фактический manifest отсутствуют;
-- future `deploy.yml` orchestration, reset schedule/last-success monitor и assignment deployment-WIF outputs ещё не реализованы; локальный runbook не доказывает IAM propagation или обязательный restore;
+- `deploy.yml`/hosted runner реализованы только локально; assignment deployment-WIF outputs, reset schedule/last-success monitor и первый hosted run ещё не выполнены, поэтому код rollback не доказывает IAM propagation или фактический restore;
 - runtime controls локально реализованы, но Cloud Logging severity ingestion, фактическая Cloud Run proxy chain/client IP и соединение через смонтированный Cloud SQL Unix socket ещё не имеют hosted evidence;
-- hosted smoke runner ещё не умеет проверять внешний exact digest без прямого DB/owner доступа;
+- hosted smoke runner имеет локальные negative/contract tests, но ещё не проверял внешний exact digest и Cloud Run/Cloud SQL chain;
 - staging/production secrets, backups/PITR, alerts, jobs, revisions и smoke evidence отсутствуют;
 - фактические source SHA/digest нельзя заполнить до публикации release image.
 
-Этап 10 закрывается только после реального staging smoke и production promotion/rollback drill с evidence. Выполнены ровно первые 4 из 7 задач: release design, reviewable IaC, release-image workflow и runtime pre-deploy controls; четвёртая задача закрыта реализацией и локальными deterministic tests, а не hosted qualification. Provisioning, публикация и deployment не выполнялись.
+Этап 10 закрывается только после реального staging smoke и production promotion/rollback drill с evidence. Выполнены ровно первые 4 из 7 задач: release design, reviewable IaC, release-image workflow и runtime pre-deploy controls; code/config часть пятой задачи не повышает прогресс без hosted qualification. Provisioning, публикация и deployment не выполнялись.

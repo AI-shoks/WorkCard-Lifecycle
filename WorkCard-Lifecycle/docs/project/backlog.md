@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 31
+version: 33
 owner: project
 updated: 2026-09-06
 ---
@@ -10,7 +10,7 @@ updated: 2026-09-06
 
 Оперативные задачи проекта следуют каноническому [[project-plan|roadmap]]. Требования к поведению системы хранятся в `docs/requirements/`, а принятые решения — в [[decision-log]] и [[adr-index|ADR]].
 
-**На 2026-09-06 этапы 1–9 закрыты; этап 10 «Релиз» остаётся в работе на 4/7. Локальный hardening добавил узкий public-IAM operator, bounded shared demo, reset/lifetime runbooks и plan assertions, но это не hosted qualification.**
+**На 2026-09-06 этапы 1–9 закрыты; этап 10 «Релиз» остаётся в работе на 4/7. Код `deploy.yml` и hosted smoke runner для пятой задачи подготовлен локально, но это ещё не provisioning, deployment или hosted qualification.**
 
 ## Выполнено — этапы 1–4
 
@@ -97,14 +97,14 @@ Desktop/mobile UI, все 14 шагов прототипа и `window.runUxCopyA
 ## В работе — этап 10 «Релиз»
 
 - [x] Выбрать Cloud Run/Artifact Registry и отдельные Cloud SQL PostgreSQL 18; зафиксировать в [[0007-cloud-run-and-cloud-sql-release|ADR-0007]], [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment]] build-once image, owner-only DB jobs, bounded shared demo, secrets/`APP_ORIGIN`, health/logging, staging smoke, promotion, rollback и lifetime.
-- [x] Реализовать [reviewable Terraform IaC](../../infra/terraform/README.md) для раздельных release/staging/production projects, IAM, Cloud SQL, Secret Manager, Cloud Run service/jobs, probes, logs, alerts, backups/PITR и budget controls; hardening добавляет reset identity/job, custom production service IAM role, отдельный future deployer WIF и deletion guards. `fmt`, `validate` и strict review plan `166/0/0` проходят без `apply`.
-- [x] Реализовать ручной `main`-only release workflow с short-lived Workload Identity, full-SHA immutable Artifact Registry tag, registry digest capture/recheck, pull/semantic Trivy scan exact опубликованного digest и schema-validated генерацией несекретного `docs/release/manifests/<SHA>.json`; будущие deployment/smoke/promotion/rollback факты пишутся отдельными append-only hash-chained records без placeholders. Обязательная будущая CI job проверяет actionlint, manifest/schema/tests и secret/WIF-safe Terraform plan; release preflight требует её успеха. Workflow и удалённая job для текущих изменений не запускались, image/manifest/hosted evidence ещё не существуют.
+- [x] Реализовать [reviewable Terraform IaC](../../infra/terraform/README.md) для раздельных release/staging/production projects, IAM, Cloud SQL, Secret Manager, Cloud Run service/jobs, probes, logs, alerts, backups/PITR и budget controls; hardening добавляет reset identity/job, custom production service IAM role, отдельные deployment-WIF bindings для deployer/smoke identities и deletion guards. `fmt`, `validate` и strict review plan `167/0/0` проходят без `apply`.
+- [x] Реализовать ручной `main`-only release workflow с short-lived Workload Identity, full-SHA immutable Artifact Registry tag, registry digest capture/recheck, pull/semantic Trivy scan exact опубликованного digest и schema-validated генерацией несекретного `docs/release/manifests/<SHA>.json`; будущие deployment/smoke/promotion/rollback факты пишутся отдельными append-only hash-chained records без placeholders. Обязательная `Release and IaC contract` CI job проверяет actionlint всех трёх workflows, manifest/schema/release tests и secret/WIF-safe Terraform plan; release preflight требует её успеха. Workflow и удалённая job для текущих изменений не запускались, image/manifest/hosted evidence ещё не существуют.
 - [x] Закрыть pre-deploy gaps из [[deployment]] на уровне кода/config: public health публикует только status; Pino пишет allowlisted Cloud Logging context; proxy/socket boundaries проверяются; общий demo ограничен 20 партиями/500 sessions, очищает expired sessions и имеет owner-only transactional reset. Фактические IAM close/restore, reset cadence, Cloud Logging ingestion, proxy chain/client IP и socket connection остаются обязательным hosted evidence, а не результатом этой задачи.
-- [ ] Реализовать hosted smoke runner без DB/owner credentials и выполнить реальный clean staging `migrate → seed → verify → deploy → smoke` для одного exact digest.
+- [ ] Завершить hosted qualification для одного exact digest: `deploy.yml`, smoke/log/evidence runners, negative tests и отдельный smoke WIF binding уже реализованы и локально проверены без DB/owner credentials; checkbox остаётся открытым до отдельно разрешённых provisioning и реального clean staging `migrate → seed → verify → deploy → smoke` без test retry.
 - [ ] После отдельного разрешения продвинуть тот же digest в production, подтвердить узкий IAM close/restore, daily reset/fail-closed policy, backup/PITR, bounded smoke, traffic rollback и lifetime/teardown evidence.
 - [ ] Обновить evidence/ограничения, выполнить strict documentation audit и semantic review; закрыть этап только по фактическим hosted результатам.
 
-**Прогресс этапа 10 — ровно 4/7:** завершены release design, reviewable IaC, неисполненный release-image workflow и runtime pre-deploy controls, включая локальный IAM/demo hardening. Результат подтверждён только code tests/config/plan/docs audit; `terraform apply` и `workflow_dispatch` не выполнялись, поэтому cloud resources, реальные secrets, registry image, фактический source SHA/digest manifest, staging/production revisions, IAM/reset/Cloud Run/Cloud SQL qualification и smoke evidence не создавались. Этап остаётся в работе.
+**Прогресс этапа 10 — ровно 4/7:** завершены release design, reviewable IaC, неисполненный release-image workflow и runtime pre-deploy controls; реализация orchestration/runner является незавершённой частью пятой задачи, а не новым закрытым пунктом. Результат подтверждён только code tests/config/plan/docs audit; `terraform apply` и `workflow_dispatch` не выполнялись, поэтому cloud resources, реальные secrets, registry image, фактический source SHA/digest manifest, staging/production revisions, IAM/reset/Cloud Run/Cloud SQL qualification и smoke evidence не создавались. Этап остаётся в работе.
 
 ## Maintenance
 

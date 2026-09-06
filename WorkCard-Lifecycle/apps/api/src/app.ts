@@ -30,6 +30,12 @@ import { registerRateLimits } from './runtime-protection.js';
 import type { SessionManagerOptions } from './session-manager.js';
 
 const expectedMigrationVersion = 3;
+const cloudTraceContextPattern = /^([0-9a-f]{32})(?:\/[0-9]+)?(?:;o=[01])?$/;
+
+function cloudTraceId(header: string | string[] | undefined): string | undefined {
+  const value = Array.isArray(header) ? header[0] : header;
+  return value?.match(cloudTraceContextPattern)?.[1];
+}
 
 export type BuildAppOptions = {
   appVersion: string;
@@ -101,12 +107,15 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
 
   app.addHook('onResponse', async (request, reply) => {
+    const traceId = cloudTraceId(request.headers['x-cloud-trace-context']);
     const fields = {
       durationMs: reply.elapsedTime,
       method: request.method,
+      remoteIp: request.ip,
       requestId: request.id,
       routeTemplate: request.routeOptions.url ?? '[unmatched]',
       status: reply.statusCode,
+      ...(traceId ? { traceId } : {}),
     };
     if (reply.statusCode >= 500) {
       request.log.error(fields, 'request completed');

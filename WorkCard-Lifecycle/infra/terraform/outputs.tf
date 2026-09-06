@@ -37,10 +37,11 @@ output "release_workload_identity" {
 }
 
 output "deployment_workload_identity" {
-  description = "Keyless identity reserved for the future deployment orchestration workflow."
+  description = "Keyless identities reserved for the deployment orchestration and hosted smoke jobs."
   value = {
     provider                 = google_iam_workload_identity_pool_provider.github_deployment.name
     deployer_service_account = google_service_account.release_deployer.email
+    smoke_service_account    = google_service_account.smoke_runner.email
     repository               = var.github_repository
     repository_id            = var.github_repository_id
     repository_owner_id      = var.github_repository_owner_id
