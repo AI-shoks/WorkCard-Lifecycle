@@ -72,7 +72,7 @@ const expectedExactCounts = new Map([
   ['google_project_iam_custom_role', 1],
   ['google_project_iam_member', 20],
   ['google_secret_manager_secret_iam_member', 16],
-  ['google_service_account_iam_member', 12],
+  ['google_service_account_iam_member', 13],
   ['google_artifact_registry_repository_iam_member', 4],
   ['google_cloud_run_v2_service', 2],
   ['google_cloud_run_v2_service_iam_member', 3],
@@ -228,6 +228,7 @@ for (const resource of resourcesOfType('google_secret_manager_secret_iam_member'
 assertExactAddresses('google_service_account_iam_member', [
   'google_service_account_iam_member.artifact_publisher_workload_identity',
   'google_service_account_iam_member.release_deployer_workload_identity',
+  'google_service_account_iam_member.smoke_runner_workload_identity',
   ...environments.flatMap((environment) =>
     workloads.map(
       (workload) =>
@@ -424,6 +425,12 @@ const deployerWorkloadIdentityBinding = requireResource(
 if (deployerWorkloadIdentityBinding?.role !== 'roles/iam.workloadIdentityUser') {
   violations.push('Release deployer не имеет ожидаемый roles/iam.workloadIdentityUser binding');
 }
+const smokeWorkloadIdentityBinding = requireResource(
+  'google_service_account_iam_member.smoke_runner_workload_identity',
+);
+if (smokeWorkloadIdentityBinding?.role !== 'roles/iam.workloadIdentityUser') {
+  violations.push('Smoke runner не имеет ожидаемый roles/iam.workloadIdentityUser binding');
+}
 
 function rootConfigurationResource(address) {
   return plan.configuration?.root_module?.resources?.find(
@@ -467,6 +474,21 @@ assertExpressionReferences(
   'service_account_id',
   ['google_service_account.release_deployer.name'],
   'release deployer WIF target',
+);
+const smokeWifConfiguration = rootConfigurationResource(
+  'google_service_account_iam_member.smoke_runner_workload_identity',
+);
+assertExpressionReferences(
+  smokeWifConfiguration,
+  'member',
+  ['google_iam_workload_identity_pool.github_deployment.name'],
+  'smoke runner WIF trust boundary',
+);
+assertExpressionReferences(
+  smokeWifConfiguration,
+  'service_account_id',
+  ['google_service_account.smoke_runner.name'],
+  'smoke runner WIF target',
 );
 
 const productionModule = plan.configuration?.root_module?.module_calls?.production?.module;

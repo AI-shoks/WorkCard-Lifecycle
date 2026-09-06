@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.environments
 status: accepted
-version: 7
+version: 8
 owner: engineering
 updated: 2026-09-06
 ---
@@ -61,7 +61,7 @@ Compose формирует внутренние URL с hostname `database`; host
 | seed job | `APP_ENV`, `APP_VERSION`, `APP_DATABASE_USER`, `LOG_LEVEL` | `MIGRATION_DATABASE_URL`, `APP_DATABASE_PASSWORD` | `DATABASE_URL`, `SESSION_SIGNING_SECRET` |
 | verify job | `APP_ENV`, `APP_VERSION`, `APP_DATABASE_USER`, `LOG_LEVEL` | `DATABASE_URL` | owner URL/password, session secret |
 
-Каждый workload ссылается на конкретный числовой Secret Manager version. Alias `latest` запрещён для release configuration. Service identities получают `secretAccessor` только на перечисленные secrets; staging identity не читает production project. Publisher и future deployer используют разные short-lived WIF providers и не хранят service-account JSON key. У deployer нет прямого secret access, но `iam.serviceAccountUser` + deploy permission даёт косвенный путь через workload identity; эта граница требует тех же controls, что secret-capable principal.
+Каждый workload ссылается на конкретный числовой Secret Manager version. Alias `latest` запрещён для release configuration. Service identities получают `secretAccessor` только на перечисленные secrets; staging identity не читает production project. Publisher и deployment workflow используют разные short-lived WIF providers и не хранят service-account JSON key. Deployment provider имеет явные targets `work-card-deployer` и `work-card-smoke`: первый остаётся привилегированным из-за `iam.serviceAccountUser` + deploy permission, второй получает только `roles/run.invoker` на private staging service. Hosted browser process дополнительно отклоняет DB/owner/PG/cloud-credential variables, не наследует GitHub OIDC и читает лишь обновляемый audience-bound ID token из удаляемого temporary file.
 
 Hosted `DATABASE_URL` и `MIGRATION_DATABASE_URL` направляются в Cloud SQL Auth Proxy Unix socket `/cloudsql/<project>:<region>:<instance>`. Socket path передаётся как полностью percent-encoded `host` query parameter PostgreSQL URL, `sslmode=disable`; пароль также URL-encoded. При наличии `K_SERVICE`/`CLOUD_RUN_JOB` startup fail-fast отклоняет TCP, raw/unencoded или неоднозначный host, лишние query parameters, неверный connection name, порт и путь длиннее лимита Unix socket. Unit test отдельно подтверждает, что закреплённый `pg@8.23.0` разбирает URL в ожидаемый `Client.host`; это не проверка наличия socket или подключения к Cloud SQL. Connection name и DB username не считаются secrets, но полный URL считается secret из-за password.
 
@@ -91,4 +91,4 @@ Hosted `DATABASE_URL` и `MIGRATION_DATABASE_URL` направляются в Cl
 
 ## Критерий принятия
 
-Для локального контура Compose model проверен, runtime-контейнер стартует без owner URL, а отдельная проверка подтверждает ограниченные права роли приложения. Кодовые tests подтверждают sanitized health, JSON logging/redaction, запрет proxy trust вне Cloud Run, one-hop spoof resistance/rate-limit key и разбор Unix-socket URL текущим `pg`. Для hosted контуров reviewable plan доказывает структуру ownership/configuration contract, но фактическая готовность по-прежнему требует `apply`, IAM inspection, exact secret-version binding, hosted `migrate → seed → verify`, безопасного `reset`, IAM close/restore, наблюдения реальной proxy chain/client IP и подключения через смонтированный socket в smoke по [[deployment]].
+Для локального контура Compose model проверен, runtime-контейнер стартует без owner URL, а отдельная проверка подтверждает ограниченные права роли приложения. Кодовые tests подтверждают sanitized health, JSON logging/redaction, запрет proxy trust вне Cloud Run, one-hop spoof resistance/rate-limit key, разбор Unix-socket URL текущим `pg` и отсутствие DB/owner credentials в hosted runner. Для hosted контуров reviewable plan и `deploy.yml` tests доказывают структуру ownership/configuration contract, но фактическая готовность по-прежнему требует `apply`, IAM inspection, exact secret-version binding, hosted `migrate → seed → verify`, безопасного `reset`, IAM close/restore, наблюдения реальной proxy chain/client IP и подключения через смонтированный socket в smoke по [[deployment]].

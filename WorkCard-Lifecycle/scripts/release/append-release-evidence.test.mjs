@@ -109,6 +109,11 @@ function stagingDeployment(recordedAt = '2026-09-05T13:00:00Z') {
         appDatabasePassword: 4,
         sessionSigningSecret: 5,
       },
+      jobExecutions: {
+        migrate: ['work-card-migrate-00001', 'work-card-migrate-00002'],
+        seed: ['work-card-seed-00001', 'work-card-seed-00002'],
+        verify: ['work-card-verify-00001', 'work-card-verify-00002'],
+      },
     },
   };
 }
@@ -123,7 +128,10 @@ function stagingSmoke(recordedAt = '2026-09-05T13:10:00Z') {
       revision: 'work-card-staging-00001',
       status: 'passed',
       runUrl: 'https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/501/attempts/1',
+      origin: 'https://work-card-app-example.europe-west1.run.app',
       checks: ['resolved-image', 'health', 'canonical-lifecycle'],
+      smokeReportSha256: `sha256:${'1'.repeat(64)}`,
+      observationsSha256: `sha256:${'2'.repeat(64)}`,
     },
   };
 }

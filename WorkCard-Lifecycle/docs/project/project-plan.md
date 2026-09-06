@@ -1,7 +1,7 @@
 ---
 artifact_id: project.plan
 status: active
-version: 22
+version: 23
 owner: project
 updated: 2026-09-06
 ---
@@ -19,7 +19,7 @@ updated: 2026-09-06
 
 ## Прогресс
 
-**На 2026-09-06 этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7: runtime pre-deploy controls и IAM/demo hardening реализованы и локально проверены после design/IaC/workflow, но фактического deployment и hosted qualification ещё нет.**
+**На 2026-09-06 этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7: `deploy.yml` и hosted smoke runner для пятой задачи реализованы локально, но provisioning, deployment и hosted qualification ещё не выполнялись.**
 
 | № | Этап | Статус | Результат |
 |---:|---|---|---|
@@ -33,7 +33,7 @@ updated: 2026-09-06
 | 7 | Backend vertical slice | `[x]` выполнено | Код, DB integration, local clean-container и CI implementation SHA подтверждены |
 | 8 | Frontend vertical slice | `[x]` выполнено | Полный браузерный процесс, clean-container и CI подтверждены для `b00ff294…` |
 | 9 | Качество | `[x]` выполнено | SHA `3ee65709966f5775928de87783fd2946d085e2bc`: все 6 обязательных jobs успешны в push и PR; ссылки ниже |
-| 10 | Релиз | `[-]` в работе, 4/7 | Design, IaC, release-image workflow, runtime controls и локальный IAM/demo hardening приняты; provisioning/hosted evidence ещё нет |
+| 10 | Релиз | `[-]` в работе, 4/7 | Design, IaC, release-image workflow и runtime controls приняты; orchestration/runner подготовлены, но provisioning/hosted evidence ещё нет |
 | 11 | Упаковка портфолио | `[ ]` не начато | Ценность и глубина проекта понятны работодателю |
 | 12 | Финальный аудит | `[ ]` не начато | Результат готов к честной демонстрации |
 
@@ -93,11 +93,11 @@ updated: 2026-09-06
 
 **Этап 9 закрыт, 2026-09-05:** implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` — все 6/6 в каждом запуске. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review также пройдены; результаты этапа 9 и ссылки на каждую job сохранены отдельно от этапов 7–8 в [[quality-gates]]. Воспроизводимые проверки описаны в [[test-strategy]].
 
-**Этап 10 «Релиз»: `[-]` в работе, ровно 4/7.** [[0007-cloud-run-and-cloud-sql-release|ADR-0007]], [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment]] фиксируют release/IAM/demo design; [infra/terraform](../../infra/terraform/README.md) описывает reviewable IaC, раздельные publisher/deployer WIF, reset и deletion guards; корневой `.github/workflows/release.yml` вручную собирает один full-SHA image и создаёт проверяемый manifest/evidence contract. Runtime controls включают sanitized health/logging/proxy/socket boundary, лимиты 20 партий/500 sessions, expired cleanup и owner-only reset. Local tests/plan не являются доказательством фактической IAM close/restore, reset cadence, Cloud Run chain, Cloud Logging ingestion или Cloud SQL connection: эти наблюдения остаются hosted evidence. `apply`, workflow и удалённый CI для текущих изменений не запускались, поэтому cloud resources, опубликованный image, фактический release SHA/digest manifest и hosted evidence отсутствуют; этап не закрыт.
+**Этап 10 «Релиз»: `[-]` в работе, ровно 4/7.** [[0007-cloud-run-and-cloud-sql-release|ADR-0007]], [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment]] фиксируют release/IAM/demo design; [infra/terraform](../../infra/terraform/README.md) описывает reviewable IaC, раздельные publisher/deployment WIF, deployer/smoke identities, reset и deletion guards; корневой `.github/workflows/release.yml` вручную собирает один full-SHA image и создаёт проверяемый manifest/evidence contract. Runtime controls включают sanitized health/logging/proxy/socket boundary, лимиты 20 партий/500 sessions, expired cleanup и owner-only reset. Пятая задача начата корневым `.github/workflows/deploy.yml`: он связывает successful release artifact того же SHA с exact-digest jobs/revision, отдельным HTTPS-only smoke runner, Cloud Logging observations и append-only evidence, но ни разу не запускался. Local tests/plan не являются доказательством фактической IAM close/restore, reset cadence, Cloud Run chain, Cloud Logging ingestion или Cloud SQL connection: эти наблюдения остаются hosted evidence. `apply`, workflow и удалённый CI для текущих изменений не запускались, поэтому cloud resources, опубликованный image, фактический release SHA/digest manifest и hosted evidence отсутствуют; этап не закрыт.
 
 - **Frontend vertical slice — выполнено:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
 - **Качество — выполнено:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
-- **Релиз — в работе, 4/7:** design, reviewable IaC, release-image workflow, runtime pre-deploy controls и локальный IAM/demo hardening приняты; provisioning, фактическая публикация image, staging/production orchestration и hosted evidence ещё предстоят.
+- **Релиз — в работе, 4/7:** design, reviewable IaC, release-image workflow и runtime pre-deploy controls приняты; staging orchestration/runner готовы только как локально проверенный код, а provisioning, публикация image, исполнение staging/production и hosted evidence ещё предстоят.
 - **Упаковка портфолио — не начато:** README, диаграммы, demo script, скриншоты, ограничения и ретроспектива.
 - **Финальный аудит — не начато:** сверка scope, критериев готовности, документации и воспроизводимости.
 

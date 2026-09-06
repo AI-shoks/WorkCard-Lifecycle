@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.adr.0008
 status: accepted
-version: 1
+version: 2
 owner: architecture
 updated: 2026-09-06
 ---
@@ -42,7 +42,7 @@ Budget notifications остаются сигналом оператору, а н
 - `roles/run.developer` сохраняется для revision/deployment операций, но не считается достаточным для IAM policy.
 - Только на конкретном production Cloud Run service deployer получает custom role `workCardPublicInvokerPolicyOperator` с ровно `run.services.getIamPolicy` и `run.services.setIamPolicy`.
 - `roles/run.admin`, `roles/owner`, `roles/editor` и user-managed service-account keys не используются.
-- Future orchestration должна получать short-lived credential через отдельный GitHub WIF pool/provider, ограниченный immutable repository/owner IDs, `main`, `workflow_dispatch` и точным `.github/workflows/deploy.yml`. Release-image publisher использует другой pool и не может обменять свой token на deployer identity.
+- Deployment orchestration получает short-lived credentials через отдельный GitHub WIF pool/provider, ограниченный immutable repository/owner IDs, `main`, `workflow_dispatch` и точным `.github/workflows/deploy.yml`. Отдельные bindings разрешают impersonation только deployer или smoke identity; release-image publisher использует другой pool и не может обменять свой token на эти identities. Это контракт конфигурации до первого разрешённого provisioning и hosted run, а не утверждение о существовании WIF в GCP.
 
 `run.services.setIamPolicy` технически позволяет менять всю IAM policy этого сервиса, поэтому runbook дополнительно разрешает только удаление/возврат точного `allUsers roles/run.invoker`, сохраняет снимки до/после и прекращает операцию при любом другом diff.
 

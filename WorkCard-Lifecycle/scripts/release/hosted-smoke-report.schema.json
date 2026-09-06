@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/AI-shoks/WorkCard-Lifecycle/main/WorkCard-Lifecycle/scripts/release/hosted-smoke-report.schema.json",
+  "title": "Work Card hosted smoke report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "startedAt", "completedAt", "origin", "revision", "status"],
+  "properties": {
+    "$schema": { "const": "../../scripts/release/hosted-smoke-report.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "startedAt": { "$ref": "#/$defs/timestamp" },
+    "completedAt": { "$ref": "#/$defs/timestamp" },
+    "sourceSha": { "$ref": "#/$defs/sourceSha" },
+    "immutableImage": { "$ref": "#/$defs/immutableImage" },
+    "revision": { "$ref": "#/$defs/revision" },
+    "origin": { "$ref": "#/$defs/origin" },
+    "status": { "enum": ["passed", "failed"] },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "requestIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "format": "uuid" }
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^/[^?#]+\\.(?:css|js)$" }
+    },
+    "sessionRateLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["limitedStatus", "successfulSessionAttempts"],
+      "properties": {
+        "limitedStatus": { "const": 429 },
+        "successfulSessionAttempts": { "type": "integer", "minimum": 1, "maximum": 30 }
+      }
+    },
+    "redactionMarkers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body", "header", "query", "spoofedIps"],
+      "properties": {
+        "body": { "type": "string", "pattern": "^SMOKE_BODY_" },
+        "header": { "type": "string", "pattern": "^SMOKE_HEADER_" },
+        "query": { "type": "string", "pattern": "^SMOKE_QUERY_" },
+        "spoofedIps": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": { "type": "string", "format": "ipv4" }
+        }
+      }
+    },
+    "failure": { "type": "string", "minLength": 1, "maxLength": 1000 }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "status": { "const": "passed" },
+        "failure": false,
+        "sourceSha": true,
+        "immutableImage": true,
+        "checks": true,
+        "requestIds": true,
+        "assets": true,
+        "sessionRateLimit": true,
+        "redactionMarkers": true
+      },
+      "required": [
+        "sourceSha",
+        "immutableImage",
+        "checks",
+        "requestIds",
+        "assets",
+        "sessionRateLimit",
+        "redactionMarkers"
+      ]
+    },
+    {
+      "properties": {
+        "status": { "const": "failed" },
+        "checks": false,
+        "requestIds": false,
+        "assets": false,
+        "sessionRateLimit": false,
+        "redactionMarkers": false,
+        "failure": true
+      },
+      "required": ["failure"]
+    }
+  ],
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+    },
+    "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "immutableImage": {
+      "type": "string",
+      "pattern": "^europe-west1-docker\\.pkg\\.dev/[a-z][a-z0-9-]{4,28}[a-z0-9]/work-card/work-card@sha256:[0-9a-f]{64}$"
+    },
+    "revision": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}$" },
+    "origin": {
+      "type": "string",
+      "pattern": "^https://[a-z0-9.-]+\\.run\\.app$"
+    }
+  }
+}

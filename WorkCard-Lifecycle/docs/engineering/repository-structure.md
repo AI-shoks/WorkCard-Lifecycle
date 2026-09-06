@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 7
+version: 8
 owner: engineering
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Repository Structure
@@ -14,7 +14,7 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 ```text
 .
-├── .github/workflows/               CI и ручной release-image workflow
+├── .github/workflows/               CI и ручные release/deploy workflows
 ├── .github/actions/setup-workspace/ общее закреплённое CI-окружение
 └── WorkCard-Lifecycle/
     ├── apps/
@@ -60,4 +60,4 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 ## Критерий принятия
 
-Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender покрыты позитивными и негативными tests, оба workflows проходят `actionlint`; Terraform-каталог дополнительно прошёл `fmt`, `validate` и secret-safe review plan без `apply`. Удалённый запуск новой обязательной `release_iac` job пока отсутствует.
+Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender и hosted smoke/evidence validators покрыты позитивными и негативными tests; `ci.yml`, `release.yml` и `deploy.yml` проходят `actionlint`. Terraform-каталог дополнительно прошёл `fmt`, `validate` и secret-safe review plan без `apply`. Удалённый запуск новой обязательной `release_iac` job и ручных release/deploy workflows пока отсутствует.

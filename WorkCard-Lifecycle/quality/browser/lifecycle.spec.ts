@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 
 const canonical = process.env['QUALITY_CANONICAL'] === '1';
+const hosted = process.env['QUALITY_HOSTED'] === '1';
 const counts = canonical ? [112, 112, 26] : [2, 2, 2];
 const total = counts.reduce((sum, value) => sum + value, 0);
 const roleIds = {
@@ -11,6 +13,40 @@ const roleIds = {
   quality: '10000000-0000-4000-8000-000000000005',
   auditor: '10000000-0000-4000-8000-000000000006',
 };
+
+test.beforeEach(async ({ context }) => {
+  if (!hosted) return;
+  const idTokenFile = process.env['HOSTED_SMOKE_ID_TOKEN_FILE'];
+  const baseUrl = process.env['QUALITY_BASE_URL'];
+  if (!idTokenFile)
+    throw new Error('HOSTED_SMOKE_ID_TOKEN_FILE is required for hosted browser smoke.');
+  if (!baseUrl) throw new Error('QUALITY_BASE_URL is required for hosted browser smoke.');
+  const hostedOrigin = new URL(baseUrl).origin;
+  await context.route('**/*', async (route) => {
+    const request = route.request();
+    if (new URL(request.url()).origin !== hostedOrigin) {
+      await route.abort('blockedbyclient');
+      return;
+    }
+
+    const idToken = (await readFile(idTokenFile, 'utf8')).trim();
+    if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(idToken)) {
+      throw new Error('Hosted smoke ID token file is missing or malformed.');
+    }
+    // route.continue() carries header overrides across redirects. Fetch exactly
+    // one hop and fulfill it instead, so an IAM token can never follow a 3xx to
+    // a different origin. Same-origin redirects are routed and authenticated
+    // again by the browser as fresh requests.
+    const response = await route.fetch({
+      headers: {
+        ...(await request.allHeaders()),
+        'x-serverless-authorization': `Bearer ${idToken}`,
+      },
+      maxRedirects: 0,
+    });
+    await route.fulfill({ response });
+  });
+});
 
 async function role(page: Page, name: keyof typeof roleIds) {
   await page
@@ -31,6 +67,14 @@ async function uiCommand(page: Page, path: string, button: string, expected = 20
   return result.json();
 }
 async function get(page: Page, path: string) {
+  if (hosted) {
+    const result = await page.evaluate(async (url) => {
+      const response = await fetch(url, { redirect: 'error' });
+      return { body: await response.text(), status: response.status };
+    }, `/api/v1${path}`);
+    expect(result.status, result.body).toBe(200);
+    return JSON.parse(result.body);
+  }
   const response = await page.request.get(`/api/v1${path}`);
   expect(response.status()).toBe(200);
   return response.json();
@@ -70,7 +114,7 @@ async function checkVisibleUi(page: Page) {
   );
 }
 
-test(`${canonical ? 'canonical 112 → 3 → 250' : 'compact 112 → 3 → 6'}: every lifecycle transition, separate final acceptance and audit/payroll read-back through UI`, async ({
+test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'compact 112 → 3 → 6'}: every lifecycle transition, separate final acceptance and audit/payroll read-back through UI`, async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
@@ -248,26 +292,28 @@ test(`${canonical ? 'canonical 112 → 3 → 250' : 'compact 112 → 3 → 6'}: 
   await page.goto(`${serialCards[0]}/audit`);
   await expect(page.getByRole('heading', { name: 'Доступ ограничен', exact: true })).toBeVisible();
 
-  const db = new Pool({
-    connectionString: process.env['QUALITY_READ_URL'],
-    options: '-c default_transaction_read_only=on',
-  });
-  try {
-    const saved = await db.query(
-      `SELECT (SELECT COUNT(*)::int FROM work_cards WHERE batch_id=$1 AND status='CLOSED') AS closed, (SELECT COUNT(*)::int FROM final_batch_acceptances WHERE batch_id=$1) AS accepted, (SELECT COUNT(*)::int FROM payroll_records WHERE work_card_id=$2) AS payroll, (SELECT COUNT(*)::int FROM audit_events WHERE correlation_id=$3) AS release_events`,
-      [batchId, serialCards[0]!.split('/').at(-1), released.correlationId],
-    );
-    expect(saved.rows).toEqual([
-      { closed: total, accepted: 1, payroll: 1, release_events: total + 4 },
-    ]);
-    const commands = await db.query(
-      "SELECT COUNT(*)::int AS count FROM command_receipts WHERE command_id=ANY($1::uuid[]) AND state='SUCCEEDED'",
-      [mutations.map((entry) => entry.commandId)],
-    );
-    expect(commands.rows[0].count).toBe(mutations.length);
-    expect(new Set(mutations.map((entry) => entry.commandId)).size).toBe(mutations.length);
-  } finally {
-    await db.end();
+  if (!hosted) {
+    const db = new Pool({
+      connectionString: process.env['QUALITY_READ_URL'],
+      options: '-c default_transaction_read_only=on',
+    });
+    try {
+      const saved = await db.query(
+        `SELECT (SELECT COUNT(*)::int FROM work_cards WHERE batch_id=$1 AND status='CLOSED') AS closed, (SELECT COUNT(*)::int FROM final_batch_acceptances WHERE batch_id=$1) AS accepted, (SELECT COUNT(*)::int FROM payroll_records WHERE work_card_id=$2) AS payroll, (SELECT COUNT(*)::int FROM audit_events WHERE correlation_id=$3) AS release_events`,
+        [batchId, serialCards[0]!.split('/').at(-1), released.correlationId],
+      );
+      expect(saved.rows).toEqual([
+        { closed: total, accepted: 1, payroll: 1, release_events: total + 4 },
+      ]);
+      const commands = await db.query(
+        "SELECT COUNT(*)::int AS count FROM command_receipts WHERE command_id=ANY($1::uuid[]) AND state='SUCCEEDED'",
+        [mutations.map((entry) => entry.commandId)],
+      );
+      expect(commands.rows[0].count).toBe(mutations.length);
+      expect(new Set(mutations.map((entry) => entry.commandId)).size).toBe(mutations.length);
+    } finally {
+      await db.end();
+    }
   }
   expect(errors).toEqual([]);
   await testInfo.attach('coverage', {

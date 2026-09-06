@@ -57,13 +57,13 @@
     {
       "properties": {
         "kind": { "const": "staging-deployment" },
-        "evidence": { "$ref": "#/$defs/deploymentEvidence" }
+        "evidence": { "$ref": "#/$defs/stagingDeploymentEvidence" }
       }
     },
     {
       "properties": {
         "kind": { "const": "staging-smoke" },
-        "evidence": { "$ref": "#/$defs/smokeEvidence" }
+        "evidence": { "$ref": "#/$defs/stagingSmokeEvidence" }
       }
     },
     {
@@ -136,6 +136,47 @@
         "secretVersions": { "$ref": "#/$defs/secretVersions" }
       }
     },
+    "jobExecutions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["migrate", "seed", "verify"],
+      "properties": {
+        "migrate": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/revision" }
+        },
+        "seed": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/revision" }
+        },
+        "verify": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/revision" }
+        }
+      }
+    },
+    "stagingDeploymentEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "resolvedImage", "runUrl", "secretVersions", "jobExecutions"],
+      "properties": {
+        "revision": { "$ref": "#/$defs/revision" },
+        "previousRevision": { "$ref": "#/$defs/revision" },
+        "resolvedImage": { "$ref": "#/$defs/immutableImage" },
+        "runUrl": { "$ref": "#/$defs/runUrl" },
+        "secretVersions": { "$ref": "#/$defs/secretVersions" },
+        "jobExecutions": { "$ref": "#/$defs/jobExecutions" }
+      }
+    },
     "smokeEvidence": {
       "type": "object",
       "additionalProperties": false,
@@ -150,6 +191,36 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         }
+      }
+    },
+    "stagingSmokeEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "status",
+        "runUrl",
+        "origin",
+        "checks",
+        "smokeReportSha256",
+        "observationsSha256"
+      ],
+      "properties": {
+        "revision": { "$ref": "#/$defs/revision" },
+        "status": { "enum": ["passed", "failed"] },
+        "runUrl": { "$ref": "#/$defs/runUrl" },
+        "origin": {
+          "type": "string",
+          "pattern": "^https://[a-z0-9.-]+\\.run\\.app$"
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "smokeReportSha256": { "$ref": "#/$defs/digest" },
+        "observationsSha256": { "$ref": "#/$defs/digest" }
       }
     },
     "promotionEvidence": {

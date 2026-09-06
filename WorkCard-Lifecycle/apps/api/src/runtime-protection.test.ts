@@ -95,9 +95,11 @@ describe('structured runtime logs', () => {
       const response = await app.inject({
         method: 'POST',
         url: '/log-probe/SECRET_PATH?token=SECRET_QUERY',
+        remoteAddress: '198.51.100.20',
         headers: {
           cookie: 'SECRET_COOKIE',
           authorization: 'SECRET_AUTH',
+          'x-cloud-trace-context': '0123456789abcdef0123456789abcdef/123;o=1',
           'x-csrf-token': 'SECRET_CSRF',
           'x-request-id': 'SECRET_REQUEST_ID',
         },
@@ -130,12 +132,14 @@ describe('structured runtime logs', () => {
       expect(completion).toMatchObject({
         appVersion: '0123456789abcdef',
         method: 'POST',
+        remoteIp: '198.51.100.20',
         requestId: response.headers['x-request-id'],
         revision: 'work-card-app-00001-example',
         routeTemplate: '/log-probe/:probeId',
         service: 'work-card-app',
         severity: 'ERROR',
         status: 500,
+        traceId: '0123456789abcdef0123456789abcdef',
       });
       expect(completion).not.toHaveProperty('level');
       expect(completion?.['durationMs']).toEqual(expect.any(Number));

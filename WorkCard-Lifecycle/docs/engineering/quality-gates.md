@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 14
+version: 15
 owner: engineering
 updated: 2026-09-06
 ---
@@ -151,22 +151,22 @@ Frontend coverage включает типизированные ответы и 
 
 При проверке реализации различались прежние 5 integration tests, новые PostgreSQL и browser suites, compact и canonical, локальные результаты и последующий CI implementation SHA. Негативная приёмка, переделка, переназначение, deployment и этапы 10–12 не добавлены. Соседние пользовательские dashboard/Home/Obsidian/site изменения не входили в implementation commit этапа 9. Семантических противоречий в затронутых канонических документах не найдено; структурный audit учитывается отдельно.
 
-## Локальные проверки укрепления этапа 10 — 2026-09-06
+## Локальные проверки PR #2 этапа 10 — 2026-09-06
 
-Текущие незакоммиченные изменения сохраняют прогресс этапа 10 ровно `4/7`. Четвёртая задача закрыта как runtime pre-deploy implementation с локальной детерминированной проверкой, но не как hosted qualification. Выполнились следующие локальные gates:
+Текущие незакоммиченные изменения в ветке `codex/stage-10-release-orchestration` сохраняют прогресс этапа 10 ровно `4/7`. Пятая задача начата как локально проверенная release-orchestration implementation, но не закрыта без provisioning и hosted qualification. Выполнились следующие локальные gates:
 
 | Проверка | Результат текущего checkout |
 |---|---|
-| `pnpm check` | PASS на Node `24.18.0` / pnpm `11.19.0`: Prettier, ESLint, strict typecheck, `158/158` frontend tests, `24/24` обычных API tests (`6` PostgreSQL integration корректно skipped без URL), `34/34` release tests и production build |
-| Focused runtime contracts | PASS: `22/22` в `app`, `config`, `runtime-protection` и web health tests; проверены exact sanitized payloads/status codes, все Pino severity mappings, safe structured logs, server-generated request ID, local XFF spoof rejection, one-hop client IP/rate-limit key и разбор encoded socket URL самим `pg` |
-| Release contract | PASS: JSON Schema и cross-field bindings manifest, semantic Trivy validation, exclusive manifest write, append-only evidence sequence/hash chain и негативные сценарии |
-| Workflow syntax | PASS: actionlint `1.7.12` для `ci.yml` и `release.yml`; Windows archive SHA-256 проверен |
+| `pnpm check` | PASS: Prettier, ESLint, strict typecheck, `158/158` frontend tests, `24/24` обычных API tests (`6` PostgreSQL integration корректно skipped без URL), `58/58` release tests и production build |
+| Runtime contracts | PASS в общей API suite: sanitized health/logging, server-generated request ID, `remoteIp`/Cloud Trace correlation, local XFF spoof rejection, one-hop client IP/rate-limit key и encoded Cloud SQL socket URL |
+| Release/deploy contracts | PASS `58/58`: immutable manifest/Trivy binding, append-only evidence chain, successful release run того же SHA/run attempt, exact-digest jobs/revision, renewable smoke-only token boundary, log correlation, negative controls и Ready-revision rollback contract |
+| Workflow syntax | PASS: actionlint `1.7.12` для `ci.yml`, `release.yml` и `deploy.yml` |
 | IAM/demo hardening | PASS runnable checks: `17/17` focused API tests для config/app/reset transaction flow, `18/18` focused interactive UI tests; capacity/session cleanup и transactional reset также имеют PostgreSQL tests, но они не исполнились без БД |
 | UX-copy audit | PASS read-only `window.runUxCopyAudit()` в desktop `1440×1000` и mobile `390×844`: по `14` шагов, `70` role variants, `7` system states, `0` production violations в каждом viewport |
-| Terraform contract | PASS на Terraform `1.16.1`: recursive `fmt -check`, `validate`, локальный `plan -refresh=false` `166 to add / 0 to change / 0 to destroy`; safety checker подтвердил exact IAM/actAs/job/secret matrices, единственный `allUsers`, две WIF-границы, восемь jobs, demo limits, reset и deletion guards, а также отсутствие broad roles/secret payloads/credential URLs |
-| Strict docs | PASS: финальный повторный `project-docs-auditor --fail-on-warning`, `57` документов, `0` ошибок, `0` предупреждений |
+| Terraform contract | PASS на Terraform `1.16.1`: recursive `fmt -check`, `validate`, локальный `plan -refresh=false` `167 to add / 0 to change / 0 to destroy`; safety checker подтвердил exact IAM/actAs/job/secret matrices, единственный `allUsers`, две WIF-границы с раздельными publisher/deployer/smoke targets, восемь jobs, demo limits, reset и deletion guards, а также отсутствие broad roles/secret payloads/credential URLs |
+| Strict docs | PASS: финальный `project-docs-auditor --fail-on-warning`, `57` документов, `0` ошибок, `0` предупреждений; semantic pass отдельно сверяет статусы и hosted/local границу |
 
-Новая `Release and IaC contract` job добавлена как седьмой обязательный CI gate и включена в release preflight, но удалённо не запускалась. Plan использовал только example inputs, фиктивный локальный token и `-refresh=false`; это не обращение к GCP и не проверка существования ресурсов. В текущем shell отсутствуют Docker/PostgreSQL и `QUALITY_OWNER_URL`/integration URLs, поэтому новые реальные DB проверки reset/capacity не выдаются за успешные. `terraform apply`, `workflow_dispatch`, build/push image и deployment не выполнялись; manifest/evidence records и hosted evidence не создавались.
+Новая `Release and IaC contract` job остаётся седьмым обязательным CI gate и теперь также проверяет `deploy.yml`, но удалённо не запускалась. Plan использовал только example inputs, фиктивный локальный token и `-refresh=false`; это не обращение к GCP и не проверка существования ресурсов. Hosted runner проверен только на mock HTTP/metadata/log fixtures: IAM token, HTTPS Cloud Run, browser lifecycle, реальный image digest и Cloud Logging не наблюдались. В текущем shell отсутствуют Docker/PostgreSQL и `QUALITY_OWNER_URL`/integration URLs, поэтому реальные DB проверки reset/capacity не выдаются за успешные. `terraform apply`, `workflow_dispatch`, build/push image и deployment не выполнялись; manifest/evidence records и hosted evidence не создавались.
 
 Смысловая сверка `backlog`/`deployment`/ADR/security/environment/API/audit contracts не нашла конфликтов: public interactive scope сохранён без tenant isolation; live retention, backup/PITR и log retention разделены; deployer indirect workload-identity risk оговорён; budget alerts не названы spending cap. Фактические IAM close/restore, daily reset, Cloud Logging ingestion, Cloud Run header chain и Cloud SQL socket mount/connection явно оставлены обязательным hosted evidence.
 
