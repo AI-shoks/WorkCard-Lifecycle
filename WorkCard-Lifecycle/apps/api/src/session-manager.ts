@@ -50,7 +50,6 @@ export type AuthenticatedSession = {
 export type SessionManagerOptions = {
   allowedOrigin: string;
   cookieSecure: boolean;
-  maximumSessions?: number;
   signingSecret: string;
 };
 
@@ -99,8 +98,11 @@ export function roleCan(role: Role, command: CommandName): boolean {
   return rolePermissions[role].includes(command);
 }
 
-export function createSessionManager(pool: Pool, options: SessionManagerOptions) {
-  const maximumSessions = options.maximumSessions ?? 500;
+export function createSessionManager(
+  pool: Pool,
+  options: SessionManagerOptions,
+  maximumSessions: number,
+) {
   const signatureFor = (sessionId: string): string =>
     createHmac('sha256', options.signingSecret).update(`session:${sessionId}`).digest('base64url');
 

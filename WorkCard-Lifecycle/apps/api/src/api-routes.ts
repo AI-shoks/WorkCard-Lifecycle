@@ -70,10 +70,7 @@ export async function registerApiRoutes(
   security: SessionManagerOptions,
   capacity: { maximumBatches: number; maximumSessions: number },
 ): Promise<void> {
-  const sessions = createSessionManager(pool, {
-    ...security,
-    maximumSessions: capacity.maximumSessions,
-  });
+  const sessions = createSessionManager(pool, security, capacity.maximumSessions);
   const workflow = createWorkflowService(pool, capacity.maximumBatches);
   const requestSessions = new WeakMap<object, AuthenticatedSession>();
 

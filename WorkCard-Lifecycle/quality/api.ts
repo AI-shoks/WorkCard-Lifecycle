@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
-import { buildApp } from '../apps/api/src/app.js';
+import { buildApp, type BuildAppOptions } from '../apps/api/src/app.js';
 import { demoUsers } from '../apps/api/src/demo-fixtures.js';
 import type { TestDatabase } from './database.js';
 
 export const origin = 'http://quality.test';
-export async function testApi(db: TestDatabase) {
+export async function testApi(db: TestDatabase, demoCapacity?: BuildAppOptions['demoCapacity']) {
   const app = await buildApp({
     appVersion: 'quality',
+    ...(demoCapacity ? { demoCapacity } : {}),
     pool: db.runtime,
     readiness: { check: async () => ({ database: 'up', migrationVersion: 3 }) },
     security: { allowedOrigin: origin, cookieSecure: false, signingSecret: randomUUID() },

@@ -18,7 +18,7 @@ const sample = async <T>(name: string, operation: () => Promise<T>) => {
 };
 try {
   await referenceFixtures(db);
-  const api = await testApi(db);
+  const api = await testApi(db, { maximumBatches: 50, maximumSessions: 500 });
   try {
     const base = await api.app.listen({ port: 0, host: '127.0.0.1' });
     async function request(role: string, path: string, body?: object) {
