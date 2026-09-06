@@ -1,176 +1,122 @@
 ---
 artifact_id: project.plan
 status: active
-version: 4
+version: 22
 owner: project
-updated: 2026-07-17
+updated: 2026-09-06
 ---
 
 # Project Plan
 
-Это главный трекер проекта. Здесь отмечается выполнение или осознанный пропуск этапов. Детали хранятся в отдельных артефактах, а не разрастаются внутри плана.
+Это канонический roadmap проекта. Здесь отмечается выполнение или осознанный пропуск этапов; подробности хранятся в отдельных артефактах.
 
 ## Обозначения
 
 - `[ ]` — не начато;
 - `[-]` — в работе;
 - `[x]` — выполнено;
-- `[~]` — пропущено; причина обязательна в примечании и [[decision-log]].
+- `[~]` — пропущено; причина обязательна в [[decision-log]].
 
 ## Прогресс
+
+**На 2026-09-06 этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7: runtime pre-deploy controls и IAM/demo hardening реализованы и локально проверены после design/IaC/workflow, но фактического deployment и hosted qualification ещё нет.**
 
 | № | Этап | Статус | Результат |
 |---:|---|---|---|
 | 0 | Инициализация | `[x]` выполнено | Проект имеет управляемую структуру |
-| 1 | Product Brief и MVP Scope | `[x]` выполнено | Однозначно понятно, что строим и чего не строим |
-| 2 | Доменная спецификация | `[x]` выполнено | Бизнес-логика описана до кода |
-| 3 | Требования и acceptance criteria | `[ ]` не начато | Каждую функцию можно проверить объективно |
-| 4 | UX-проектирование | `[ ]` не начато | Основной сценарий проходится в прототипе |
-| 5 | Техническая архитектура | `[ ]` не начато | Ключевые технические решения приняты |
-| 6 | Инженерный фундамент | `[ ]` не начато | Проект воспроизводимо запускается и проверяется |
-| 7 | Backend vertical slice | `[ ]` не начато | Основной сценарий работает через API и БД |
-| 8 | Frontend vertical slice | `[ ]` не начато | Основной сценарий выполняется в браузере |
-| 9 | Качество | `[ ]` не начато | Критические правила защищены тестами |
-| 10 | Релиз | `[ ]` не начато | Проект доступен онлайн и воспроизводимо разворачивается |
+| 1 | Product Brief и MVP Scope | `[x]` выполнено | Scope отделяет подтверждённый AS-IS от синтетического TO-BE |
+| 2 | Доменная спецификация | `[x]` выполнено | Агрегаты, состояния, роли и инварианты приняты |
+| 3 | Требования и acceptance criteria | `[x]` выполнено | Сценарии связаны с проверяемыми критериями |
+| 4 | UX-проектирование | `[x]` выполнено | 14-шаговый прототип и UX-спецификация согласованы с моделью |
+| 5 | Техническая архитектура | `[x]` выполнено | Приняты данные, API, транзакции, безопасность и шесть ADR |
+| 6 | Инженерный фундамент | `[x]` выполнено | Созданы monorepo, БД bootstrap, контейнерный runtime и CI |
+| 7 | Backend vertical slice | `[x]` выполнено | Код, DB integration, local clean-container и CI implementation SHA подтверждены |
+| 8 | Frontend vertical slice | `[x]` выполнено | Полный браузерный процесс, clean-container и CI подтверждены для `b00ff294…` |
+| 9 | Качество | `[x]` выполнено | SHA `3ee65709966f5775928de87783fd2946d085e2bc`: все 6 обязательных jobs успешны в push и PR; ссылки ниже |
+| 10 | Релиз | `[-]` в работе, 4/7 | Design, IaC, release-image workflow, runtime controls и локальный IAM/demo hardening приняты; provisioning/hosted evidence ещё нет |
 | 11 | Упаковка портфолио | `[ ]` не начато | Ценность и глубина проекта понятны работодателю |
-| 12 | Финальный аудит | `[ ]` не начато | Проект объективно завершён и готов к демонстрации |
+| 12 | Финальный аудит | `[ ]` не начато | Результат готов к честной демонстрации |
 
-## Этап 0. Инициализация — выполнено
+## Этапы 0–4 — выполнены
 
-- [x] Создать репозиторий.
-- [x] Определить структуру документации.
-- [x] Завести [[backlog]].
-- [x] Зафиксировать [[definition-of-done]].
-- [x] Завести [[decision-log]] и [[risk-register]].
-- [x] Закрепить [[case-study-positioning|независимое позиционирование case study]].
-- [x] Зафиксировать [[document-governance|правила актуальности, версий и замещения документов]].
+- Product framing: [[product-brief]], [[mvp-scope]], [[success-criteria]], [[decision-provenance]].
+- Domain: [[glossary]], [[domain-model]], [[business-rules]], [[commands-events]], [[work-card-state-machine]], [[roles-permissions]].
+- Requirements: [[use-cases]], [[user-stories]], [[negative-scenarios]], [[acceptance-criteria]], [[requirements-traceability]].
+- UX: [[screen-map]], [[user-flows]], [[wireframes]], [[ui-states]], [[permission-ux]], [[ux-copy-guidelines]] и [14-шаговый прототип](../ux/prototype.html).
 
-## Этап 1. Product Brief и MVP Scope — выполнено
+Предыдущие этапы закрепили `ProductionBatch 1 → many WorkCardSet`, operation-scoped нормы, UUID карточек без физической нумерации, positive-only first-article gate, мастерское ведение карточек и отдельную цифровую финальную приёмку партии.
 
-- [x] Зафиксировать [[product-brief|проблему, пользователей и ценность]].
-- [x] Зафиксировать [[mvp-scope|границы системы, основной сценарий и out of scope]].
-- [x] Принять [[success-criteria|критерии успеха и готовности MVP]].
-- [x] Перевести все артефакты этапа в статус `accepted`.
+## Этап 5. Техническая архитектура — выполнено
 
-**Закрыт:** 2026-07-16. Следующая контрольная точка — этап 2, доменная спецификация.
+- [x] [[technology-stack|Технологический стек]].
+- [x] [[system-context|Системный контекст и границы frontend/backend]].
+- [x] [[er-model|Реляционная модель]].
+- [x] [[api-contracts|HTTP API и ошибки]].
+- [x] [[transactions-concurrency|Транзакции и конкурентность]].
+- [x] [[audit-log-design|Транзакционный audit log]].
+- [x] [[mock-integrations|Mock-интеграции]].
+- [x] [[security-baseline|Security baseline]].
+- [x] [[adr-index|ADR-0001–ADR-0006]].
 
-## Этап 2. Доменная спецификация — выполнено
+**Закрыт:** 2026-09-01. Архитектура сохраняет принятые предметные границы, server-side query событий по `correlationId`, optimistic concurrency, доверенный серверный actor context и идемпотентный локальный payroll adapter.
 
-- [x] [[glossary]]
-- [x] [[as-is-to-be|AS-IS и TO-BE]]
-- [x] [[domain-model|Сущности, связи и агрегаты]]
-- [x] [[business-rules|Бизнес-инварианты]]
-- [x] [[commands-events|Команды и доменные события]]
-- [x] [[work-card-state-machine|State machine WorkCard]]
-- [x] [[roles-permissions|Роли и права]]
+## Этап 6. Инженерный фундамент — выполнено
 
-**Закрыт:** 2026-07-17. Строгий аудит документации: 47 документов, 0 ошибок, 0 предупреждений. Следующая контрольная точка — этап 3, требования и acceptance criteria.
+- [x] [[repository-structure|Структура pnpm monorepo]].
+- [x] [[local-development|Локальный и контейнерный запуск]].
+- [x] [[environments|Конфигурация окружений и секретов]].
+- [x] [[database-bootstrap|Миграции, seed и runtime verification]].
+- [x] [[quality-gates|Format, lint, typecheck, tests и build]].
+- [x] [[ci-pipeline|CI и clean-container smoke test]].
 
-## Этап 3. Требования и acceptance criteria
+**Закрыт:** 2026-09-01. Foundation содержит Fastify API с health endpoints, React shell, общие контракты, PostgreSQL bootstrap, multi-stage Docker image, Compose и GitHub Actions. На момент закрытия этапа 6 он ещё не реализовывал производственный backend-сценарий этапа 7.
 
-- [ ] [[use-cases]]
-- [ ] [[user-stories]]
-- [ ] [[negative-scenarios]]
-- [ ] [[acceptance-criteria|Given / When / Then]]
-- [ ] [[requirements-traceability|Связь требований с тестами]]
+## Этап 7. Backend vertical slice — выполнено
 
-## Этап 4. UX-проектирование
+- [x] Read-only паспорт, operation plans и нормы технолога/БТБ.
+- [x] Партия и несколько operation-scoped `WorkCardSet`.
+- [x] Генерация UUID-карточек без sequence labels, со snapshots.
+- [x] First-article gate и serial boundary.
+- [x] Массовое назначение, включая fixture `1 + 59 + 52`.
+- [x] Lifecycle-команды мастера и positive-only БТК.
+- [x] Финальная приёмка партии и audit log.
+- [x] Mock payroll export и защита от повтора.
+- [x] API/integration tests критических разрешений, инвариантов и конфликтов.
+- [x] Подтвердить обновлённый образ и clean-container startup локально на текущем checkout.
+- [x] Подтвердить implementation commit удалёнными `quality`/`container` jobs для того же SHA.
 
-- [ ] [[screen-map|Карта экранов и информационная архитектура]]
-- [ ] [[user-flows|Пользовательские потоки и массовые операции]]
-- [ ] [[wireframes]]
-- [ ] [[ui-states|Пустые состояния, ошибки и загрузка]]
-- [ ] [[permission-ux|Блокировка запрещённых действий]]
+**Закрыт 2026-09-02:** implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) локально прошёл 11 обычных тестов, 5 PostgreSQL integration tests, production build, clean-container, миграции `0001`–`0003`, повторный seed и runtime grants verification. Большой сценарий подтверждает `3 sets / 250 cards / 254 release events`, а компактная fixture из двух карточек проходит все lifecycle-переходы, финальную приёмку, payroll и audit/read-back только через HTTP API. [Push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041) для того же SHA полностью зелёные: оба jobs `Code and database quality` и `Clean container startup` завершены успешно.
 
-## Этап 5. Техническая архитектура
+## Этапы 8–12
 
-- [ ] [[technology-stack|Выбор стека]]
-- [ ] [[system-context|Структура frontend и backend]]
-- [ ] [[er-model]]
-- [ ] [[api-contracts]]
-- [ ] [[transactions-concurrency|Транзакции и конфликтующие изменения]]
-- [ ] [[audit-log-design]]
-- [ ] [[mock-integrations]]
-- [ ] [[security-baseline]]
-- [ ] [[adr-index|ADR]]
+**Этап 8 закрыт, 2026-09-05:** implementation SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`; [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) имеют успешные `quality` и `container` для этого SHA. Локально подтверждены clean-container без кэша на новом томе, миграции/seed, healthy SPA/API/БД и HTTP 200. Ранее прошли 157 frontend, 9 API и 5 PostgreSQL integration tests, полный браузерный процесс `112 → 3 → 250`, отдельная финальная приёмка, audit `254/254`, единственный payroll, desktop/mobile и UX-copy. Старые отметки об отсутствии Docker и невыполненных commit/push сняты по подтверждённым результатам; они не являются ограничениями этапа 9.
 
-## Этап 6. Инженерный фундамент
+**Этап 9 закрыт, 2026-09-05:** implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` — все 6/6 в каждом запуске. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review также пройдены; результаты этапа 9 и ссылки на каждую job сохранены отдельно от этапов 7–8 в [[quality-gates]]. Воспроизводимые проверки описаны в [[test-strategy]].
 
-- [ ] [[repository-structure]]
-- [ ] [[local-development|Docker и локальный запуск]]
-- [ ] [[environments|Конфигурация окружений и секреты]]
-- [ ] [[database-bootstrap|Миграции и seed-данные]]
-- [ ] [[quality-gates|Lint, format и typecheck]]
-- [ ] [[ci-pipeline|CI]]
+**Этап 10 «Релиз»: `[-]` в работе, ровно 4/7.** [[0007-cloud-run-and-cloud-sql-release|ADR-0007]], [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment]] фиксируют release/IAM/demo design; [infra/terraform](../../infra/terraform/README.md) описывает reviewable IaC, раздельные publisher/deployer WIF, reset и deletion guards; корневой `.github/workflows/release.yml` вручную собирает один full-SHA image и создаёт проверяемый manifest/evidence contract. Runtime controls включают sanitized health/logging/proxy/socket boundary, лимиты 20 партий/500 sessions, expired cleanup и owner-only reset. Local tests/plan не являются доказательством фактической IAM close/restore, reset cadence, Cloud Run chain, Cloud Logging ingestion или Cloud SQL connection: эти наблюдения остаются hosted evidence. `apply`, workflow и удалённый CI для текущих изменений не запускались, поэтому cloud resources, опубликованный image, фактический release SHA/digest manifest и hosted evidence отсутствуют; этап не закрыт.
 
-## Этап 7. Backend vertical slice
+- **Frontend vertical slice — выполнено:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
+- **Качество — выполнено:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
+- **Релиз — в работе, 4/7:** design, reviewable IaC, release-image workflow, runtime pre-deploy controls и локальный IAM/demo hardening приняты; provisioning, фактическая публикация image, staging/production orchestration и hosted evidence ещё предстоят.
+- **Упаковка портфолио — не начато:** README, диаграммы, demo script, скриншоты, ограничения и ретроспектива.
+- **Финальный аудит — не начато:** сверка scope, критериев готовности, документации и воспроизводимости.
 
-- [ ] Синтетическая партия, маршрут и нормы.
-- [ ] `WorkCardSet` и генерация отдельных `WorkCard`.
-- [ ] Массовое назначение.
-- [ ] Переходы состояний.
-- [ ] Подтверждение мастером и БТК.
-- [ ] Закрытие и audit log.
-- [ ] Mock payroll export и защита от повтора.
+### Исходный прогноз и оставшаяся работа
 
-## Этап 8. Frontend vertical slice
+Это оценка сфокусированного труда, а не обещанная календарная дата:
 
-- [ ] Переключение ролей.
-- [ ] Таблицы комплектов и карточек, фильтры.
-- [ ] Массовые действия и формы.
-- [ ] История карточки и статусы.
-- [ ] Обработка ошибок.
-- [ ] Связь с реальным API.
-
-## Этап 9. Качество
-
-- [ ] [[test-strategy|Unit, integration и end-to-end тесты]].
-- [ ] Тесты state machine, permissions и инвариантов.
-- [ ] Тест повторного экспорта.
-- [ ] Тест миграций.
-- [ ] Базовые проверки безопасности и производительности.
-
-## Этап 10. Релиз
-
-- [ ] [[deployment|Staging и production deployment]].
-- [ ] CI/CD, health checks и логирование.
-- [ ] Smoke tests.
-- [ ] Проверка запуска с чистого окружения.
-
-## Этап 11. Упаковка портфолио
-
-- [ ] README и архитектурные диаграммы.
-- [ ] ADR, AS-IS и TO-BE.
-- [ ] [[demo-script]], скриншоты и короткое видео.
-- [ ] Тестовые учётные записи.
-- [ ] Ограничения, дальнейшее развитие и ретроспектива.
-
-## Этап 12. Финальный аудит
-
-- [ ] Сверка с [[mvp-scope]].
-- [ ] Проверка всех критериев готовности.
-- [ ] Отсутствие критических дефектов.
-- [ ] Актуальность документации.
-- [ ] Воспроизводимый запуск.
-- [ ] Честное позиционирование и готовность к демонстрации.
-
-## Сквозные процессы
-
-На каждом этапе поддерживаем [[backlog]], контролируем scope, обновляем документацию по правилам [[document-governance]], фиксируем ADR и риски, сохраняем понятную Git-историю и регулярно собираем рабочий демонстрационный срез.
+- исходная оценка этапа 9 — 2–4 рабочих дня; этап закрыт 2026-09-05;
+- этапы 10–12 — 3–5 рабочих дней;
+- исходная оценка этапов 9–12 — 5–9 сфокусированных рабочих дней; сохранена как история планирования и не заменяет фактические критерии закрытия.
 
 ## После базового MVP
 
-### Итерация 2
-
 - отклонение БТК и доработка;
-- спор по норме;
-- версионность нормы;
-- повторный выпуск карточек.
-
-### Итерация 3
-
+- спор по норме и версионность нормы;
+- повторный выпуск карточек;
 - ретроактивные карточки;
-- уведомления;
-- расширенная аналитика;
-- улучшенная ролевая модель;
-- доработка UX.
+- уведомления, аналитика и развитие ролевой модели.
+
+## Сквозной процесс
+
+Каждый этап проходит цикл `inspect → implement → relevant tests → diff review → final relevant check`. [[backlog]] хранит актуальные задачи, [[decision-log]] и ADR — решения, а structural audit всегда дополняется отдельным semantic review.

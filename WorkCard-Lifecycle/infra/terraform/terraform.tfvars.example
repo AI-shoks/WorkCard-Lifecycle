@@ -1,0 +1,85 @@
+# Review-only placeholders. Replace every value after confirming billing,
+# globally unique project IDs, actual Cloud Run origins and a published digest.
+organization_id = "123456789012"
+
+billing_account_id = "000000-000000-000000"
+
+project_ids = {
+  release    = "replace-work-card-release"
+  staging    = "replace-work-card-staging"
+  production = "replace-work-card-production"
+}
+
+# Resolve these immutable IDs from the GitHub API immediately before an
+# approved apply; the numeric examples below are review-only placeholders.
+github_repository          = "AI-shoks/WorkCard-Lifecycle"
+github_repository_id       = "123456789"
+github_repository_owner_id = "123456789"
+
+source_sha  = "0000000000000000000000000000000000000000"
+image_digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+app_origins = {
+  staging    = "https://work-card-staging-111111111111.europe-west1.run.app"
+  production = "https://work-card-production-222222222222.europe-west1.run.app"
+}
+
+alert_email_addresses = ["alerts@example.com"]
+
+budget = {
+  currency_code = "USD"
+  monthly_amounts = {
+    release    = 10
+    staging    = 30
+    production = 30
+  }
+}
+
+cloud_sql_tiers = {
+  staging    = "db-f1-micro"
+  production = "db-f1-micro"
+}
+
+# The review plan deliberately includes all eight jobs and both services. A future initial
+# apply must use foundation -> jobs -> service phases described in README.md.
+workload_enablement = {
+  staging = {
+    jobs    = true
+    service = true
+  }
+  production = {
+    jobs    = true
+    service = true
+  }
+}
+
+# Increment only the affected counters when rotating a write-only value.
+secret_generations = {
+  staging = {
+    owner_database_password = 1
+    database_url            = 1
+    migration_database_url  = 1
+    app_database_password   = 1
+    session_signing_secret  = 1
+  }
+  production = {
+    owner_database_password = 1
+    database_url            = 1
+    migration_database_url  = 1
+    app_database_password   = 1
+    session_signing_secret  = 1
+  }
+}
+
+common_labels = {
+  workload = "portfolio-demo"
+}
+
+database_connection_alert_threshold = 8
+
+# Keep false for every normal plan/apply. The teardown runbook requires a
+# separately reviewed guard-unlock plan before a destroy plan.
+teardown_mode = false
+
+# staging_secret_values and production_secret_values are intentionally absent.
+# Supply them as ephemeral TF_VAR_* inputs from an approved secret source.

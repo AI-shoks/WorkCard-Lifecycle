@@ -1,0 +1,283 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: WorkCard-Lifecycle
+
+jobs:
+  release_iac:
+    name: Release and IaC contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_LINUX_AMD64_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      TERRAFORM_VERSION: 1.16.1
+      TERRAFORM_LINUX_AMD64_SHA256: 745d33b4b02b7980c62a38ec1beea24ee084ea8caf3f503c200554bd9a0cbe49
+      TF_IN_AUTOMATION: "true"
+      GOOGLE_OAUTH_ACCESS_TOKEN: review-only-no-cloud-access
+      TF_VAR_staging_secret_values: >-
+        {"owner_database_password":"review-staging-owner-000000000001","app_database_password":"review-staging-runtime-0000000002","session_signing_secret":"review-staging-session-0000000003"}
+      TF_VAR_production_secret_values: >-
+        {"owner_database_password":"review-production-owner-0000000001","app_database_password":"review-production-runtime-00000002","session_signing_secret":"review-production-session-00000003"}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Install checksum-pinned actionlint and Terraform
+        run: |
+          set -euo pipefail
+
+          tools_directory="$RUNNER_TEMP/release-tools"
+          actionlint_archive="$RUNNER_TEMP/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          terraform_archive="$RUNNER_TEMP/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          mkdir -p "$tools_directory/actionlint" "$tools_directory/terraform"
+
+          curl --fail --show-error --silent --location --retry 3 \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            --output "$actionlint_archive"
+          printf '%s  %s\n' "$ACTIONLINT_LINUX_AMD64_SHA256" "$actionlint_archive" \
+            | sha256sum --check --strict
+          tar -xzf "$actionlint_archive" -C "$tools_directory/actionlint" actionlint
+
+          curl --fail --show-error --silent --location --retry 3 \
+            "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" \
+            --output "$terraform_archive"
+          printf '%s  %s\n' "$TERRAFORM_LINUX_AMD64_SHA256" "$terraform_archive" \
+            | sha256sum --check --strict
+          unzip -q "$terraform_archive" -d "$tools_directory/terraform"
+
+          echo "$tools_directory/actionlint" >> "$GITHUB_PATH"
+          echo "$tools_directory/terraform" >> "$GITHUB_PATH"
+
+      - name: Validate pinned tool versions
+        run: |
+          set -euo pipefail
+          actionlint -version | grep -Fqx "$ACTIONLINT_VERSION"
+          terraform version -json \
+            | jq -e --arg version "$TERRAFORM_VERSION" '.terraform_version == $version' >/dev/null
+
+      - name: Lint CI and release workflows
+        run: actionlint ../.github/workflows/ci.yml ../.github/workflows/release.yml
+
+      - name: Validate release manifests, schemas, and append-only evidence
+        run: pnpm test:release
+
+      - name: Validate Terraform formatting and configuration
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/terraform init -backend=false -input=false -lockfile=readonly
+          terraform -chdir=infra/terraform fmt -check -recursive
+          terraform -chdir=infra/terraform validate
+
+      - name: Prove the review plan keeps secrets out and WIF narrowly scoped
+        run: |
+          set -euo pipefail
+          cp infra/terraform/terraform.tfvars.example "$RUNNER_TEMP/review.tfvars"
+          terraform -chdir=infra/terraform plan \
+            -refresh=false \
+            -input=false \
+            -lock=false \
+            -var-file="$RUNNER_TEMP/review.tfvars" \
+            -out="$RUNNER_TEMP/review.tfplan"
+          terraform -chdir=infra/terraform show -json "$RUNNER_TEMP/review.tfplan" \
+            | node infra/terraform/scripts/assert-plan-safe.mjs
+
+  quality:
+    name: Code and database quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+        env:
+          POSTGRES_DB: workcard
+          POSTGRES_USER: workcard_owner
+          POSTGRES_PASSWORD: workcard_owner_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workcard_owner -d workcard"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      QUALITY_OWNER_URL: postgresql://workcard_owner:workcard_owner_ci@localhost:5432/workcard
+      APP_DATABASE_PASSWORD: workcard_app_ci
+      APP_DATABASE_USER: workcard_app
+      DATABASE_URL: postgresql://workcard_app:workcard_app_ci@localhost:5432/workcard
+      MIGRATION_DATABASE_URL: postgresql://workcard_owner:workcard_owner_ci@localhost:5432/workcard
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Run code quality gates
+        run: pnpm check
+
+      - name: Validate database bootstrap
+        run: |
+          pnpm db:migrate
+          pnpm db:seed
+          pnpm db:seed
+          pnpm db:verify
+
+      - name: Run backend integration tests
+        env:
+          INTEGRATION_DATABASE_URL: ${{ env.DATABASE_URL }}
+          INTEGRATION_MIGRATION_DATABASE_URL: ${{ env.MIGRATION_DATABASE_URL }}
+        run: pnpm --filter @work-card/api test:integration
+
+      - name: Validate Compose model
+        run: docker compose config --quiet
+
+      - name: Transaction, migration and security regression tests
+        run: pnpm test:quality
+
+  container:
+    name: Clean container startup
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Build and start the clean environment
+        run: |
+          docker compose build --no-cache app
+          docker compose up --no-build --wait --wait-timeout 180
+
+      - name: Check runtime endpoints
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:3000/health/live
+          curl --fail --silent --show-error http://127.0.0.1:3000/health/ready
+          curl --fail --silent --show-error http://127.0.0.1:3000/
+
+      - name: Scan the exact runtime image for HIGH and CRITICAL vulnerabilities
+        run: |
+          mkdir -p .quality-results
+          docker save work-card-lifecycle:local -o .quality-results/runtime-image.tar
+          docker run --rm -v "$PWD/.quality-results:/scan" aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 image --input /scan/runtime-image.tar --scanners vuln --parallel 1 --no-progress --severity HIGH,CRITICAL --exit-code 1 --format json --output /scan/image-vulnerabilities.json
+
+      - name: Save vulnerability report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-vulnerabilities
+          path: WorkCard-Lifecycle/.quality-results/image-vulnerabilities.json
+          include-hidden-files: true
+          retention-days: 7
+
+      - name: Show container logs after failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop the environment
+        if: always()
+        run: docker compose down --volumes --remove-orphans
+
+  security:
+    name: Dependency and secret security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-workspace
+      - name: Audit all dependency scopes
+        run: pnpm security:dependencies
+      - name: Scan Git history and current source with redaction
+        run: pnpm security:secrets
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: redacted-secret-reports
+          path: WorkCard-Lifecycle/.quality-results/secrets-*.json
+          include-hidden-files: true
+          retention-days: 7
+
+  browser:
+    name: Browser (${{ matrix.scale }})
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        scale: [compact, canonical]
+    services:
+      postgres:
+        image: postgres:18.6-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+        env:
+          POSTGRES_PASSWORD: quality_ci_local
+        ports: [5432:5432]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      QUALITY_OWNER_URL: postgresql://postgres:quality_ci_local@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Compact lifecycle and recovery on desktop/mobile
+        if: matrix.scale == 'compact'
+        run: pnpm test:browser
+      - name: All 250 lifecycle transitions through the UI
+        if: matrix.scale == 'canonical'
+        run: pnpm test:browser:canonical
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: browser-${{ matrix.scale }}
+          path: |
+            WorkCard-Lifecycle/playwright-report/${{ matrix.scale }}
+            WorkCard-Lifecycle/test-results/${{ matrix.scale }}
+            WorkCard-Lifecycle/.quality-results/browser-${{ matrix.scale }}.json
+          include-hidden-files: true
+          retention-days: 7
+
+  performance:
+    name: Representative performance profile
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+        env:
+          POSTGRES_PASSWORD: quality_ci_local
+        ports: [5432:5432]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      QUALITY_OWNER_URL: postgresql://postgres:quality_ci_local@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm --filter @work-card/contracts build
+      - run: pnpm test:performance
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: performance-profile
+          path: WorkCard-Lifecycle/.quality-results/performance.json
+          include-hidden-files: true
+          retention-days: 7

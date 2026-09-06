@@ -1,0 +1,371 @@
+name: Release image
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-image
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+    working-directory: WorkCard-Lifecycle
+
+jobs:
+  preflight:
+    name: Verify release candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      ci-run-url: ${{ steps.candidate.outputs.ci-run-url }}
+      source-sha: ${{ steps.source.outputs.source-sha }}
+    steps:
+      - name: Checkout the dispatched revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Validate the source revision
+        id: source
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] || {
+            echo "Release image accepts only an explicit workflow_dispatch." >&2
+            exit 1
+          }
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || {
+            echo "Release image must be dispatched from refs/heads/main." >&2
+            exit 1
+          }
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "github.sha is not a full lowercase commit SHA." >&2
+            exit 1
+          }
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]] || {
+            echo "The checked-out commit does not match github.sha." >&2
+            exit 1
+          }
+          [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
+            echo "Release build requires a clean checkout." >&2
+            exit 1
+          }
+
+          echo "source-sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Require the complete successful push CI for the same SHA
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+        run: |
+          set -euo pipefail
+
+          runs_json="$(gh api --method GET \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+            -f branch=main \
+            -f event=push \
+            -f status=success \
+            -f head_sha="$SOURCE_SHA" \
+            -f per_page=20)"
+
+          ci_run_id="$(jq -er --arg sha "$SOURCE_SHA" \
+            '[.workflow_runs[] | select(.head_sha == $sha and .head_branch == "main" and .event == "push" and .conclusion == "success")][0].id' \
+            <<<"$runs_json")"
+          ci_run_url="$(jq -er --argjson id "$ci_run_id" \
+            '.workflow_runs[] | select(.id == $id) | .html_url' \
+            <<<"$runs_json")"
+          jobs_json="$(gh api --method GET \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${ci_run_id}/jobs" \
+            -f filter=latest \
+            -f per_page=100)"
+
+          required_jobs=(
+            "Code and database quality"
+            "Clean container startup"
+            "Dependency and secret security"
+            "Browser (compact)"
+            "Browser (canonical)"
+            "Representative performance profile"
+            "Release and IaC contract"
+          )
+          for required_job in "${required_jobs[@]}"; do
+            jq -e --arg name "$required_job" \
+              '[.jobs[] | select(.name == $name and .status == "completed" and .conclusion == "success")] | length == 1' \
+              <<<"$jobs_json" >/dev/null || {
+              echo "Required CI job is not uniquely successful: $required_job" >&2
+              exit 1
+            }
+          done
+
+          echo "ci-run-url=$ci_run_url" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Build, publish, verify, and scan
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT: ${{ vars.GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT }}
+      GCP_RELEASE_PROJECT_ID: ${{ vars.GCP_RELEASE_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      REGION: europe-west1
+      SOURCE_CI_RUN_URL: ${{ needs.preflight.outputs.ci-run-url }}
+      SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
+      TRIVY_IMAGE: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+    steps:
+      - name: Checkout the verified source SHA
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.preflight.outputs.source-sha }}
+
+      - name: Set up the pinned release workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Validate keyless release configuration
+        run: |
+          set -euo pipefail
+
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "The release candidate is not a full lowercase commit SHA." >&2
+            exit 1
+          }
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]] || {
+            echo "The publish checkout does not match the verified candidate." >&2
+            exit 1
+          }
+          [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
+            echo "Release build requires a clean checkout." >&2
+            exit 1
+          }
+          [[ "$GCP_RELEASE_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]] || {
+            echo "GCP_RELEASE_PROJECT_ID is missing or invalid." >&2
+            exit 1
+          }
+          [[ "$GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT" == "work-card-publisher@${GCP_RELEASE_PROJECT_ID}.iam.gserviceaccount.com" ]] || {
+            echo "GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT does not match the Terraform publisher identity." >&2
+            exit 1
+          }
+          [[ "$GCP_WORKLOAD_IDENTITY_PROVIDER" =~ ^projects/[0-9]+/locations/global/workloadIdentityPools/github-actions/providers/work-card-release$ ]] || {
+            echo "GCP_WORKLOAD_IDENTITY_PROVIDER is missing or invalid." >&2
+            exit 1
+          }
+
+          image_repository="${REGION}-docker.pkg.dev/${GCP_RELEASE_PROJECT_ID}/work-card/work-card"
+          image_tag="${image_repository}:${SOURCE_SHA}"
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
+          {
+            echo "IMAGE_REPOSITORY=$image_repository"
+            echo "IMAGE_TAG=$image_tag"
+            echo "BUILD_SCAN_RUN_URL=$run_url"
+          } >> "$GITHUB_ENV"
+
+      - name: Build the release image once
+        id: build
+        run: |
+          set -euo pipefail
+
+          docker build \
+            --platform linux/amd64 \
+            --pull \
+            --no-cache \
+            --build-arg "APP_VERSION=$SOURCE_SHA" \
+            --tag "$IMAGE_TAG" \
+            .
+          local_image_id="$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')"
+          [[ "$local_image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "The local release image has an invalid image ID." >&2
+            exit 1
+          }
+          echo "local-image-id=$local_image_id" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud through Workload Identity
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          create_credentials_file: true
+          project_id: ${{ env.GCP_RELEASE_PROJECT_ID }}
+          service_account: ${{ env.GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set up the pinned Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ env.GCP_RELEASE_PROJECT_ID }}
+          version: 582.0.0
+
+      - name: Authenticate Docker and reject an existing immutable tag
+        run: |
+          set -euo pipefail
+
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+          error_file="$(mktemp)"
+          if existing_digest="$(gcloud artifacts docker images describe "$IMAGE_TAG" \
+            --project "$GCP_RELEASE_PROJECT_ID" \
+            --format='value(image_summary.digest)' 2>"$error_file")"; then
+            echo "Immutable release tag already exists with digest $existing_digest; refusing to rebuild or overwrite it." >&2
+            exit 1
+          fi
+          if ! grep -Eiq 'NOT_FOUND|not found|does not exist' "$error_file"; then
+            echo "Could not prove that the immutable release tag is absent." >&2
+            sed -E 's/(ya29\.[A-Za-z0-9._-]+)/[REDACTED]/g' "$error_file" >&2
+            exit 1
+          fi
+
+      - name: Publish the full-SHA tag and capture its registry digest
+        id: publish
+        run: |
+          set -euo pipefail
+
+          docker push "$IMAGE_TAG"
+          image_digest="$(gcloud artifacts docker images describe "$IMAGE_TAG" \
+            --project "$GCP_RELEASE_PROJECT_ID" \
+            --format='value(image_summary.digest)')"
+          [[ "$image_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "Artifact Registry returned an invalid image digest." >&2
+            exit 1
+          }
+
+          immutable_image="${IMAGE_REPOSITORY}@${image_digest}"
+          {
+            echo "IMAGE_DIGEST=$image_digest"
+            echo "IMMUTABLE_IMAGE=$immutable_image"
+          } >> "$GITHUB_ENV"
+          {
+            echo "image-digest=$image_digest"
+            echo "immutable-image=$immutable_image"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Pull and verify the published image by digest
+        env:
+          LOCAL_IMAGE_ID: ${{ steps.build.outputs.local-image-id }}
+        run: |
+          set -euo pipefail
+
+          docker pull --platform linux/amd64 "$IMMUTABLE_IMAGE"
+          published_metadata="$(docker image inspect "$IMMUTABLE_IMAGE")"
+          published_image_id="$(jq -er '.[0].Id' <<<"$published_metadata")"
+          oci_revision="$(jq -er '.[0].Config.Labels["org.opencontainers.image.revision"]' <<<"$published_metadata")"
+          app_version="$(jq -er '.[0].Config.Env | map(select(startswith("APP_VERSION="))) | select(length == 1) | .[0][12:]' <<<"$published_metadata")"
+          platform="$(jq -er '.[0] | "\(.Os)/\(.Architecture)"' <<<"$published_metadata")"
+
+          [[ "$published_image_id" == "$LOCAL_IMAGE_ID" ]] || {
+            echo "The published image config does not match the single local build." >&2
+            exit 1
+          }
+          [[ "$oci_revision" == "$SOURCE_SHA" ]] || {
+            echo "The published OCI revision label does not match the source SHA." >&2
+            exit 1
+          }
+          [[ "$app_version" == "$SOURCE_SHA" ]] || {
+            echo "The published APP_VERSION does not match the source SHA." >&2
+            exit 1
+          }
+          [[ "$platform" == "linux/amd64" ]] || {
+            echo "The published image platform is not linux/amd64." >&2
+            exit 1
+          }
+
+          mkdir -p .quality-results/release
+          docker save "$IMMUTABLE_IMAGE" --output .quality-results/release/published-image.tar
+          {
+            echo "IMAGE_CONFIG_DIGEST=$published_image_id"
+            echo "OCI_REVISION_LABEL=$oci_revision"
+          } >> "$GITHUB_ENV"
+
+      - name: Scan the pulled published digest
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            -v "$PWD/.quality-results/release:/scan" \
+            "$TRIVY_IMAGE" image \
+            --input /scan/published-image.tar \
+            --scanners vuln \
+            --parallel 1 \
+            --no-progress \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --format json \
+            --output /scan/image-vulnerabilities.json
+
+      - name: Refresh the short-lived Workload Identity credential
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          create_credentials_file: true
+          project_id: ${{ env.GCP_RELEASE_PROJECT_ID }}
+          service_account: ${{ env.GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Recheck tag and digest in Artifact Registry
+        run: |
+          set -euo pipefail
+
+          tag_digest="$(gcloud artifacts docker images describe "$IMAGE_TAG" \
+            --project "$GCP_RELEASE_PROJECT_ID" \
+            --format='value(image_summary.digest)')"
+          exact_digest="$(gcloud artifacts docker images describe "$IMMUTABLE_IMAGE" \
+            --project "$GCP_RELEASE_PROJECT_ID" \
+            --format='value(image_summary.digest)')"
+          [[ "$tag_digest" == "$IMAGE_DIGEST" && "$exact_digest" == "$IMAGE_DIGEST" ]] || {
+            echo "Artifact Registry digest recheck failed." >&2
+            exit 1
+          }
+
+      - name: Create the non-secret release manifest
+        run: |
+          set -euo pipefail
+
+          generated_at="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
+          node scripts/release/create-release-manifest.mjs \
+            --source-sha "$SOURCE_SHA" \
+            --image-tag "$IMAGE_TAG" \
+            --image-digest "$IMAGE_DIGEST" \
+            --image-config-digest "$IMAGE_CONFIG_DIGEST" \
+            --oci-revision-label "$OCI_REVISION_LABEL" \
+            --source-ci-run-url "$SOURCE_CI_RUN_URL" \
+            --build-scan-run-url "$BUILD_SCAN_RUN_URL" \
+            --scanner-image "$TRIVY_IMAGE" \
+            --generated-at "$generated_at"
+
+          manifest_path="docs/release/manifests/${SOURCE_SHA}.json"
+          node scripts/release/validate-release-manifest.mjs \
+            --manifest "$manifest_path" \
+            --scan-report .quality-results/release/image-vulnerabilities.json
+
+          {
+            echo "### Release image candidate"
+            echo
+            echo "- Source SHA: \`$SOURCE_SHA\`"
+            echo "- Immutable image: \`$IMMUTABLE_IMAGE\`"
+            echo "- Manifest artifact path: \`WorkCard-Lifecycle/$manifest_path\`"
+            echo "- Terraform apply and deployment: not performed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-image-${{ needs.preflight.outputs.source-sha }}
+          path: |
+            WorkCard-Lifecycle/docs/release/manifests/${{ needs.preflight.outputs.source-sha }}.json
+            WorkCard-Lifecycle/docs/release/release-manifest.schema.json
+            WorkCard-Lifecycle/docs/release/release-evidence.schema.json
+            WorkCard-Lifecycle/.quality-results/release/image-vulnerabilities.json
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 30

@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Цифровые рабочие карточки — кликабельный прототип</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #607080;
+      --line: #d8e0e6;
+      --panel: #ffffff;
+      --canvas: #f3f6f8;
+      --navy: #173b57;
+      --navy-2: #22587e;
+      --orange: #e36f2d;
+      --orange-soft: #fff1e8;
+      --green: #267a5a;
+      --green-soft: #e9f7f0;
+      --yellow: #9a6900;
+      --yellow-soft: #fff6d9;
+      --red: #a13d3d;
+      --red-soft: #fff0f0;
+      --radius: 14px;
+      --shadow: 0 12px 32px rgba(23, 59, 87, .09);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); }
+    button, select, input { font: inherit; }
+    button, select { min-height: 42px; }
+    button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible {
+      outline: 3px solid rgba(227, 111, 45, .32);
+      outline-offset: 2px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      min-height: 76px;
+      padding: 14px clamp(18px, 4vw, 52px);
+      color: #fff;
+      background: linear-gradient(120deg, #112f47, #1d567b);
+      border-bottom: 4px solid var(--orange);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+    .mark {
+      display: grid; place-items: center; width: 42px; height: 42px;
+      border: 2px solid rgba(255,255,255,.8); border-radius: 12px;
+      font-weight: 800; letter-spacing: -.04em;
+    }
+    .brand strong { display: block; font-size: 17px; }
+    .brand span { display: block; opacity: .75; font-size: 12px; margin-top: 2px; }
+    .role-control { display: flex; align-items: center; gap: 10px; }
+    .role-control label { font-size: 12px; opacity: .76; }
+    .role-control select {
+      color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.32);
+      border-radius: 10px; padding: 0 34px 0 12px;
+    }
+    .role-control option { color: var(--ink); background: white; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      gap: 24px;
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 24px clamp(16px, 3vw, 38px) 40px;
+    }
+    .steps, .workspace, .supplementary-card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .steps { padding: 18px 12px; align-self: start; position: sticky; top: 18px; }
+    .steps h2 { margin: 2px 10px 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; }
+    .step-list { display: grid; gap: 5px; }
+    .step-button {
+      width: 100%; display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 9px;
+      min-height: 48px; padding: 7px 10px; border: 0; border-radius: 10px; background: transparent;
+      color: var(--muted); text-align: left; cursor: pointer;
+    }
+    .step-button:hover { background: #f5f8fa; color: var(--ink); }
+    .step-button[aria-current="step"] { color: var(--navy); background: #eaf2f7; font-weight: 700; }
+    .step-button.done .step-index { background: var(--green); color: white; border-color: var(--green); }
+    .step-index {
+      display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line);
+      border-radius: 50%; font-size: 11px; font-weight: 800;
+    }
+    .step-copy { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+
+    .workspace { min-width: 0; overflow: hidden; }
+    .workspace-head { padding: clamp(20px, 4vw, 38px); border-bottom: 1px solid var(--line); }
+    .crumbs { color: var(--muted); font-size: 13px; margin-bottom: 15px; }
+    .eyebrow { color: var(--orange); font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    h1 { margin: 8px 0 8px; color: var(--navy); font-size: clamp(25px, 3vw, 38px); line-height: 1.12; }
+    .lead { max-width: 880px; margin: 0; color: var(--muted); line-height: 1.55; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin-top: 24px; }
+    .metric { padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: #fbfcfd; }
+    .metric span { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    .metric strong { display: block; margin-top: 5px; color: var(--navy); font-size: 19px; }
+
+    .screen { padding: clamp(20px, 4vw, 38px); min-height: 420px; }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card { border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px; background: #f7f9fa; border-bottom: 1px solid var(--line); }
+    .card-head h3 { margin: 0; color: var(--navy); font-size: 15px; }
+    .card-body { padding: 17px; }
+    .field { display: grid; gap: 6px; margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label, .label { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .field input, .field select {
+      width: 100%; min-height: 44px; padding: 10px 12px; color: var(--ink); background: white;
+      border: 1px solid #bfcbd4; border-radius: 9px;
+    }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .fact { padding: 12px; background: #f7f9fa; border-radius: 9px; }
+    .fact span { display: block; color: var(--muted); font-size: 11px; }
+    .fact strong { display: block; margin-top: 4px; font-size: 14px; overflow-wrap: anywhere; }
+    .callout { margin-top: 16px; padding: 14px 16px; border-left: 4px solid var(--navy-2); background: #eef5f9; border-radius: 9px; line-height: 1.5; }
+    .callout.warn { border-color: var(--yellow); background: var(--yellow-soft); }
+    .callout.ok { border-color: var(--green); background: var(--green-soft); }
+    .callout.guard { border-color: var(--orange); background: var(--orange-soft); }
+
+    .badge { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+    .badge.pending { color: var(--yellow); background: var(--yellow-soft); }
+    .badge.ok { color: var(--green); background: var(--green-soft); }
+    .badge.neutral { color: var(--navy); background: #eaf2f7; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; }
+    table { width: 100%; border-collapse: collapse; min-width: 650px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
+    th { color: var(--muted); background: #f7f9fa; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    tr:last-child td { border-bottom: 0; }
+    code { color: #29495e; background: #edf3f6; padding: 2px 6px; border-radius: 5px; font-size: .92em; }
+    .distribution { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .distribution div { flex: 1 1 150px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; }
+    .distribution span { color: var(--muted); font-size: 11px; }
+    .distribution strong { display: block; margin-top: 4px; color: var(--navy); font-size: 20px; }
+
+    .timeline { display: grid; grid-template-columns: repeat(5, minmax(90px, 1fr)); gap: 8px; margin-top: 16px; }
+    .timeline div { padding: 11px 8px; border: 1px solid var(--line); border-radius: 9px; text-align: center; color: var(--muted); font-size: 11px; }
+    .timeline .done { color: var(--green); border-color: #abd7c5; background: var(--green-soft); }
+    .timeline .current { color: var(--navy); border-color: #9fc1d6; background: #edf5fa; font-weight: 800; }
+
+    .workspace-actions {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 18px clamp(20px, 4vw, 38px); border-top: 1px solid var(--line); background: #fbfcfd;
+    }
+    .action-group, .state-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+    .button { border: 1px solid #b8c5ce; border-radius: 9px; padding: 0 15px; background: white; color: var(--navy); font-weight: 750; cursor: pointer; }
+    .button:hover:not(:disabled) { border-color: var(--navy-2); background: #f0f5f8; }
+    .button.primary { color: white; border-color: var(--orange); background: var(--orange); }
+    .button.primary:hover:not(:disabled) { background: #c85b20; }
+    .button:disabled { cursor: not-allowed; opacity: .5; }
+    .permission-note { min-height: 18px; color: var(--red); font-size: 12px; text-align: right; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    .supplementary { grid-column: 2; display: grid; gap: 16px; }
+    .supplementary-card { overflow: hidden; box-shadow: none; }
+    .supplementary-card summary { padding: 17px 20px; color: var(--navy); background: #fbfcfd; cursor: pointer; font-weight: 800; }
+    .supplementary-body { padding: 20px; border-top: 1px solid var(--line); }
+    .supplementary-body > :first-child { margin-top: 0; }
+    .state-panel { display: grid; gap: 4px; min-height: 76px; margin-top: 14px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: #f7f9fa; }
+    .state-panel.error { border-color: #e0b4b4; background: var(--red-soft); }
+    .prototype-warning { margin: 0 0 16px; padding: 14px 16px; border-left: 4px solid var(--orange); background: var(--orange-soft); border-radius: 9px; line-height: 1.5; }
+    .technical-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .prototype-summary { margin-bottom: 16px; }
+    .developer-codes { margin-top: 16px; border: 1px solid var(--line); border-radius: 10px; background: #f7f9fa; overflow: hidden; }
+    .developer-codes summary { padding: 15px; background: #f7f9fa; }
+    .developer-code-body { padding: 0 15px 15px; border-top: 1px solid var(--line); }
+    .developer-code-body .hint { margin: 14px 0; }
+
+    @media (max-width: 960px) {
+      .app { grid-template-columns: 1fr; }
+      .steps { position: static; }
+      .step-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .step-button { grid-template-columns: 28px; justify-content: center; }
+      .step-copy { display: none; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .supplementary { grid-column: 1; }
+    }
+    @media (max-width: 680px) {
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .role-control { width: 100%; align-items: stretch; flex-direction: column; gap: 6px; }
+      .role-control select { width: 100%; max-width: none; }
+      .grid.two, .facts, .technical-grid { grid-template-columns: 1fr; }
+      .step-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .timeline { grid-template-columns: 1fr; }
+      .workspace-actions { align-items: stretch; flex-direction: column; }
+      .action-group { justify-content: space-between; }
+      .permission-note { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">РК</div>
+      <div><strong>Цифровые рабочие карточки</strong><span>кликабельный прототип · тестовые данные</span></div>
+    </div>
+    <div class="role-control">
+      <label for="role">Роль в прототипе</label>
+      <select id="role" aria-describedby="roleHelp">
+        <option value="PLANNER">Ирина · Планировщик ПДБ</option>
+        <option value="MASTER">Михаил · Мастер</option>
+        <option value="WORKER">Алексей · Рабочий</option>
+        <option value="QUALITY_CONTROLLER">Ольга · Контролёр БТК</option>
+        <option value="ADMIN_AUDITOR">Анна · Администратор демонстрации</option>
+      </select>
+      <span id="roleHelp" class="sr-only">Смена роли показывает доступные действия и не изменяет производственные данные.</span>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside class="steps" aria-label="Шаги основного процесса">
+      <h2>Основной процесс</h2>
+      <nav id="stepList" class="step-list" aria-label="Четырнадцать шагов основного процесса"></nav>
+    </aside>
+
+    <main class="workspace">
+      <section class="workspace-head">
+        <div id="crumbs" class="crumbs"></div>
+        <div id="eyebrow" class="eyebrow"></div>
+        <h1 id="title"></h1>
+        <p id="lead" class="lead"></p>
+        <div id="metrics" class="metrics"></div>
+      </section>
+
+      <section id="screen" class="screen" aria-live="polite"></section>
+
+      <footer class="workspace-actions">
+        <div class="action-group">
+          <button id="previous" class="button" type="button">Вернуться к предыдущему шагу</button>
+          <button id="reset" class="button" type="button">Начать процесс заново</button>
+        </div>
+        <div>
+          <div id="permissionNote" class="permission-note" role="status"></div>
+          <button id="primary" class="button primary" type="button" aria-describedby="permissionNote"></button>
+        </div>
+      </footer>
+    </main>
+
+    <section class="supplementary" aria-label="Дополнительные возможности прототипа">
+      <details id="systemStates" class="supplementary-card">
+        <summary>Системные сообщения</summary>
+        <div class="supplementary-body">
+          <p class="hint">Эти примеры позволяют проверить формулировки загрузки, пустого состояния, ошибки, отсутствия доступа, изменения данных и повторного действия.</p>
+          <div class="state-actions" aria-label="Примеры системных состояний">
+            <button class="button" type="button" data-state="loading">Показать загрузку данных</button>
+            <button class="button" type="button" data-state="empty">Показать пустое состояние</button>
+            <button class="button" type="button" data-state="error">Показать ошибку загрузки</button>
+            <button class="button" type="button" data-state="conflict">Показать изменение данных</button>
+            <button class="button" type="button" data-state="denied">Показать отсутствие доступа</button>
+            <button class="button" type="button" data-state="replay">Показать повторную приёмку</button>
+          </div>
+          <div id="stateMessage" class="state-panel" role="status" aria-live="polite">
+            <strong>Системное сообщение не выбрано</strong>
+            <span>Выберите пример, чтобы увидеть текст состояния.</span>
+          </div>
+        </div>
+      </details>
+
+      <details id="prototypeInfo" class="supplementary-card">
+        <summary>Сведения о прототипе</summary>
+        <div class="supplementary-body">
+          <p class="prototype-warning"><strong>Сведения для демонстрации.</strong> Здесь используются понятные названия требования, роли, действия и контекста текущего экрана. Внутренние коды доступны отдельно только разработчику.</p>
+          <div id="prototypeSummary" class="technical-grid prototype-summary"></div>
+          <div class="state-actions" style="margin-bottom:16px">
+            <button id="runUxAudit" class="button" type="button">Запустить проверку пользовательского текста</button>
+            <button id="showPrematureAcceptance" class="button" type="button">Показать незавершённую партию</button>
+            <button id="restoreReadyAcceptance" class="button" type="button">Вернуть готовую партию</button>
+          </div>
+          <div id="uxAuditResult" class="state-panel" role="status" aria-live="polite">
+            <strong>Проверка ещё не запускалась</strong>
+            <span>Результат появится здесь и не изменит производственные данные.</span>
+          </div>
+          <details id="developerCodes" class="developer-codes" data-ux-technical-exception="developer-codes">
+            <summary>Технические коды для разработчика</summary>
+            <div class="developer-code-body">
+              <p class="hint">Вложенный блок содержит исходные идентификаторы, коды ролей, команды, события и версии. Они не предназначены для производственного интерфейса.</p>
+              <div id="prototypeTechnical" class="technical-grid"></div>
+            </div>
+          </details>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <div id="announcement" class="sr-only" aria-live="assertive"></div>
+
+  <script>
+    const roles = {
+      PLANNER: "Планировщик ПДБ",
+      MASTER: "Мастер",
+      WORKER: "Рабочий",
+      QUALITY_CONTROLLER: "Контролёр БТК",
+      ADMIN_AUDITOR: "Администратор демонстрации"
+    };
+
+    const setRows = `
+      <div class="table-wrap"><table>
+        <thead><tr><th>Группа операций</th><th>Норма</th><th>Карточек по плану</th><th>Приёмка первой детали</th></tr></thead>
+        <tbody>
+          <tr><td>Операции 010–030</td><td>0,80 ч</td><td>112 карточек</td><td><span class="badge pending">Ожидается</span></td></tr>
+          <tr><td>Операции 040–060</td><td>1,25 ч</td><td>112 карточек</td><td><span class="badge pending">Ожидается</span></td></tr>
+          <tr><td>Операция 070</td><td>0,45 ч</td><td>26 карточек</td><td><span class="badge pending">Ожидается</span></td></tr>
+        </tbody>
+      </table></div>`;
+
+    const statusLabels = {
+      RELEASED: "Выпущена",
+      ASSIGNED: "Назначена исполнителю",
+      IN_PROGRESS: "Выполняется",
+      COMPLETED: "Работа завершена",
+      CLOSED: "Закрыта"
+    };
+
+    const purposeLabels = {
+      FIRST_ARTICLE: "Первая деталь",
+      SERIAL: "Обработка партии"
+    };
+
+    const prototypeOverviews = [
+      { requirement: "создание производственной партии", action: "создание производственной партии", contextLabel: "Паспорт", context: "демонстрационный, версия A" },
+      { requirement: "выпуск рабочих карточек", action: "выпуск карточек по группам операций", contextLabel: "Партия", context: "112 изделий" },
+      { requirement: "назначение рабочей карточки", action: "назначение карточки для первой детали", contextLabel: "Группа операций", context: "операции 010–030" },
+      { requirement: "ведение рабочей карточки", action: "фиксация начала работы", contextLabel: "Назначение", context: "первая деталь" },
+      { requirement: "ведение рабочей карточки", action: "фиксация завершения работы", contextLabel: "Назначение", context: "первая деталь" },
+      { requirement: "приёмка первой детали", action: "приёмка первой детали", contextLabel: "Результат", context: "обработка партии разрешена" },
+      { requirement: "назначение рабочих карточек", action: "распределение карточек обработки партии", contextLabel: "Распределение", context: "60 и 52 карточки" },
+      { requirement: "ведение рабочей карточки", action: "фиксация начала обработки партии", contextLabel: "Назначение", context: "обработка партии" },
+      { requirement: "ведение рабочей карточки", action: "фиксация завершения обработки партии", contextLabel: "Назначение", context: "обработка партии" },
+      { requirement: "подтверждение качества карточки", action: "подтверждение качества карточки", contextLabel: "Результат", context: "карточка закрыта" },
+      { requirement: "финальная приёмка производственной партии", action: "финальная приёмка производственной партии", contextLabel: "Готовность", context: "все обязательные условия выполнены" },
+      { requirement: "финальная приёмка производственной партии", action: "просмотр результата финальной приёмки", contextLabel: "Результат", context: "финальная приёмка записана" },
+      { requirement: "тестовый учёт нормо-часов", action: "создание тестовой записи нормо-часов", contextLabel: "Назначение", context: "демонстрационная проверка" },
+      { requirement: "просмотр журнала действий", action: "проверка журнала действий", contextLabel: "Процесс", context: "основной сценарий завершён" }
+    ];
+
+    const steps = [
+      {
+        short: "Создать партию", role: "PLANNER", eyebrow: "Планировщик ПДБ · шаг 1 из 14", title: "Новая партия по подготовленному паспорту",
+        crumbs: "Партии / Новая партия", lead: "Планировщик ПДБ выбирает подготовленный паспорт технолога БТБ и вводит только количество изделий в партии.",
+        action: "Создать партию из 112 изделий", metrics: [["Паспорт", "Демонстрационный · версия A"], ["Изделий в партии", "112"], ["Группы операций", "3"], ["Редактирование норм", "Только просмотр"]],
+        html: `<div class="grid two">
+          <article class="card"><div class="card-head"><h3>Параметры партии</h3><span class="badge neutral">Тестовые данные</span></div><div class="card-body">
+            <div class="field"><label for="passport">Подготовленный производственный паспорт</label><select id="passport"><option>Демонстрационный паспорт · версия A · Синтетическое изделие</option></select></div>
+            <div class="field"><label for="quantity">Количество изделий в партии</label><input id="quantity" value="112" inputmode="numeric" aria-describedby="quantityHelp"></div>
+            <p id="quantityHelp" class="hint">ПДБ не вводит маршрут и нормы: они загружены из подготовленного паспорта.</p>
+          </div></article>
+          <article class="card"><div class="card-head"><h3>План операций и нормы · только просмотр</h3></div><div class="card-body">
+            <div class="facts"><div class="fact"><span>Операции 010–030</span><strong>0,80 ч · 112 карточек</strong></div><div class="fact"><span>Операции 040–060</span><strong>1,25 ч · 112 карточек</strong></div><div class="fact"><span>Операция 070</span><strong>0,45 ч · 26 карточек</strong></div><div class="fact"><span>Всего</span><strong>250 карточек</strong></div></div>
+          </div></article>
+        </div><div class="callout guard"><strong>Важно:</strong> цифровая карточка не является номером физической детали.</div>`,
+        technical: [["Требование", "UC-001"], ["Роль", "PLANNER"], ["Команда", "CreateProductionBatch"], ["Паспорт", "PP-DEMO rev A"]]
+      },
+      {
+        short: "Выпустить карточки", role: "PLANNER", eyebrow: "Планировщик ПДБ · шаг 2 из 14", title: "Партия из 112 изделий готова к выпуску карточек",
+        crumbs: "Партии / Партия 112", lead: "Одно действие создаёт все комплекты паспорта и 250 карточек. При ошибке не создаётся ни одной карточки.",
+        action: "Выпустить карточки по группам операций", metrics: [["Изделий в партии", "112 изделий"], ["Комплектов", "3"], ["Карточек всего", "250"], ["Состояние партии", "Создана"]],
+        html: `${setRows}<div class="callout warn"><strong>Необратимое действие:</strong> повторный выпуск в этой версии прототипа не предусмотрен. Каждая карточка сохранит количество изделий в партии как контекст.</div>`,
+        technical: [["Требование", "UC-002"], ["Роль", "PLANNER"], ["Команда", "ReleaseWorkCardSets"], ["Версия партии", "1"]]
+      },
+      {
+        short: "Назначить первую деталь", role: "MASTER", eyebrow: "Мастер · шаг 3 из 14", title: "Выбор карточки для первой детали",
+        crumbs: "Партия 112 / Операции 010–030", lead: "До приёмки первой детали мастер может назначить ровно одну свободную карточку этого комплекта.",
+        action: "Назначить карточку для первой детали", metrics: [["Приёмка первой детали", "Ожидается"], ["Карточек по плану", "112"], ["Назначено", "0"], ["Норма", "0,80 ч"]],
+        html: `<div class="table-wrap"><table><thead><tr><th>Выбор</th><th>Состояние</th><th>Исполнитель</th><th>Назначение</th></tr></thead><tbody>
+          <tr><td><input type="radio" checked name="firstPieceCard" aria-label="Выбрать свободную карточку в первой строке для первой детали"></td><td>Выпущена</td><td>—</td><td>—</td></tr>
+          <tr><td><input type="radio" name="firstPieceCard" aria-label="Выбрать свободную карточку во второй строке для первой детали"></td><td>Выпущена</td><td>—</td><td>—</td></tr>
+          <tr><td><input type="radio" name="firstPieceCard" aria-label="Выбрать свободную карточку в третьей строке для первой детали"></td><td>Выпущена</td><td>—</td><td>—</td></tr>
+        </tbody></table></div>
+        <div class="grid two" style="margin-top:16px"><div class="fact"><span>Исполнитель</span><strong>Алексей · Рабочий</strong></div><div class="fact"><span>Назначение</span><strong>Первая деталь</strong></div></div>
+        <div class="callout guard">Карточка выбирается как внутренняя запись; номер физической детали ей не присваивается.</div>`,
+        technical: [["Требование", "UC-003"], ["Роль", "MASTER"], ["Назначение", "FIRST_ARTICLE"], ["Внутренний ID", "9f4e2b7a…"]]
+      },
+      {
+        short: "Начать работу", role: "MASTER", eyebrow: "Мастер · шаг 4 из 14", title: "Карточка первой детали назначена",
+        crumbs: "Партия 112 / Операции 010–030 / Рабочая карточка", lead: "Мастер фиксирует начало работы назначенного исполнителя. Рабочий видит назначение, но не изменяет состояние карточки.",
+        action: "Зафиксировать начало работы по карточке", metrics: [["Состояние", "Назначена исполнителю"], ["Назначение", "Первая деталь"], ["Исполнитель", "Алексей"], ["Последнее действие", "Назначение карточки"]],
+        html: cardDetails("ASSIGNED", "FIRST_ARTICLE", "Ожидается фиксация начала работы мастером", 1),
+        technical: [["Требование", "UC-004"], ["Роль", "MASTER"], ["Состояние", "ASSIGNED"], ["Версия карточки", "2"]]
+      },
+      {
+        short: "Завершить работу", role: "MASTER", eyebrow: "Мастер · шаг 5 из 14", title: "Выполняется работа по первой детали",
+        crumbs: "Партия 112 / Операции 010–030 / Рабочая карточка", lead: "После фактического выполнения мастер фиксирует завершение работы, сохраняя Алексея исполнителем.",
+        action: "Зафиксировать завершение работы по карточке", metrics: [["Состояние", "Выполняется"], ["Назначение", "Первая деталь"], ["Исполнитель", "Алексей"], ["Начало зафиксировал", "Михаил · Мастер"]],
+        html: cardDetails("IN_PROGRESS", "FIRST_ARTICLE", "Начало работы зафиксировал Михаил · Мастер", 2),
+        technical: [["Требование", "UC-004"], ["Роль", "MASTER"], ["Состояние", "IN_PROGRESS"], ["Версия карточки", "3"]]
+      },
+      {
+        short: "Принять первую деталь", role: "QUALITY_CONTROLLER", eyebrow: "Контролёр БТК · шаг 6 из 14", title: "Приёмка первой детали",
+        crumbs: "Партия 112 / Операции 010–030 / Рабочая карточка", lead: "Контролёр БТК принимает первую деталь, закрывает её карточку и разрешает обработку партии по этой группе операций.",
+        action: "Принять первую деталь и разрешить обработку партии", metrics: [["Состояние карточки", "Работа завершена"], ["Приёмка первой детали", "Ожидается"], ["Исполнитель", "Алексей"], ["Группа операций", "010–030"]],
+        html: `${cardDetails("COMPLETED", "FIRST_ARTICLE", "Завершение работы зафиксировал Михаил · Мастер", 3)}<div class="callout warn"><strong>Одно согласованное действие:</strong> карточка первой детали закрывается, а обработка партии по группе операций разрешается. Отклонение и доработка в прототип не входят.</div>`,
+        technical: [["Требование", "UC-005"], ["Роль", "QUALITY_CONTROLLER"], ["Команда", "AcceptFirstArticle"], ["Переход", "WorkCard: COMPLETED → CLOSED; WorkCardSet: FIRST_ARTICLE_PENDING → SERIAL_ALLOWED"]]
+      },
+      {
+        short: "Распределить карточки", role: "MASTER", eyebrow: "Мастер · шаг 7 из 14", title: "Распределение карточек обработки партии",
+        crumbs: "Партия 112 / Операции 010–030", lead: "Карточка первой детали входит в долю первого исполнителя. Два последовательных назначения дают итог: 60 + 52 = 112 карточек.",
+        action: "Подтвердить распределение 112 карточек", metrics: [["Обработка партии", "Разрешена"], ["Карточек по плану", "112"], ["Назначено", "112"], ["Осталось назначить", "0"]],
+        html: `<div class="distribution"><div><span>Алексей · включая карточку первой детали</span><strong>60 карточек</strong></div><div><span>Сергей</span><strong>52 карточки</strong></div><div><span>Всего в комплекте</span><strong>112 карточек</strong></div></div>
+        <div class="callout ok"><strong>60 + 52 = 112 карточек.</strong> Распределение задаётся количеством; диапазоны номеров деталей не используются.</div>
+        <div class="table-wrap" style="margin-top:16px"><table><thead><tr><th>Назначение карточки</th><th>Состояние</th><th>Исполнитель</th></tr></thead><tbody>
+          <tr><td>Первая деталь</td><td>Закрыта</td><td>Алексей</td></tr>
+          <tr><td>Обработка партии</td><td>Назначена исполнителю</td><td>Алексей</td></tr>
+          <tr><td>Обработка партии</td><td>Назначена исполнителю</td><td>Сергей</td></tr>
+        </tbody></table></div>`,
+        technical: [["Требование", "UC-003"], ["Роль", "MASTER"], ["Состояние комплекта", "SERIAL_ALLOWED"], ["Внутренние ID", "9f4e2b7a… / a12c880d… / c8071d64…"]]
+      },
+      {
+        short: "Начать обработку", role: "MASTER", eyebrow: "Мастер · шаг 8 из 14", title: "Карточка обработки партии назначена",
+        crumbs: "Партия 112 / Операции 010–030 / Рабочая карточка", lead: "Приёмка первой детали выполнена. Мастер фиксирует начало работы по одной карточке обработки партии.",
+        action: "Зафиксировать начало работы по карточке", metrics: [["Состояние", "Назначена исполнителю"], ["Назначение", "Обработка партии"], ["Исполнитель", "Сергей"], ["Обработка партии", "Разрешена"]],
+        html: cardDetails("ASSIGNED", "SERIAL", "Обработка партии по группе операций разрешена", 1, "c8071d64…", "Сергей"),
+        technical: [["Требование", "UC-004"], ["Роль", "MASTER"], ["Состояние", "ASSIGNED"], ["Назначение", "SERIAL"]]
+      },
+      {
+        short: "Завершить обработку", role: "MASTER", eyebrow: "Мастер · шаг 9 из 14", title: "Выполняется обработка партии",
+        crumbs: "Партия 112 / Операции 010–030 / Рабочая карточка", lead: "После фактического выполнения мастер фиксирует завершение работы по карточке. Дополнительное подтверждение мастера не требуется.",
+        action: "Зафиксировать завершение работы по карточке", metrics: [["Состояние", "Выполняется"], ["Назначение", "Обработка партии"], ["Исполнитель", "Сергей"], ["Начало зафиксировал", "Михаил · Мастер"]],
+        html: cardDetails("IN_PROGRESS", "SERIAL", "Начало работы зафиксировал Михаил · Мастер", 2, "c8071d64…", "Сергей"),
+        technical: [["Требование", "UC-004"], ["Роль", "MASTER"], ["Состояние", "IN_PROGRESS"], ["Версия карточки", "3"]]
+      },
+      {
+        short: "Подтвердить качество", role: "QUALITY_CONTROLLER", eyebrow: "Контролёр БТК · шаг 10 из 14", title: "Подтверждение качества карточки",
+        crumbs: "Партия 112 / Операции 010–030 / Рабочая карточка", lead: "Контролёр БТК подтверждает качество одной завершённой карточки обработки партии. Это действие не является финальной приёмкой всей партии.",
+        action: "Подтвердить качество карточки", metrics: [["Состояние карточки", "Работа завершена"], ["Объект проверки", "Одна карточка"], ["Обработка партии", "Разрешена"], ["Исполнитель", "Сергей"]],
+        html: `${cardDetails("COMPLETED", "SERIAL", "Завершение работы зафиксировал Михаил · Мастер", 3, "c8071d64…", "Сергей")}<div class="callout guard"><strong>Разделение действий:</strong> подтверждение качества закрывает только эту карточку. Финальная приёмка партии выполняется позже отдельным действием.</div>`,
+        technical: [["Требование", "UC-006"], ["Роль", "QUALITY_CONTROLLER"], ["Команда", "ConfirmWorkCardQuality"], ["Переход", "WorkCard: COMPLETED → CLOSED"]]
+      },
+      {
+        short: "Принять партию", role: "QUALITY_CONTROLLER", eyebrow: "Контролёр БТК · шаг 11 из 14", title: "Партия готова к финальной приёмке",
+        crumbs: "Партии / Партия 112 / Финальная приёмка", lead: "Отдельное действие доступно после приёмки первых деталей и подтверждения качества всех обязательных карточек.",
+        action: "Подтвердить финальную приёмку партии", ready: true,
+        blockedReason: "Сначала примите первые детали во всех обязательных комплектах и подтвердите качество всех карточек обработки партии.",
+        metrics: [["Первые детали приняты", "3 из 3 групп"], ["Карточки закрыты", "250 из 250"], ["Финальная приёмка", "Не выполнена"], ["Доступ", "Контролёр БТК"]],
+        notReadyMetrics: [["Первые детали приняты", "2 из 3 групп"], ["Карточки закрыты", "249 из 250"], ["Финальная приёмка", "Недоступна"], ["Доступ", "Контролёр БТК"]],
+        html: `<div class="grid two"><article class="card"><div class="card-head"><h3>Готовность партии</h3><span class="badge ok">Все условия выполнены</span></div><div class="card-body"><div class="facts"><div class="fact"><span>Первые детали приняты</span><strong>3 из 3 групп</strong></div><div class="fact"><span>Карточки обработки партии</span><strong>250 из 250 закрыты</strong></div><div class="fact"><span>Финальная приёмка партии</span><strong>Ещё не выполнена</strong></div><div class="fact"><span>Ответственная роль</span><strong>Контролёр БТК</strong></div></div></div></article>
+          <article class="card"><div class="card-head"><h3>Отдельное действие БТК</h3></div><div class="card-body"><p>Подтверждение создаёт одну неизменяемую запись финальной приёмки для всей партии.</p><p class="hint">Повторяющееся закрытие остальных карточек свёрнуто в подготовленное состояние. Закрытие последней карточки само по себе не означает финальную приёмку партии.</p></div></article></div>
+        <div class="callout guard"><strong>Важно:</strong> цифровая запись не хранит и не заменяет подписи БТК на физических карточках.</div>`,
+        notReadyHtml: `<div class="grid two"><article class="card"><div class="card-head"><h3>Готовность партии</h3><span class="badge pending">Условия не выполнены</span></div><div class="card-body"><div class="facts"><div class="fact"><span>Первые детали приняты</span><strong>2 из 3 групп</strong></div><div class="fact"><span>Карточки обработки партии</span><strong>249 из 250 закрыты</strong></div><div class="fact"><span>Финальная приёмка партии</span><strong>Недоступна</strong></div><div class="fact"><span>Ответственная роль</span><strong>Контролёр БТК</strong></div></div></div></article>
+          <article class="card"><div class="card-head"><h3>Что нужно завершить</h3></div><div class="card-body"><p>Примите первую деталь по оставшейся группе операций и подтвердите качество последней карточки обработки партии.</p><p class="hint">Закрытие последней карточки не выполнит финальную приёмку автоматически.</p></div></article></div>
+        <div class="callout warn"><strong>Финальная приёмка недоступна:</strong> обязательные условия ещё не выполнены.</div>`,
+        technical: [["Требование", "UC-015"], ["Роль", "QUALITY_CONTROLLER"], ["Команда", "RecordFinalBatchAcceptance"], ["Expected version", "7"], ["Событие", "FinalBatchAccepted"]]
+      },
+      {
+        short: "Проверить приёмку", role: "QUALITY_CONTROLLER", eyebrow: "Контролёр БТК · шаг 12 из 14", title: "Финальная приёмка партии выполнена",
+        crumbs: "Партии / Партия 112 / Финальная приёмка", lead: "Экран показывает отдельную неизменяемую запись, ответственного контролёра и время финальной приёмки.",
+        action: "Перейти к тестовому учёту нормо-часов", metrics: [["Состояние партии", "Финально принята"], ["Финальная приёмка", "Записана"], ["Принял", "Ольга · Контролёр БТК"], ["Время", "17.07.2026 · 15:04"]],
+        html: `<article class="card"><div class="card-head"><h3>Финальная приёмка партии</h3><span class="badge ok">Записана один раз</span></div><div class="card-body"><div class="facts"><div class="fact"><span>Партия</span><strong>112 изделий</strong></div><div class="fact"><span>Приняла</span><strong>Ольга · Контролёр БТК</strong></div><div class="fact"><span>Дата и время</span><strong>17.07.2026 · 15:04</strong></div><div class="fact"><span>Основание</span><strong>250 карточек закрыты</strong></div><div class="fact"><span>Физические подписи</span><strong>Хранятся вне цифровой записи</strong></div><div class="fact"><span>Повторное действие</span><strong>Не создаёт дубликат</strong></div></div></div></article>
+        <div class="callout ok"><strong>Согласованный результат:</strong> запись приёмки и состояние партии сохранены вместе. Повтор того же действия возвращает эту запись без дублирования.</div>`,
+        technical: [["Требование", "UC-015"], ["Роль", "QUALITY_CONTROLLER"], ["FinalBatchAcceptance ID", "FBA-8d31…"], ["ProductionBatch", "B-112"], ["Command ID", "CMD-FBA-112"], ["Batch version", "8"], ["UTC", "17.07.2026 12:04 UTC"]]
+      },
+      {
+        short: "Учесть нормо-часы", role: "ADMIN_AUDITOR", eyebrow: "Администратор демонстрации · шаг 13 из 14", title: "Карточка готова к тестовому учёту нормо-часов",
+        crumbs: "Партия 112 / Рабочая карточка / Тестовый учёт нормо-часов", lead: "Администратор демонстрации создаёт одну неизменяемую тестовую запись нормы без расчёта денег и фактического времени.",
+        action: "Создать тестовую запись нормо-часов", metrics: [["Состояние карточки", "Закрыта"], ["Исполнитель", "Сергей"], ["Норма", "0,80 ч"], ["Тестовая запись", "Ещё не создана"]],
+        html: `<div class="grid two"><article class="card"><div class="card-head"><h3>Закрытая карточка</h3><span class="badge ok">Закрыта</span></div><div class="card-body"><div class="facts"><div class="fact"><span>Исполнитель</span><strong>Сергей</strong></div><div class="fact"><span>Группа операций</span><strong>Операции 010–030</strong></div><div class="fact"><span>Норма</span><strong>0,80 ч</strong></div><div class="fact"><span>Тестовая запись</span><strong>Ещё не создана</strong></div></div></div></article>
+          <article class="card"><div class="card-head"><h3>Граница тестового учёта</h3></div><div class="card-body"><p>Для закрытой карточки и её исполнителя будет создана одна запись нормы.</p><p class="hint">Зарплата, налоги, коэффициенты, фактическое время и выплата не рассчитываются.</p></div></article></div>`,
+        technical: [["Требование", "UC-009"], ["Роль", "ADMIN_AUDITOR"], ["Команда", "ExportWorkCardToPayroll"], ["PayrollRecord", "workCardId + beneficiaryId + normHoursSnapshot"]]
+      },
+      {
+        short: "Проверить журнал", role: "ADMIN_AUDITOR", eyebrow: "Администратор демонстрации · шаг 14 из 14", title: "Основной процесс завершён",
+        crumbs: "Журнал действий / Партия 112", lead: "Финальный экран показывает созданную тестовую запись нормо-часов и понятную историю действий по партии.",
+        action: "Начать демонстрацию заново", metrics: [["Тестовых записей", "1"], ["Финальная приёмка", "Выполнена"], ["Комплектов и карточек", "3 и 250"], ["Распределение", "60 + 52 карточки"]],
+        html: `<div class="grid two"><article class="card"><div class="card-head"><h3>Тестовая запись нормо-часов</h3><span class="badge ok">Создана один раз</span></div><div class="card-body"><div class="facts"><div class="fact"><span>Исполнитель</span><strong>Сергей</strong></div><div class="fact"><span>Норма</span><strong>0,80 ч</strong></div><div class="fact"><span>Группа операций</span><strong>Операции 010–030</strong></div><div class="fact"><span>Денежный расчёт</span><strong>Не выполняется</strong></div></div></div></article>
+          <article class="card"><div class="card-head"><h3>Журнал действий</h3><span class="badge neutral">Только просмотр</span></div><div class="card-body"><p>Создана партия · Планировщик ПДБ</p><p>Работа по карточке начата и завершена · Мастер</p><p>Первая деталь принята · Контролёр БТК</p><p>Качество карточки подтверждено · Контролёр БТК</p><p>Финальная приёмка партии выполнена · Контролёр БТК</p><p>Создана тестовая запись нормо-часов · Администратор демонстрации</p></div></article></div>
+        <div class="callout ok"><strong>Проверено:</strong> 112 изделий → 3 комплекта → 250 карточек; приёмка первой детали до обработки партии; распределение 60 + 52; отдельная финальная приёмка; одна тестовая запись нормо-часов.</div>
+        <div class="callout guard"><strong>Разделение контроля:</strong> приёмка первой детали, подтверждение качества карточки и финальная приёмка партии — три разных действия. Физические подписи БТК остаются вне цифрового прототипа.</div>`,
+        technical: [["Требования", "UC-008 / UC-014"], ["Роль", "ADMIN_AUDITOR"], ["correlationId", "COR-DEMO-112"], ["События", "ProductionBatchCreated / WorkCardStarted / WorkCardCompleted / FirstArticleAccepted / WorkCardQualityConfirmed / FinalBatchAccepted / WorkCardExportedToPayroll"]]
+      }
+    ];
+
+    function cardDetails(status, purpose, note, activeIndex, uuid = "9f4e2b7a…", assignee = "Алексей") {
+      const statusOrder = ["RELEASED", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "CLOSED"];
+      return `<article class="card"><div class="card-head"><h3>Рабочая карточка</h3><span class="badge neutral">${statusLabels[status]}</span></div><div class="card-body">
+        <div class="facts"><div class="fact"><span>Исполнитель</span><strong>${assignee}</strong></div><div class="fact"><span>Назначение</span><strong>${purposeLabels[purpose]}</strong></div><div class="fact"><span>Изделий в партии</span><strong>112 · не позиция карточки</strong></div><div class="fact"><span>Норма по группе операций</span><strong>0,80 ч</strong></div><div class="fact"><span>Приёмка первой детали</span><strong>${purpose === "FIRST_ARTICLE" ? "Ожидается" : "Выполнена"}</strong></div><div class="fact"><span>Состояние карточки</span><strong>${statusLabels[status]}</strong></div></div>
+        <div class="timeline" aria-label="Последовательность состояний карточки">${statusOrder.map((label, index) => `<div class="${index < activeIndex ? "done" : index === activeIndex ? "current" : ""}">${statusLabels[label]}</div>`).join("")}</div>
+        <div class="callout">${note}</div>
+      </div></article>`;
+    }
+
+    const systemStateCopy = {
+      loading: ["Загрузка данных…", "Подождите, данные партии обновляются."],
+      empty: ["Карточек пока нет", "Выпустите карточки по группам операций, чтобы начать распределение."],
+      error: ["Не удалось загрузить данные", "Повторите попытку. Если ошибка сохранится, сообщите администратору демонстрации."],
+      conflict: ["Данные изменились", "Данные изменились другим пользователем. Обновите данные и повторите действие."],
+      denied: ["Нет доступа", "Это действие доступно роли «Контролёр БТК». Выберите нужную роль или вернитесь к просмотру."],
+      replay: ["Финальная приёмка уже записана", "Повторное действие вернуло существующую запись и не создало дубликат."]
+    };
+
+    let current = 0;
+    let selectedRole = steps[0].role;
+
+    const els = {
+      role: document.getElementById("role"), stepList: document.getElementById("stepList"), crumbs: document.getElementById("crumbs"),
+      eyebrow: document.getElementById("eyebrow"), title: document.getElementById("title"), lead: document.getElementById("lead"),
+      metrics: document.getElementById("metrics"), screen: document.getElementById("screen"), previous: document.getElementById("previous"),
+      reset: document.getElementById("reset"), primary: document.getElementById("primary"), permissionNote: document.getElementById("permissionNote"),
+      announcement: document.getElementById("announcement"), prototypeSummary: document.getElementById("prototypeSummary"),
+      prototypeTechnical: document.getElementById("prototypeTechnical"),
+      stateMessage: document.getElementById("stateMessage")
+    };
+
+    function renderSteps() {
+      els.stepList.innerHTML = steps.map((step, index) => `<button type="button" class="step-button ${index < current ? "done" : ""}" data-step="${index}" ${index === current ? 'aria-current="step"' : ""} title="${step.short}" aria-label="Шаг ${index + 1} из ${steps.length}: ${step.short}"><span class="step-index">${index + 1}</span><span class="step-copy">${step.short}</span></button>`).join("");
+      els.stepList.querySelectorAll("button").forEach(button => button.addEventListener("click", () => go(Number(button.dataset.step), true)));
+    }
+
+    function renderPrototypeDetails(step, index) {
+      const overview = prototypeOverviews[index];
+      const summary = [["Требование", overview.requirement], ["Роль", roles[step.role]], ["Действие", overview.action], [overview.contextLabel, overview.context]];
+      els.prototypeSummary.innerHTML = summary.map(([label, value]) => `<div class="fact"><span>${label}:</span><strong>${value}</strong></div>`).join("");
+      els.prototypeTechnical.innerHTML = step.technical.map(([label, value]) => `<div class="fact"><span>${label}</span><strong><code>${value}</code></strong></div>`).join("");
+    }
+
+    function render() {
+      const step = steps[current];
+      renderSteps();
+      els.role.value = selectedRole;
+      els.crumbs.textContent = step.crumbs;
+      els.eyebrow.textContent = step.eyebrow;
+      els.title.textContent = step.title;
+      els.lead.textContent = step.lead;
+      const visibleMetrics = step.ready === false && step.notReadyMetrics ? step.notReadyMetrics : step.metrics;
+      const visibleHtml = step.ready === false && step.notReadyHtml ? step.notReadyHtml : step.html;
+      els.metrics.innerHTML = visibleMetrics.map(([label, value]) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join("");
+      els.screen.innerHTML = visibleHtml;
+      renderPrototypeDetails(step, current);
+      els.previous.disabled = current === 0;
+      els.primary.textContent = step.action;
+      const prerequisitesMet = step.ready !== false;
+      const allowed = selectedRole === step.role && prerequisitesMet;
+      els.primary.disabled = !allowed;
+      els.permissionNote.textContent = allowed ? "" : selectedRole !== step.role ? `Действие доступно роли «${roles[step.role]}». Сейчас выбрана роль «${roles[selectedRole]}».` : step.blockedReason || "Действие недоступно до выполнения обязательных условий.";
+      document.title = `${current + 1} из ${steps.length} · ${step.title}`;
+    }
+
+    function go(index, syncRole = true) {
+      current = Math.max(0, Math.min(steps.length - 1, index));
+      if (syncRole) selectedRole = steps[current].role;
+      render();
+      els.announcement.textContent = `Открыт шаг ${current + 1}: ${steps[current].title}. Активная роль: ${roles[selectedRole]}.`;
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+
+    els.role.addEventListener("change", event => {
+      selectedRole = event.target.value;
+      render();
+      els.announcement.textContent = `Активная роль изменена: ${roles[selectedRole]}. Производственные данные не изменены.`;
+    });
+    els.previous.addEventListener("click", () => go(current - 1, true));
+    els.reset.addEventListener("click", () => go(0, true));
+    els.primary.addEventListener("click", () => current === steps.length - 1 ? go(0, true) : go(current + 1, true));
+    document.querySelectorAll("[data-state]").forEach(button => button.addEventListener("click", () => {
+      const [heading, message] = systemStateCopy[button.dataset.state];
+      els.stateMessage.classList.toggle("error", ["error", "conflict", "denied"].includes(button.dataset.state));
+      els.stateMessage.innerHTML = `<strong>${heading}</strong><span>${message}</span>`;
+    }));
+    document.getElementById("showPrematureAcceptance").addEventListener("click", () => {
+      steps[10].ready = false;
+      current = 10;
+      selectedRole = steps[10].role;
+      render();
+      els.announcement.textContent = "Показана незавершённая партия: финальная приёмка недоступна.";
+    });
+    document.getElementById("restoreReadyAcceptance").addEventListener("click", () => {
+      steps[10].ready = true;
+      current = 10;
+      selectedRole = steps[10].role;
+      render();
+      els.announcement.textContent = "Показана готовая партия: финальная приёмка доступна контролёру БТК.";
+    });
+
+    window.__workCardPrototype = {
+      getState: () => ({ current, selectedRole, finalAcceptanceReady: steps[10].ready }),
+      showStep: (index, role = steps[index].role) => { current = index; selectedRole = role; render(); },
+      showFinalAcceptanceVariant: ready => { steps[10].ready = ready; current = 10; selectedRole = steps[10].role; render(); },
+      restoreState: state => { current = state.current; selectedRole = state.selectedRole; steps[10].ready = state.finalAcceptanceReady; render(); },
+      getSystemStateStrings: () => Object.entries(systemStateCopy).map(([state, copy]) => ({ state, text: copy.join(" ") })),
+      stepCount: steps.length,
+      roleCodes: Object.keys(roles),
+      stateKeys: Object.keys(systemStateCopy)
+    };
+
+    render();
+  </script>
+  <script src="../../scripts/ux-copy-audit.js"></script>
+</body>
+</html>
