@@ -64,7 +64,7 @@ it('session rate limiting returns 429/Retry-After without trusting forwarded IPs
   const app = await buildApp({
     appVersion: 'rate-test',
     pool: db.runtime,
-    readiness: { check: async () => ({ database: 'up', migrationVersion: 3 }) },
+    readiness: { check: async () => ({ database: 'up', migrationVersion: 4 }) },
     security: { allowedOrigin: origin, cookieSecure: true, signingSecret: randomUUID() },
   });
   try {
@@ -105,7 +105,7 @@ it('общий demo-контур отклоняет новую сессию по
     appVersion: 'capacity-test',
     demoCapacity: { maximumBatches: 20, maximumSessions: sessionsBefore + 1 },
     pool: db.runtime,
-    readiness: { check: async () => ({ database: 'up', migrationVersion: 3 }) },
+    readiness: { check: async () => ({ database: 'up', migrationVersion: 4 }) },
     security: { allowedOrigin: origin, cookieSecure: true, signingSecret: randomUUID() },
   });
   try {

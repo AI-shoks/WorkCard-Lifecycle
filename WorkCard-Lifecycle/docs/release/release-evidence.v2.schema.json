@@ -1,0 +1,528 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/AI-shoks/WorkCard-Lifecycle/main/WorkCard-Lifecycle/docs/release/release-evidence.v2.schema.json",
+  "title": "Work Card Render release lifecycle evidence v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "sequence",
+    "recordedAt",
+    "sourceSha",
+    "immutableImage",
+    "previousRecordSha256",
+    "kind",
+    "evidence"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "../../release-evidence.v2.schema.json"
+    },
+    "schemaVersion": {
+      "const": 2
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+    },
+    "sourceSha": {
+      "$ref": "#/$defs/sourceSha"
+    },
+    "immutableImage": {
+      "$ref": "#/$defs/immutableImage"
+    },
+    "previousRecordSha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/digest"
+        }
+      ]
+    },
+    "kind": {
+      "enum": [
+        "staging-smoke",
+        "production-deployment",
+        "production-smoke",
+        "rollback-decision",
+        "production-attempt",
+        "rollback-attempt",
+        "rollback-deployment"
+      ]
+    },
+    "evidence": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "sequence": {
+            "const": 1
+          }
+        },
+        "required": ["sequence"]
+      },
+      "then": {
+        "properties": {
+          "previousRecordSha256": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "previousRecordSha256": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    }
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "kind": {
+          "const": "staging-smoke"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runUrl",
+            "configurationRevision",
+            "status",
+            "provider",
+            "resolvedImage",
+            "smokeReportSha256"
+          ],
+          "properties": {
+            "runUrl": {
+              "$ref": "#/$defs/runUrl"
+            },
+            "configurationRevision": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+            },
+            "status": {
+              "const": "passed"
+            },
+            "provider": {
+              "const": "actions-docker"
+            },
+            "resolvedImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "smokeReportSha256": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "production-deployment"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runUrl",
+            "configurationRevision",
+            "provider",
+            "serviceId",
+            "deployId",
+            "previousImage",
+            "resolvedImage",
+            "persistentImage",
+            "resolvedDigest",
+            "status",
+            "stagingReportSha256"
+          ],
+          "properties": {
+            "runUrl": {
+              "$ref": "#/$defs/runUrl"
+            },
+            "configurationRevision": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+            },
+            "provider": {
+              "const": "render"
+            },
+            "serviceId": {
+              "type": "string",
+              "pattern": "^srv-[a-z0-9]{20}$"
+            },
+            "deployId": {
+              "type": "string",
+              "pattern": "^dep-[a-z0-9]{20}$"
+            },
+            "previousImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "resolvedImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "persistentImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "resolvedDigest": {
+              "$ref": "#/$defs/digest"
+            },
+            "status": {
+              "const": "live"
+            },
+            "stagingReportSha256": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "production-smoke"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runUrl",
+            "configurationRevision",
+            "status",
+            "origin",
+            "checks",
+            "smokeReportSha256",
+            "observationsSha256"
+          ],
+          "properties": {
+            "runUrl": {
+              "$ref": "#/$defs/runUrl"
+            },
+            "configurationRevision": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+            },
+            "status": {
+              "const": "passed"
+            },
+            "origin": {
+              "type": "string",
+              "pattern": "^https://[a-z0-9.-]+$"
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "smokeReportSha256": {
+              "$ref": "#/$defs/digest"
+            },
+            "observationsSha256": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "rollback-decision"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runUrl",
+            "configurationRevision",
+            "decision",
+            "fromImage",
+            "toImage",
+            "compatibilityEvidenceSha256"
+          ],
+          "properties": {
+            "runUrl": {
+              "$ref": "#/$defs/runUrl"
+            },
+            "configurationRevision": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+            },
+            "decision": {
+              "enum": ["required", "completed"]
+            },
+            "fromImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "toImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "compatibilityEvidenceSha256": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "production-attempt"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runUrl",
+            "configurationRevision",
+            "serviceId",
+            "previousImage",
+            "requestedImage",
+            "status"
+          ],
+          "properties": {
+            "runUrl": {
+              "$ref": "#/$defs/runUrl"
+            },
+            "configurationRevision": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+            },
+            "serviceId": {
+              "type": "string",
+              "pattern": "^srv-[a-z0-9]{20}$"
+            },
+            "previousImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "requestedImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "status": {
+              "enum": ["prepared", "triggered"]
+            },
+            "deployId": {
+              "type": "string",
+              "pattern": "^dep-[a-z0-9]{20}$"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "triggered"
+                  }
+                },
+                "required": ["status"]
+              },
+              "then": {
+                "required": ["deployId"],
+                "properties": {
+                  "deployId": {
+                    "type": "string",
+                    "pattern": "^dep-[a-z0-9]{20}$"
+                  }
+                }
+              },
+              "else": {
+                "not": {
+                  "required": ["deployId"],
+                  "properties": {
+                    "deployId": {
+                      "type": "string",
+                      "pattern": "^dep-[a-z0-9]{20}$"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "rollback-attempt"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runUrl",
+            "configurationRevision",
+            "serviceId",
+            "previousImage",
+            "requestedImage",
+            "status",
+            "compatibilityEvidenceSha256"
+          ],
+          "properties": {
+            "runUrl": {
+              "$ref": "#/$defs/runUrl"
+            },
+            "configurationRevision": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+            },
+            "serviceId": {
+              "type": "string",
+              "pattern": "^srv-[a-z0-9]{20}$"
+            },
+            "previousImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "requestedImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "status": {
+              "enum": ["prepared", "triggered"]
+            },
+            "deployId": {
+              "type": "string",
+              "pattern": "^dep-[a-z0-9]{20}$"
+            },
+            "compatibilityEvidenceSha256": {
+              "$ref": "#/$defs/digest"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "triggered"
+                  }
+                },
+                "required": ["status"]
+              },
+              "then": {
+                "required": ["deployId"],
+                "properties": {
+                  "deployId": {
+                    "type": "string",
+                    "pattern": "^dep-[a-z0-9]{20}$"
+                  }
+                }
+              },
+              "else": {
+                "not": {
+                  "required": ["deployId"],
+                  "properties": {
+                    "deployId": {
+                      "type": "string",
+                      "pattern": "^dep-[a-z0-9]{20}$"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "kind": {
+          "const": "rollback-deployment"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runUrl",
+            "configurationRevision",
+            "provider",
+            "serviceId",
+            "deployId",
+            "previousImage",
+            "resolvedImage",
+            "persistentImage",
+            "resolvedDigest",
+            "status",
+            "compatibilityEvidenceSha256"
+          ],
+          "properties": {
+            "runUrl": {
+              "$ref": "#/$defs/runUrl"
+            },
+            "configurationRevision": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+            },
+            "provider": {
+              "const": "render"
+            },
+            "serviceId": {
+              "type": "string",
+              "pattern": "^srv-[a-z0-9]{20}$"
+            },
+            "deployId": {
+              "type": "string",
+              "pattern": "^dep-[a-z0-9]{20}$"
+            },
+            "previousImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "resolvedImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "persistentImage": {
+              "$ref": "#/$defs/immutableImage"
+            },
+            "resolvedDigest": {
+              "$ref": "#/$defs/digest"
+            },
+            "status": {
+              "const": "live"
+            },
+            "compatibilityEvidenceSha256": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sourceSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "immutableImage": {
+      "type": "string",
+      "pattern": "^ghcr\\.io/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_./-]*@sha256:[0-9a-f]{64}$"
+    },
+    "runUrl": {
+      "type": "string",
+      "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/[1-9][0-9]*(?:/attempts/[1-9][0-9]*)?$"
+    }
+  }
+}

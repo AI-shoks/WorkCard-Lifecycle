@@ -1,9 +1,9 @@
 ---
 artifact_id: testing.strategy
 status: active
-version: 3
+version: 4
 owner: quality
-updated: 2026-09-05
+updated: 2026-09-17
 ---
 
 # Test Strategy
@@ -51,9 +51,15 @@ updated: 2026-09-05
 
 `quality/security.test.ts` проверяет фактические HTTP routes всех ролей до schema/resource validation, закрытые audit/payroll reads, CSRF другой сессии, отсутствующий/недопустимый Origin, поддельную cookie, body spoofing, SQL-shaped input, payload/list limits, rotation/logout/idle/absolute expiry/disabled identity и rate limit с поддельным forwarded IP. `runtime-protection.test.ts` проверяет реальную конфигурацию логирования и отсутствие headers/body/query/driver secrets в response/logs. `quality/budgets.test.ts` проверяет активные PostgreSQL time budgets и rollback заблокированной команды.
 
+## Maintenance и deployment contract
+
+Для перехода [[0009-render-free-neon-free-release|ADR-0009]] обязательны отдельные локальные PostgreSQL проверки non-superuser bootstrap/repeat и privileged role rejection, owner-only state grants, immutable migration checksums, shared/exclusive barrier для read/session/command, auth-reset receipt race, cancellation и 26h fail-closed. Тесты доказывают SQL/code behavior на disposable DB; они не подключаются к Neon и не заменяют hosted qualification.
+
+Config tests требуют direct Neon `verify-full`, expected host/database и отказывают pooler/downgrade/неоднозначным overrides. Runtime pool errors и Render proxy peer/CIDR-chain рассматриваются отдельно от реального network evidence. Release tests сохраняют versioned schemas, scan/checksum/evidence bindings и exact digest contract, добавляя Render status/resolved digest и fixed owner/reset boundaries. Не нужно удалять существующие security, browser compact/canonical, container scan или performance gates.
+
 ## Изоляция и воспроизведение
 
-`QUALITY_OWNER_URL` должен явно указывать локальный/CI PostgreSQL. `quality/database.ts` создаёт случайные `q9_*` БД и отдельные runtime-роли, выполняет миграции и удаляет только созданные этим вызовом ресурсы в `finally`. Системные и demo-БД не выбираются по умолчанию; тесты не используют `DATABASE_URL` приложения как fallback. Для локального Docker используйте отдельный Compose project, порт и `quality/compose.override.yaml`: в основном Compose том имеет явное имя, поэтому одного `-p` недостаточно.
+`QUALITY_OWNER_URL` должен явно указывать локальный/CI PostgreSQL. Host guard не ослабляется для Neon; hosted release использует отдельный явный owner CLI и target contract. `quality/database.ts` создаёт случайные `q9_*` БД и отдельные runtime-роли, выполняет миграции и удаляет только созданные этим вызовом ресурсы в `finally`. Системные и demo-БД не выбираются по умолчанию; тесты не используют `DATABASE_URL` приложения как fallback. Для локального Docker используйте отдельный Compose project, порт и `quality/compose.override.yaml`: в основном Compose том имеет явное имя, поэтому одного `-p` недостаточно.
 
 Пример после подготовки отдельного PostgreSQL и задания `QUALITY_OWNER_URL`:
 

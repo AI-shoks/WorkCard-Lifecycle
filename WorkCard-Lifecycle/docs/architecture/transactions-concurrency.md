@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.transactions-concurrency
 status: accepted
-version: 3
+version: 4
 owner: architecture
-updated: 2026-09-05
+updated: 2026-09-17
 ---
 
 # Transactions and Concurrency
@@ -26,7 +26,7 @@ updated: 2026-09-05
 Порядок каждой mutation:
 
 1. Проверить trusted session, route permission, mutation Origin/CSRF и затем JSON schema вне транзакции.
-2. Начать transaction и вставить `command_receipt(state = IN_PROGRESS)` с уникальным `commandId`.
+2. Начать `READ COMMITTED` transaction, получить shared maintenance barrier, отдельным SQL statement проверить persistent state/freshness и повторно проверить active session/generation; только затем вставить `command_receipt(state = IN_PROGRESS)` с уникальным `commandId`.
 3. Если insert проиграл unique race, дождаться winner transaction и прочитать receipt:
    - тот же type/actor и `SUCCEEDED` → вернуть сохранённый result как replay;
    - другой type/actor → `COMMAND_ID_REUSED`;
@@ -44,7 +44,7 @@ updated: 2026-09-05
 
 Чтобы не создавать циклы ожидания:
 
-1. `production_batches` по UUID;
+1. maintenance shared advisory barrier и separate state/session check, затем `production_batches` по UUID;
 2. `work_card_sets` по UUID ascending;
 3. `work_cards` по UUID ascending;
 4. immutable result/business-key row (`final_batch_acceptances`, `payroll_records`);
@@ -148,6 +148,14 @@ Lock card, проверить expected version, `CLOSED` и assignee. Затем
 - Клиент не выполняет automatic command retry, auto merge или force overwrite. После полного чтения доступность действия вычисляется заново из server `availableActions`, state/gate и permissions.
 - Тот же `commandId` используют только для явной проверки результата неопределённого transport outcome; новая команда возможна лишь после нового решения/подтверждения пользователя и получает новый ID.
 
+## Maintenance concurrency
+
+Все runtime reads, session create/touch/delete/cleanup и commands используют shared advisory barrier до DB работы; admission разрешён только при `maintenance=false` и `maintenance_requested=false`, свежем timestamp и валидном состоянии. Ключ отдельный от capacity locks. Состояние `demo_maintenance_state` читается отдельным statement после lock в `READ COMMITTED`; объединение lock и read в одном statement может сохранить старый snapshot во время ожидания и запрещено.
+
+Owner session mutex сериализует bootstrap/reset/release (включая локальные запуски). До ожидания exclusive barrier owner отдельно коммитит `maintenance_requested=true`; новые admissions уже закрыты, допущенные transactions завершаются. Под exclusive barrier фиксируются `maintenance=true` и следующая generation. Timeout/cancellation во время drain сохраняет requested flag; успешный verified reopen очищает оба флага. Это состояние коммитится раньше разрушительных reset действий; `finally` его не открывает. Новые операции отвечают безопасным `503`; auth, выполненная до reset, не даёт права создать/replay receipt после смены generation.
+
+Runtime только читает `maintenance`, `maintenance_requested`, `generation`, `last_reset_verified_at`; owner изменяет их. Verified timestamp обновляется только после успешного initial bootstrap/reset + verify. После 26 часов без него закрываются DB operations/readiness, liveness не обращается к DB. Verify может выполняться owner при закрытом gate. Подробности — [[database-bootstrap]].
+
 ## Read consistency
 
 - Обычные GET используют statement-level consistency `READ COMMITTED` и возвращают versions.
@@ -165,3 +173,6 @@ Lock card, проверить expected version, `CLOSED` и assignee. Затем
 6. Две final acceptance дают одну immutable row и одну batch version increment.
 7. Два payroll export дают одну record и одно success event.
 8. Runtime DB role не может update/delete audit/final/payroll rows.
+
+9. Maintenance race: допущенные reads/commands завершаются до exclusive close, ожидающие shared reads видят новое состояние отдельным statement; session cleanup тоже блокируется.
+10. Auth-reset-command не создаёт receipt/event; error/cancellation оставляет gate закрытым, verify не меняет timestamp и не открывает доступ.

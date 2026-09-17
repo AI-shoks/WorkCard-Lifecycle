@@ -1,134 +1,168 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const workflowPath = resolve(projectRoot, '..', '.github', 'workflows', 'deploy.yml');
-const workflow = await readFile(workflowPath, 'utf8');
-const browserLifecycle = await readFile(
-  resolve(projectRoot, 'quality', 'browser', 'lifecycle.spec.ts'),
-  'utf8',
-);
-const hostedSmokeRunner = await readFile(
-  resolve(projectRoot, 'scripts', 'release', 'hosted-smoke.mjs'),
-  'utf8',
-);
-
-function section(start, end) {
-  const startIndex = workflow.indexOf(start);
-  const endIndex = workflow.indexOf(end, startIndex + start.length);
-  assert(startIndex >= 0, `Workflow section is missing: ${start}`);
-  assert(endIndex > startIndex, `Workflow section end is missing: ${end}`);
-  return workflow.slice(startIndex, endIndex);
+const read = async (path) =>
+  (await readFile(new globalThis.URL(path, import.meta.url), 'utf8')).replaceAll('\r\n', '\n');
+const workflow = await read('../../../.github/workflows/deploy.yml');
+const release = await read('../../../.github/workflows/release.yml');
+const reset = await read('../../../.github/workflows/reset.yml');
+const rollback = await read('../../../.github/workflows/rollback.yml');
+const resume = await read('./resume-publication.mjs');
+const ci = await read('../../../.github/workflows/ci.yml');
+const fetchRelease = await read('./fetch-release.mjs');
+const browser = await read('../../quality/browser/lifecycle.spec.ts');
+function section(text, start, end) {
+  const first = text.indexOf(start);
+  const last = end ? text.indexOf(end, first + start.length) : text.length;
+  assert(first >= 0 && last > first, `Missing section ${start}`);
+  return text.slice(first, last);
 }
 
-test('deploy workflow is an explicit main-only staging operation', () => {
-  const trigger = section('on:\n', '\npermissions:');
-  assert.match(trigger, /^on:\n {2}workflow_dispatch:/);
-  assert.doesNotMatch(trigger, /\b(?:push|pull_request|schedule|workflow_run):/);
-  assert.match(workflow, /CONFIRMATION.*inputs\.confirmation/);
-  assert.match(workflow, /DEPLOY EXACT DIGEST TO STAGING/);
-  assert.match(workflow, /GITHUB_REF.*refs\/heads\/main/);
-  assert.match(workflow, /^ {4}environment: staging$/m);
-  assert.doesNotMatch(workflow, /terraform\s+(?:-chdir=\S+\s+)?apply\b/i);
-});
-
-test('deploy workflow accepts only the successful release artifact for the same SHA', () => {
-  const preflight = section('  preflight:\n', '\n  deploy:\n');
-  assert.match(preflight, /actions\/workflows\/release\.yml\/runs/);
-  assert.match(preflight, /\.head_sha == \$sha/);
-  assert.match(preflight, /\.conclusion == "success"/);
-  assert.match(preflight, /run-id: \$\{\{ steps\.release\.outputs\.release-run-id \}\}/);
-  assert.match(preflight, /validate-release-manifest\.mjs/);
-  assert.match(preflight, /\.run_attempt/);
-  assert.match(preflight, /attempts\/\$\{release_run_attempt\}/);
-  assert.match(preflight, /\.sourceSha == \$sha.*\.ociRevisionLabel == \$sha/s);
-  assert.match(preflight, /\.buildScanRunUrl == \$release_run_url/);
-});
-
-test('database preparation and rollout are bound to the exact digest', () => {
-  const deploy = section('  deploy:\n', '\n  smoke:\n');
-  const executionStep = section(
-    '      - name: Verify exact job boundaries and execute twice\n',
-    '      - name: Create and verify a no-traffic revision\n',
-  );
-  const noTrafficStep = section(
-    '      - name: Create and verify a no-traffic revision\n',
-    '      - name: Switch staging traffic and append deployment evidence\n',
-  );
-  const trafficStep = section(
-    '      - name: Switch staging traffic and append deployment evidence\n',
-    '      - name: Upload non-secret deployment evidence\n',
-  );
-  assert.match(deploy, /immutable_image=.*\.immutableImage/);
-  assert.match(deploy, /gcloud artifacts docker images describe "\$IMMUTABLE_IMAGE"/);
-  const verifyIndex = executionStep.indexOf('verify_job "$job" "$ordinal" >/dev/null');
-  const executeIndex = executionStep.indexOf('gcloud run jobs execute');
-  assert(verifyIndex >= 0 && verifyIndex < executeIndex);
-  for (const pair of [
-    ['migrate_one', 'migrate 1'],
-    ['seed_one', 'seed 1'],
-    ['verify_one', 'verify 1'],
-    ['migrate_two', 'migrate 2'],
-    ['seed_two', 'seed 2'],
-    ['verify_two', 'verify 2'],
-  ]) {
-    assert.match(executionStep, new RegExp(`${pair[0]}=.*execute_job ${pair[1]}`));
+test('release and promotion are explicit main-only operations and owner workflows share one concurrency group', () => {
+  for (const text of [release, workflow, rollback]) {
+    assert.match(text, /workflow_dispatch:/);
+    assert.match(text, /GITHUB_REF.*refs\/heads\/main/);
+    assert.doesNotMatch(
+      section(text, 'on:\n', '\npermissions:'),
+      /^ {2}(?:push|pull_request|schedule|workflow_run):/m,
+    );
   }
-  assert.doesNotMatch(executionStep, /--(?:args|command|set-env-vars|update-env-vars|set-secrets)\b/);
-  assert.match(deploy, /--image "\$IMMUTABLE_IMAGE"/);
-  assert.match(noTrafficStep, /--no-traffic/);
-  assert.doesNotMatch(noTrafficStep, /gcloud run services update-traffic/);
-  assert.match(noTrafficStep, /gcloud run revisions describe "\$previous_revision"/);
-  assert.match(noTrafficStep, /any\(\.type == "Ready"/);
-  const revisionCheck = noTrafficStep.indexOf('verify-staging-revision.mjs');
-  const trafficSwitch = trafficStep.indexOf('gcloud run services update-traffic');
-  assert(revisionCheck >= 0 && trafficSwitch >= 0);
-  assert.match(deploy, /echo "rollback-required=true".*gcloud run services update-traffic/s);
+  assert.match(workflow, /PROMOTE EXACT DIGEST/);
+  for (const text of [workflow, reset, rollback]) {
+    assert.match(text, /group: work-card-owner-and-release/);
+    assert.match(text, /cancel-in-progress: false/);
+  }
 });
 
-test('hosted smoke impersonates only the invoker identity and receives no DB credential', () => {
-  const smoke = section('  smoke:\n', '\n  observe:\n');
-  assert.match(smoke, /GCP_STAGING_SMOKE_SERVICE_ACCOUNT/);
-  assert.match(smoke, /hosted-smoke\.mjs/);
-  assert.match(smoke, /--service-account "\$GCP_STAGING_SMOKE_SERVICE_ACCOUNT"/);
-  assert.match(smoke, /--workload-identity-provider "\$GCP_DEPLOYMENT_WORKLOAD_IDENTITY_PROVIDER"/);
-  assert.doesNotMatch(smoke, /google-github-actions\/auth/);
-  assert.doesNotMatch(
-    smoke,
-    /(?:DATABASE_URL|MIGRATION_DATABASE_URL|APP_DATABASE_PASSWORD|QUALITY_OWNER_URL|QUALITY_READ_URL|GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT)/,
+test('resume uses a single-file original publication artifact and never rebuilds that digest', () => {
+  assert.match(
+    release,
+    /name: published-identity-\$\{\{ needs\.preflight\.outputs\.source-sha \}\}-\$\{\{ github\.run_attempt \}\}/,
   );
-  assert.doesNotMatch(smoke, /setup-gcloud|gcloud\s/);
-  assert.match(browserLifecycle, /context\.route\('\*\*\/\*'/);
-  assert.match(browserLifecycle, /new URL\(request\.url\(\)\)\.origin !== hostedOrigin/);
-  assert.match(browserLifecycle, /route\.abort\('blockedbyclient'\)/);
-  assert.match(browserLifecycle, /route\.fetch\(\{[\s\S]*maxRedirects: 0/);
-  assert.match(browserLifecycle, /HOSTED_SMOKE_ID_TOKEN_FILE/);
-  assert.match(browserLifecycle, /page\.evaluate\(async \(url\)/);
-  assert.doesNotMatch(browserLifecycle, /context\.setExtraHTTPHeaders/);
-  assert.match(hostedSmokeRunner, /'GCP_RELEASE_DEPLOYER_SERVICE_ACCOUNT'/);
-  assert.match(hostedSmokeRunner, /delete childEnvironment\[name\]/);
-  assert.match(hostedSmokeRunner, /'ACTIONS_ID_TOKEN_REQUEST_TOKEN'/);
+  assert.match(resume, /`published-identity-\$\{sourceSha\}-\$\{run\.run_attempt\}`/);
+  assert.match(resume, /resolve\(directory, 'published-identity\.json'\)/);
+  assert.doesNotMatch(
+    resume,
+    /docker build|\.quality-results\/release\/published-identity\.json'\), 'utf8'/,
+  );
+  assert(
+    release.indexOf('Retain original publication identity') <
+      release.indexOf('Prove anonymous public pull'),
+  );
+  assert.match(resume, /Original build and publication must both be proven successful/);
 });
 
-test('failure after a rollout attempt restores the recorded prior revision', () => {
-  const rollback = workflow.slice(workflow.indexOf('  rollback_failed_staging:\n'));
-  assert.match(rollback, /always\(\).*rollback-required == 'true'/s);
-  assert.match(rollback, /PREVIOUS_REVISION: \$\{\{ needs\.deploy\.outputs\.previous-revision \}\}/);
-  const readyCheck = rollback.indexOf('gcloud run revisions describe "$PREVIOUS_REVISION"');
-  const trafficSwitch = rollback.indexOf('--to-revisions "${PREVIOUS_REVISION}=100"');
-  assert(readyCheck >= 0 && readyCheck < trafficSwitch);
-  assert.match(rollback, /any\(\.type == "Ready"/);
-  assert.match(rollback, /--to-revisions "\$\{PREVIOUS_REVISION\}=100"/);
+test('rollback preserves durable intent and uses a separate secret-free smoke boundary', () => {
+  assert.match(rollback, /ROLLBACK PREVIOUS COMPATIBLE DIGEST/);
+  assert.match(rollback, /fetch-release\.mjs "\$CURRENT_SHA"/);
+  assert.match(rollback, /fetch-release\.mjs "\$TARGET_SHA"/);
+  assert.match(rollback, /rollback-render\.mjs/);
+  assert.doesNotMatch(
+    rollback,
+    /MIGRATION_DATABASE_URL|APP_DATABASE_PASSWORD|SESSION_SIGNING_SECRET|docker build/,
+  );
+  const smoke = section(rollback, '  smoke:\n', '\n  evidence:\n');
+  assert.doesNotMatch(smoke, /secrets\.|DATABASE_URL|RENDER_API_KEY/);
+  assert.match(smoke, /RENDER_ORIGIN: \$\{\{ needs\.rollback\.outputs\.origin \}\}/);
+  assert.match(rollback, /origin: \$\{\{ steps\.deployment\.outputs\.origin \}\}/);
+  assert.match(rollback, /retain-evidence\.mjs "\$TARGET_SHA" "\$CURRENT_SHA"/);
 });
 
-test('all third-party actions are pinned to immutable commit SHAs', () => {
-  const uses = [...workflow.matchAll(/^\s*uses:\s*(\S+)/gm)].map((match) => match[1]);
-  assert(uses.length > 0);
-  for (const action of uses) {
-    if (action.startsWith('./')) continue;
-    assert.match(action, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40}$/);
+test('build once and preserve all gates before public digest promotion', () => {
+  assert.equal([...release.matchAll(/docker build --platform linux\/amd64/g)].length, 1);
+  assert.match(release, /docker manifest inspect/);
+  assert.match(release, /packages: write/);
+  assert.match(release, /public-docker.*pull --platform linux\/amd64 "\$IMMUTABLE_IMAGE"/);
+  assert.match(release, /--severity HIGH,CRITICAL --exit-code 1/);
+  assert.match(release, /validate-release-manifest\.mjs/);
+  assert.match(release, /gh release create/);
+  assert.equal([...release.matchAll(/verify-image-config\.mjs/g)].length, 2);
+  assert.match(release, /--image-config-digest "\$LOCAL_IMAGE_CONFIG_DIGEST"/);
+  assert.doesNotMatch(release, /LOCAL_IMAGE_ID|--arg id/);
+  for (const name of [
+    'Code and database quality',
+    'Clean container startup',
+    'Dependency and secret security',
+    'Browser (compact)',
+    'Browser (canonical)',
+    'Representative performance profile',
+    'Release and IaC contract',
+  ])
+    assert(release.includes(name));
+  assert.doesNotMatch(workflow, /docker build|gcloud|google-github-actions|terraform/);
+  assert.match(workflow, /verify-image-migrations\.mjs/);
+});
+
+test('durable release fetch verifies successful exact-SHA CI, release run, scan and checksums', () => {
+  assert.match(fetchRelease, /run\.head_sha, sourceSha/);
+  assert.match(fetchRelease, /run\.head_branch, 'main'/);
+  assert.match(fetchRelease, /run\.conclusion, 'success'/);
+  assert.match(fetchRelease, /ci\.yml/);
+  assert.match(fetchRelease, /release\.yml/);
+  assert.match(fetchRelease, /validateTrivyScanReport/);
+  assert.match(fetchRelease, /Release archive contains unexpected paths/);
+});
+
+test('owner, runtime, Render adapter and browser have separate secret boundaries', () => {
+  for (const [start, end] of [
+    ['  staging_owner:\n', '\n  staging:\n'],
+    ['  production_owner:\n', '\n  deploy:\n'],
+  ]) {
+    const owner = section(workflow, start, end);
+    assert.match(owner, /MIGRATION_DATABASE_URL/);
+    assert.match(owner, /timeout --signal=TERM --kill-after=30s 600s/);
+    assert.match(owner, /owner-maintenance\.js|dist\/migrate\.js/);
+    assert.doesNotMatch(owner, /RENDER_API_KEY|SESSION_SIGNING_SECRET|secrets\.DATABASE_URL/);
+  }
+  const staging = section(workflow, '  staging:\n', '\n  production_owner:\n');
+  assert.doesNotMatch(staging, /MIGRATION_DATABASE_URL|APP_DATABASE_PASSWORD|RENDER_API_KEY/);
+  assert.match(staging, /127\.0\.0\.1:3000:3000/);
+  assert.match(staging, /\/health\/ready/);
+  const smoke = section(workflow, '  smoke:\n', '\n  evidence:\n');
+  assert.doesNotMatch(smoke, /DATABASE_URL|PASSWORD|SIGNING_SECRET|RENDER_API_KEY|secrets\./);
+  assert.match(smoke, /RENDER_ORIGIN: \$\{\{ needs\.deploy\.outputs\.origin \}\}/);
+  assert.match(workflow, /origin: \$\{\{ steps\.deployment\.outputs\.origin \}\}/);
+  assert.match(smoke, /public-smoke\.mjs/);
+  assert.match(browser, /context\.route\('\*\*\/\*'/);
+  assert.match(browser, /maxRedirects: 0/);
+});
+
+test('reset runs a fixed current-image command with only owner URL and expected target', () => {
+  assert.match(reset, /cron: ["']17 2 \* \* \*["']/);
+  assert.match(reset, /RESET SYNTHETIC PRODUCTION DEMO/);
+  assert.match(reset, /current-render-image\.mjs/);
+  assert.match(reset, /fetch-release\.mjs/);
+  const owner = section(reset, '  reset:\n');
+  assert.match(owner, /owner-maintenance\.js reset/);
+  assert.match(owner, /STAGING_NEON_HOST/);
+  assert.doesNotMatch(
+    owner,
+    /APP_DATABASE_PASSWORD|SESSION_SIGNING_SECRET|RENDER_API_KEY|db:seed|owner-maintenance\.js seed/,
+  );
+  assert.doesNotMatch(reset, /trap.*(?:open|reopen)|suspend/);
+});
+
+test('GCP IaC activation is replaced while local database, browser, security and performance gates stay', () => {
+  assert.match(ci, /infra\/render\/check-contract\.mjs/);
+  assert.doesNotMatch(ci, /infra\/terraform\/scripts\/\*\.test\.mjs/);
+  assert.doesNotMatch(ci, /terraform -chdir=.*(?:plan|apply|init)/);
+  for (const name of [
+    'Clean container startup',
+    'Dependency and secret security',
+    'Representative performance profile',
+  ])
+    assert(ci.includes(name));
+  assert.match(ci, /postgres:18\.6/);
+});
+
+test('every external action is pinned and active workflows contain no GCP identity', () => {
+  for (const text of [ci, release, workflow, reset, rollback]) {
+    const uses = [...text.matchAll(/^\s*(?:- )?uses:\s*(\S+)/gm)].map((match) => match[1]);
+    assert(uses.length);
+    for (const action of uses)
+      if (!action.startsWith('./'))
+        assert.match(action, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40}$/);
+    assert.doesNotMatch(text, /id-token: write|google-github-actions|GCP_|gcloud/);
   }
 });

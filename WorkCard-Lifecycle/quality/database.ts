@@ -5,13 +5,16 @@ import { Client, Pool } from 'pg';
 
 import { runMigrations } from '../apps/api/src/migration-runner.js';
 import { databaseBudgets } from '../apps/api/src/runtime-protection.js';
-import type { MigrationConfig } from '../apps/api/src/config.js';
+import { inspectDatabaseUrlForPg, type MigrationConfig } from '../apps/api/src/config.js';
 import { demoOperations, demoPassport, demoUsers } from '../apps/api/src/demo-fixtures.js';
 
-export async function isolatedDatabase(label: string, migrate = true) {
+export async function isolatedDatabase(label: string, migrate = true, nonSuperuserOwner = false) {
   const raw = process.env['QUALITY_OWNER_URL'];
   assert(raw, 'QUALITY_OWNER_URL is required; tests never fall back to the application database.');
   const url = new URL(raw);
+  // pg query parameters can override URL authority: reject them before any
+  // connection, in addition to the existing strict local-host allowlist.
+  inspectDatabaseUrlForPg(raw, 'QUALITY_OWNER_URL');
   assert(
     ['localhost', '127.0.0.1', '[::1]', 'postgres', 'database'].includes(url.hostname),
     'Only an explicit local/CI PostgreSQL server is allowed.',
@@ -19,9 +22,20 @@ export async function isolatedDatabase(label: string, migrate = true) {
   const name = `q9_${label}_${randomUUID().replaceAll('-', '')}`;
   assert(/^q9_[a-z_]+_[a-f0-9]{32}$/.test(name));
   const role = `${name}_app`;
+  const ownerRole = `${name}_owner`;
   const control = new Client({ connectionString: raw });
   await control.connect();
-  await control.query(`CREATE DATABASE "${name}"`);
+  if (nonSuperuserOwner) {
+    const password = randomBytes(24).toString('hex');
+    await control.query(
+      `CREATE ROLE "${ownerRole}" LOGIN CREATEROLE NOINHERIT PASSWORD '${password}'`,
+    );
+    await control.query(`CREATE DATABASE "${name}" OWNER "${ownerRole}"`);
+    url.username = ownerRole;
+    url.password = password;
+  } else {
+    await control.query(`CREATE DATABASE "${name}"`);
+  }
   url.pathname = `/${name}`;
   const config: MigrationConfig = {
     migrationDatabaseUrl: url.href,
@@ -43,6 +57,7 @@ export async function isolatedDatabase(label: string, migrate = true) {
       await control.query(`DROP DATABASE "${name}"`);
       const exists = await control.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role]);
       if (exists.rowCount) await control.query(`DROP ROLE "${role}"`);
+      if (nonSuperuserOwner) await control.query(`DROP ROLE "${ownerRole}"`);
     } finally {
       await control.end();
     }
@@ -91,6 +106,12 @@ export async function referenceFixtures(db: TestDatabase, compact = false) {
         plan.normHours,
         plan.scopeCode,
       ],
+    );
+  }
+  const state = await db.owner.query("SELECT to_regclass('demo_maintenance_state') AS name");
+  if (state.rows[0]?.name) {
+    await db.owner.query(
+      'UPDATE demo_maintenance_state SET maintenance = false, maintenance_requested = false, last_reset_verified_at = clock_timestamp() WHERE singleton',
     );
   }
 }

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "platform": "linux/amd64",
+  "runtime": "render-free",
+  "runtimeServiceCount": 1,
+  "stagingRuntime": "temporary-actions-or-local-docker",
+  "database": {
+    "provider": "neon",
+    "plan": "free",
+    "postgresMajor": 18,
+    "environments": ["production", "staging"],
+    "separateProjects": true,
+    "endpoint": "direct",
+    "sslmode": "verify-full"
+  },
+  "image": {
+    "registry": "ghcr.io",
+    "visibility": "public",
+    "reference": "digest",
+    "retention": "all-released-digests-for-service-lifetime-and-rollback",
+    "automaticDeletion": false
+  },
+  "evidence": {
+    "durableStore": "github-release-assets",
+    "retention": "service-lifetime-and-rollback",
+    "artifactsAreTemporary": true
+  },
+  "owner": {
+    "entrypoint": "node dist/owner-maintenance.js",
+    "commands": ["bootstrap", "reset", "verify", "release"],
+    "workflowConcurrency": "work-card-owner-and-release",
+    "timeoutSeconds": 600
+  },
+  "health": {
+    "liveness": "/health/live",
+    "readiness": "/health/ready"
+  },
+  "hostedQualification": [
+    "observed-proxy-chain",
+    "spoof-resistant-rate-limit",
+    "secure-cookies-csrf-origin",
+    "tls-neon-target-role",
+    "render-resolved-digest",
+    "cold-start-and-free-quotas"
+  ]
+}

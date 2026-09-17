@@ -5,7 +5,7 @@ const canonical = process.env['QUALITY_CANONICAL'] === '1';
 
 if (!process.env['QUALITY_BASE_URL'] || (!hosted && !process.env['QUALITY_READ_URL']))
   throw new Error(
-    'Use pnpm test:browser, or the hosted smoke runner with an IAM-protected HTTPS origin.',
+    'Use pnpm test:browser, or the isolated public Render/temporary staging smoke runner.',
   );
 
 const scale = hosted ? 'hosted-smoke' : canonical ? 'canonical' : 'compact';
@@ -16,8 +16,7 @@ export default defineConfig({
   retries: 0,
   forbidOnly: true,
   // 250 cards require 750 separate UI lifecycle decisions plus read-back and navigation.
-  // The hosted runner renews its audience-bound token out of process and keeps
-  // the credential out of traces; allow for real Cloud Run/Cloud SQL latency.
+  // Allow for real Render/Neon latency, but keep a finite release timeout.
   timeout: hosted ? 25 * 60_000 : canonical ? 15 * 60_000 : 120_000,
   expect: { timeout: 10_000 },
   outputDir: `test-results/${scale}`,
@@ -28,8 +27,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: process.env['QUALITY_BASE_URL'],
-    // A hosted context carries a short-lived IAM ID token. Never serialize its
-    // request headers into a Playwright trace artifact.
+    // Hosted browser has no DB/deploy credentials; keep session headers out of traces.
     trace: hosted ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
     serviceWorkers: hosted ? 'block' : 'allow',

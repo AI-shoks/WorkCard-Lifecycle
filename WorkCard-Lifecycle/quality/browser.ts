@@ -21,6 +21,22 @@ try {
   });
   try {
     security.allowedOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
+    const browserEnvironment = { ...process.env };
+    for (const name of [
+      'QUALITY_OWNER_URL',
+      'MIGRATION_DATABASE_URL',
+      'APP_DATABASE_PASSWORD',
+      'INTEGRATION_MIGRATION_DATABASE_URL',
+      'DATABASE_URL',
+      'SESSION_SIGNING_SECRET',
+      'RENDER_API_KEY',
+      'GITHUB_TOKEN',
+      'GH_TOKEN',
+      'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+      'ACTIONS_ID_TOKEN_REQUEST_URL',
+      'PGPASSWORD',
+    ])
+      delete browserEnvironment[name];
     const child = spawn(
       process.execPath,
       [
@@ -31,7 +47,7 @@ try {
       {
         stdio: 'inherit',
         env: {
-          ...process.env,
+          ...browserEnvironment,
           QUALITY_BASE_URL: security.allowedOrigin,
           QUALITY_READ_URL: db.runtimeUrl,
           QUALITY_CANONICAL: canonical ? '1' : '0',

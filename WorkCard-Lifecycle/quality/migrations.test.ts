@@ -27,7 +27,7 @@ afterEach(async () => {
 it('failed SQL/history and grants roll back their transaction; corrected restart is safe, including concurrent runners', async () => {
   const { db, dir } = await fixture();
   await runMigrations(db.config, dir);
-  const migration = join(dir, '0004_fault-probe.sql');
+  const migration = join(dir, '0005_fault-probe.sql');
   await writeFile(
     migration,
     'CREATE TABLE q9_probe(id integer PRIMARY KEY); INSERT INTO q9_probe VALUES (1); SELECT 1/0;',
@@ -40,7 +40,7 @@ it('failed SQL/history and grants roll back their transaction; corrected restart
     (await db.owner.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(
       (row: { version: number }) => row.version,
     ),
-  ).toEqual([1, 2, 3]);
+  ).toEqual([1, 2, 3, 4]);
   await writeFile(
     migration,
     'CREATE TABLE q9_probe(id integer PRIMARY KEY); INSERT INTO q9_probe VALUES (1);',
@@ -57,14 +57,14 @@ it('failed SQL/history and grants roll back their transaction; corrected restart
   });
   expect(
     (await db.owner.query('SELECT MAX(version) AS version FROM schema_migrations')).rows[0],
-  ).toEqual({ version: 3 });
+  ).toEqual({ version: 4 });
   await db.owner.query(
     'DROP TRIGGER q9_fail_history ON schema_migrations; DROP FUNCTION q9_fail_history();',
   );
   await Promise.all([runMigrations(db.config, dir), runMigrations(db.config, dir)]);
   expect((await db.owner.query('SELECT * FROM q9_probe')).rows).toEqual([{ id: 1 }]);
   expect(
-    (await db.owner.query('SELECT COUNT(*)::int AS count FROM schema_migrations WHERE version=4'))
+    (await db.owner.query('SELECT COUNT(*)::int AS count FROM schema_migrations WHERE version=5'))
       .rows[0],
   ).toEqual({ count: 1 });
   expect((await db.runtime.query('SELECT COUNT(*)::int AS count FROM work_cards')).rows[0]).toEqual(
@@ -83,14 +83,14 @@ it('failed SQL/history and grants roll back their transaction; corrected restart
   const beforeGrants = await grants();
   // This valid DDL commits, then the standard grants phase hits its missing table.
   await writeFile(
-    join(dir, '0005_grants-probe.sql'),
+    join(dir, '0006_grants-probe.sql'),
     'ALTER TABLE demo_sessions RENAME TO q9_sessions_probe;',
   );
   await expect(runMigrations(db.config, dir)).rejects.toMatchObject({ code: '42P01' });
   expect(await grants()).toEqual(beforeGrants);
   expect(
     (await db.owner.query('SELECT MAX(version) AS version FROM schema_migrations')).rows[0],
-  ).toEqual({ version: 5 });
+  ).toEqual({ version: 6 });
   // Explicit fixture repair; already applied SQL must not execute again.
   await db.owner.query('ALTER TABLE q9_sessions_probe RENAME TO demo_sessions');
   await runMigrations(db.config, dir);
@@ -102,7 +102,7 @@ it('checksum drift, missing applied file and duplicate versions stop before new 
   await runMigrations(db.config, dir);
   const file = join(dir, '0003_align-operation-plan-norm-precision.sql');
   const original = await readFile(file, 'utf8');
-  await writeFile(join(dir, '0004_new-probe.sql'), 'CREATE TABLE q9_probe(id integer);');
+  await writeFile(join(dir, '0005_new-probe.sql'), 'CREATE TABLE q9_probe(id integer);');
   const history = (await db.owner.query('SELECT * FROM schema_migrations ORDER BY version')).rows;
   await writeFile(file, `${original}\n-- drift`);
   await expect(runMigrations(db.config, dir)).rejects.toThrow('изменена или отсутствует');
@@ -123,6 +123,9 @@ it('real 0003 refuses lossy norm conversion without changing data; restart succe
   const { db, dir } = await fixture();
   const file = join(dir, '0003_align-operation-plan-norm-precision.sql');
   const sql = await readFile(file, 'utf8');
+  const laterFile = join(dir, '0004_demo-maintenance-state.sql');
+  const laterSql = await readFile(laterFile, 'utf8');
+  await rm(laterFile);
   await rm(file);
   await runMigrations(db.config, dir);
   await referenceFixtures(db);
@@ -140,6 +143,7 @@ it('real 0003 refuses lossy norm conversion without changing data; restart succe
     (await db.owner.query('SELECT MAX(version) AS version FROM schema_migrations')).rows[0],
   ).toEqual({ version: 2 });
   await db.owner.query('UPDATE operation_plans SET norm_hours = 0.250 WHERE operation_number=10');
+  await writeFile(laterFile, laterSql);
   await runMigrations(db.config, dir);
   await runMigrations(db.config, dir);
   expect(

@@ -1,94 +1,96 @@
 ---
 artifact_id: engineering.environments
 status: accepted
-version: 8
+version: 11
 owner: engineering
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # Environments and Secrets
 
-Конфигурация поступает только через environment variables. Образ не содержит environment-specific секретов и одинаков для local, test, staging и production. Hosted binding следует [[deployment]] и [[0007-cloud-run-and-cloud-sql-release|ADR-0007]]; [reviewable Terraform](../../infra/terraform/README.md) описывает resources и binding, но без `apply` и secret values они ещё не созданы.
+Один image содержит SPA/API и owner CLI. Environment-specific конфигурация передаётся при запуске; secrets не входят в image, repository, browser bundle, health или release evidence. Текущий контракт — [[0009-render-free-neon-free-release|ADR-0009]] и [[deployment]].
 
 ## Контуры
 
-| Контур | Данные | БД | Секреты | Назначение |
-|---|---|---|---|---|
-| local | детерминированные синтетические | Docker volume | локальный `.env` с demo-значениями | разработка и демонстрация |
-| test/CI | синтетические, пересоздаются | ephemeral PostgreSQL service | job environment | автоматические проверки |
-| staging | только разрешённые синтетические | отдельный Cloud SQL PostgreSQL 18 | Secret Manager staging project | hosted smoke и приёмка exact digest |
-| production | только общие synthetic demo-данные; mutable rows daily reset | отдельный Cloud SQL PostgreSQL 18 с backups/PITR | Secret Manager production project | публичный interactive portfolio demo без tenant isolation |
-
-Реальные производственные, кадровые и расчётные данные не допускаются ни в один контур MVP.
-
-## Переменные приложения
-
-| Переменная | Потребитель | Правило |
-|---|---|---|
-| `APP_ENV` | API | только `development`, `test`, `staging`, `production` |
-| `APP_VERSION` | API/operator logs | full source commit SHA без секрета; sanitized public health его не показывает |
-| `HOST`, `PORT` | API | `HOST=0.0.0.0`; Cloud Run сам inject-ит `PORT=3000` после настройки container port |
-| `LOG_LEVEL` | API/jobs | разрешённый уровень Pino; hosted Terraform фиксирует `info` |
-| `PROXY_TRUST_MODE` | API | `none` вне Cloud Run; `cloud-run` доверяет только непосредственному platform proxy |
-| `DEMO_MAX_BATCHES` | API | hosted значение `20`; целое `1..100`, ограничивает live aggregate roots |
-| `DEMO_MAX_SESSIONS` | API | hosted значение `500`; целое `1..10000`, ограничивает server session rows |
-| `DATABASE_URL` | API/verify | только runtime-роль; hosted workload требует Cloud SQL Unix socket |
-| `WEB_DIST_PATH` | API | каталог собранного SPA |
-| `APP_ORIGIN` | API | один точный канонический HTTPS service origin контура, без path/query/trailing slash |
-| `SESSION_SIGNING_SECRET` | API | минимум 32 символа; вне development/test обязателен явно |
-| `COMPOSE_APP_ORIGIN` | Compose | local same-origin URL собранного приложения; преобразуется в `APP_ORIGIN` контейнера |
-
-`K_SERVICE`/`K_REVISION` для service и `CLOUD_RUN_JOB`/`CLOUD_RUN_EXECUTION` для jobs добавляет сама платформа. Код использует их только как ограниченную границу hosted-конфигурации и безопасный logging context; задавать эти зарезервированные имена Terraform не должен.
-
-## Переменные bootstrap
-
-| Переменная | Доступ | Правило |
-|---|---|---|
-| `MIGRATION_DATABASE_URL` | только Cloud Run migrate/reset/seed jobs | schema owner/role administration, не передаётся API service |
-| `APP_DATABASE_USER` | migrate, verify и local Compose | безопасный PostgreSQL identifier; hosted app извлекает user из `DATABASE_URL` и отдельно переменную не получает |
-| `APP_DATABASE_PASSWORD` | migrate/seed job и формирование runtime URL | Secret Manager; не передаётся отдельным значением API service и не логируется |
-| `POSTGRES_*` | local/CI database service | инфраструктурные значения контура |
-
-Compose формирует внутренние URL с hostname `database`; host-команды используют loopback URL из `.env`. Пароли с произвольными спецсимволами в hosted environment передаются готовыми URL, корректно закодированными secret store.
-
-## Hosted binding matrix
-
-| Cloud Run workload | Несекретная конфигурация | Доступные secret versions | Запрещено передавать |
+| Контур | Приложение | PostgreSQL | Секреты |
 |---|---|---|---|
-| app service | `APP_ENV`, `APP_VERSION`, `APP_ORIGIN`, `HOST`, `LOG_LEVEL`, `PROXY_TRUST_MODE=cloud-run`, `DEMO_MAX_BATCHES=20`, `DEMO_MAX_SESSIONS=500`, `WEB_DIST_PATH` | `DATABASE_URL`, `SESSION_SIGNING_SECRET` | `MIGRATION_DATABASE_URL`, `APP_DATABASE_PASSWORD`, owner configuration |
-| migrate job | `APP_ENV`, `APP_VERSION`, `APP_DATABASE_USER`, `LOG_LEVEL` | `MIGRATION_DATABASE_URL`, `APP_DATABASE_PASSWORD` | `DATABASE_URL`, `SESSION_SIGNING_SECRET` |
-| reset job | `APP_ENV`, `APP_VERSION`, `LOG_LEVEL` | только `MIGRATION_DATABASE_URL` | `APP_DATABASE_PASSWORD`, `DATABASE_URL`, `SESSION_SIGNING_SECRET` |
-| seed job | `APP_ENV`, `APP_VERSION`, `APP_DATABASE_USER`, `LOG_LEVEL` | `MIGRATION_DATABASE_URL`, `APP_DATABASE_PASSWORD` | `DATABASE_URL`, `SESSION_SIGNING_SECRET` |
-| verify job | `APP_ENV`, `APP_VERSION`, `APP_DATABASE_USER`, `LOG_LEVEL` | `DATABASE_URL` | owner URL/password, session secret |
+| local | Compose или Vite/API | локальная PostgreSQL 18 | раздельные ignored `.env` / `.env.owner`, только synthetic values |
+| test/CI | disposable процессы/containers | локальная disposable PostgreSQL 18 | job-scoped synthetic values; никакого Neon |
+| staging | локальный/временный Actions Docker | отдельный Neon Free project, PostgreSQL 18 | отдельные owner/runtime environments |
+| production | один Render Free image service | другой Neon Free project, PostgreSQL 18 | Render runtime; отдельный owner environment |
 
-Каждый workload ссылается на конкретный числовой Secret Manager version. Alias `latest` запрещён для release configuration. Service identities получают `secretAccessor` только на перечисленные secrets; staging identity не читает production project. Publisher и deployment workflow используют разные short-lived WIF providers и не хранят service-account JSON key. Deployment provider имеет явные targets `work-card-deployer` и `work-card-smoke`: первый остаётся привилегированным из-за `iam.serviceAccountUser` + deploy permission, второй получает только `roles/run.invoker` на private staging service. Hosted browser process дополнительно отклоняет DB/owner/PG/cloud-credential variables, не наследует GitHub OIDC и читает лишь обновляемый audience-bound ID token из удаляемого temporary file.
+Реальные производственные, кадровые и расчётные данные запрещены. Staging не является постоянным вторым Render service и не использует production DB.
 
-Hosted `DATABASE_URL` и `MIGRATION_DATABASE_URL` направляются в Cloud SQL Auth Proxy Unix socket `/cloudsql/<project>:<region>:<instance>`. Socket path передаётся как полностью percent-encoded `host` query parameter PostgreSQL URL, `sslmode=disable`; пароль также URL-encoded. При наличии `K_SERVICE`/`CLOUD_RUN_JOB` startup fail-fast отклоняет TCP, raw/unencoded или неоднозначный host, лишние query parameters, неверный connection name, порт и путь длиннее лимита Unix socket. Unit test отдельно подтверждает, что закреплённый `pg@8.23.0` разбирает URL в ожидаемый `Client.host`; это не проверка наличия socket или подключения к Cloud SQL. Connection name и DB username не считаются secrets, но полный URL считается secret из-за password.
+## Переменные
 
-## `APP_ORIGIN`
+| Имя | Потребитель | Контракт |
+|---|---|---|
+| `APP_ENV` | API/owner | `development`, `test`, `staging`, `production`; последние два требуют Neon contract |
+| `APP_VERSION` | API/owner | source SHA из image; metadata без секрета |
+| `CONFIGURATION_REVISION` | release evidence | несекретная метка reviewed config/rotation; не provider secret version |
+| `RELEASE_EVIDENCE_DURABLE` | Render release adapter | обязательное значение `1`; omission не разрешает promotion без durable journal |
+| `RENDER_API_KEY` | adapter / отдельный log-verification job | доступ к Render API; отсутствует в owner/runtime/browser |
+| `GH_TOKEN` | release preflight / evidence writer | job-scoped GitHub token; write только для immutable release assets/evidence |
+| `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT` | durable evidence context | несекретный binding к фактическому GitHub run/attempt |
+| `WORKCARD_ROLLBACK_AUTHORIZATION` | rollback adapter | явное подтверждение fixed rollback operation; не secret и не SQL input |
+| `RENDER_OWNER_ID`, `RENDER_SERVICE_ID`, `RENDER_ORIGIN` | adapter/qualification | exact ожидаемые workspace/service/origin, без payload |
+| `HOST`, `PORT` | API | bind `0.0.0.0`, фактический `PORT` Render; Docker health использует тот же порт |
+| `LOG_LEVEL` | API/owner | безопасный JSON logger |
+| `DATABASE_URL` | API | только SQL-created runtime role, direct Neon TCP/TLS |
+| `MIGRATION_DATABASE_URL` | owner CLI | только owner; запрещена runtime/browser |
+| `NEON_DATABASE_HOST`, `NEON_DATABASE_NAME` | API/owner | обязательный exact ожидаемый target в staging/production |
+| `APP_DATABASE_USER`, `APP_DATABASE_PASSWORD` | bootstrap/release | создание/проверка runtime role; отсутствуют в runtime/browser |
+| `SESSION_SIGNING_SECRET` | API | минимум 32 CSPRNG bytes; уникален для каждого контура |
+| `APP_ORIGIN` | API | один точный browser origin без path/query/trailing slash; production только HTTPS |
+| `PROXY_TRUST_MODE` | API | `none` для local/Actions Docker; Render initial `observe` или qualified `render` |
+| `PROXY_TRUSTED_CIDRS` | Render API | отсутствует в `observe`; в `render` — reviewed allowlist наблюдённых peers, не весь internet |
+| `RENDER`, `RENDER_SERVICE_ID`, `RENDER_INSTANCE_ID` | Render API | platform metadata, не substitute proxy qualification |
+| `STAGING_NEON_HOST` | production owner target guard | несекретный direct staging host; production target обязан отличаться |
+| `PRODUCTION_NEON_HOST` | staging owner target guard | несекретный direct production host; staging target обязан отличаться |
+| `DEMO_MAX_BATCHES`, `DEMO_MAX_SESSIONS` | API | hosted bounds `20` и `500` |
+| `WEB_DIST_PATH` | API | каталог production SPA |
+| `COMPOSE_APP_ORIGIN`, `POSTGRES_*` | local/CI | только disposable local configuration |
 
-- staging и production имеют разные значения;
-- значение равно origin страницы в browser и начинается с `https://`;
-- Cloud Run revision tag URL, локальный proxy URL и будущий custom domain не добавляются как второй origin;
-- смена service URL/custom domain требует отдельной revision и browser security regression check;
-- `APP_ORIGIN` с HTTPS автоматически включает `Secure` для session cookie.
+Runtime во всех средах отвергает `MIGRATION_DATABASE_URL` и `APP_DATABASE_PASSWORD`; не загружайте owner env в API shell. Local owner/bootstrap использует отдельный `.env.owner` из `.env.owner.example`; runtime — `.env` из `.env.example`.
 
-Конкретный service origin передаётся Terraform как обязательный input и проверяется по фактическому Cloud Run URI. В Git хранится только placeholder example, а не выдуманное release-значение.
+Внутри одного контура `APP_DATABASE_USER` и `APP_DATABASE_PASSWORD` задают SQL runtime-роль, которой соответствует `DATABASE_URL`; owner `MIGRATION_DATABASE_URL` использует другую роль. Оператор проверяет этот binding при разрешённой настройке/rotation, не записывая значения в Git/evidence и не передавая runtime URL owner CLI. Runtime readiness подтверждает успешное подключение отдельно от owner catalog verification.
 
-## Политика секретов
+Staging runtime с `APP_ENV=staging` может использовать direct Neon и `PROXY_TRUST_MODE=none` без Render marker. Local Compose использует `APP_ENV=test` при production Node/image; это не ослабляет hosted TLS contract или loopback guard DB-test helpers.
 
-- `.env` и логи исключены из Git; `.env.example` не содержит настоящих секретов.
-- owner URL отсутствует в environment runtime-контейнера `app`.
-- staging/production используют разные secret resources и DB roles; secret payload не копируется между контурами.
-- `SESSION_SIGNING_SECRET` создаётся CSPRNG минимум из 32 random bytes; rotation означает новый закреплённый version и инвалидирует существующие demo sessions.
-- Cloud Run configuration фиксирует числовой secret version вместе с revision, чтобы rollback не зависел от изменяемого alias.
-- Pino пишет однострочный JSON с ISO `time`, Cloud Logging `severity` и `message`; app records содержат `appVersion`, service/revision, request ID, route template, status и duration, jobs — command/execution/phase/outcome.
-- logger исключает query/body/headers/cookies, CSRF/session tokens, DB URL, SQL и raw driver message/stack; автоматический тест проверяет injected markers согласно [[security-baseline]].
-- session cookie подписана, имеет `HttpOnly`/`SameSite=Lax`, а `Secure` включается для HTTPS origin; SPA хранит CSRF только в памяти и очищает защищённое состояние при смене роли.
-- секреты не передаются в browser bundle, health response или OpenAPI.
-- уникальные staging/production secret resources, numeric versions и workload bindings описаны Terraform; сами credentials, `apply` и hosted inspection ещё не выполнены.
-- утечка секрета требует ротации; удаление строки из Git не считается устранением утечки.
+## Neon TCP/TLS
 
-## Критерий принятия
+Runtime и owner URL содержат точный direct hostname, ожидаемое имя database и единственный `sslmode=verify-full`. Сертификат и hostname проверяются. `-pooler`, socket paths, чужие target host/database, downgrade, повторные параметры и конфликтующие overrides отклоняются. `PG*`/TLS overrides нельзя использовать для обхода contract; `NODE_TLS_REJECT_UNAUTHORIZED=0` запрещён. Полный URL содержит пароль и всегда считается secret. Логи не должны печатать URL или raw parser/driver error.
 
-Для локального контура Compose model проверен, runtime-контейнер стартует без owner URL, а отдельная проверка подтверждает ограниченные права роли приложения. Кодовые tests подтверждают sanitized health, JSON logging/redaction, запрет proxy trust вне Cloud Run, one-hop spoof resistance/rate-limit key, разбор Unix-socket URL текущим `pg` и отсутствие DB/owner credentials в hosted runner. Для hosted контуров reviewable plan и `deploy.yml` tests доказывают структуру ownership/configuration contract, но фактическая готовность по-прежнему требует `apply`, IAM inspection, exact secret-version binding, hosted `migrate → seed → verify`, безопасного `reset`, IAM close/restore, наблюдения реальной proxy chain/client IP и подключения через смонтированный socket в smoke по [[deployment]].
+Direct endpoint необходим из-за session advisory locks и startup timeout options. Общая PostgreSQL session у transaction pooler не обеспечивает эти ожидания. Реальное TLS соединение и CA/hostname validation проверяются только в отдельно разрешённой hosted qualification; unit tests доказывают contract/parser behavior.
+
+## Secret boundaries
+
+| Процесс | Доступно | Не передаётся |
+|---|---|---|
+| Render runtime / staging runtime container | `DATABASE_URL`, `SESSION_SIGNING_SECRET`, несекретный target/origin/proxy contract | owner URL/password, Render API token |
+| owner bootstrap/release | `MIGRATION_DATABASE_URL`, `APP_DATABASE_USER`, `APP_DATABASE_PASSWORD`, target metadata | session secret, runtime URL |
+| owner reset/verify | `MIGRATION_DATABASE_URL`, target metadata | runtime URL/password, session secret |
+| browser smoke | exact origin и несекретные expected metadata | любые DB/owner/PG/cloud/deployment credentials |
+| Render adapter / rollback adapter | `RENDER_API_KEY`, job-scoped `GH_TOKEN`, service metadata и configuration revision | DB/owner credentials |
+| Render log verification | `RENDER_API_KEY`, reviewed peer CIDRs и source/report metadata | DB/owner/runtime credentials; browser process здесь не запускается |
+| GHCR publisher | job-scoped `GITHUB_TOKEN` с `packages: write` | Neon и Render secrets |
+
+GitHub Environments разделены: `staging-owner`, `staging-runtime`, `production-owner`, `production`; последний обслуживает Render adapter. Owner secrets передаются только соответствующим owner steps/containers; наследовать их browser process запрещено. Runtime и browser не должны работать на self-hosted shared runner с сохранёнными owner credentials.
+
+Фактическое состояние на 2026-09-17: через `gh` в точном repository `AI-shoks/WorkCard-Lifecycle` созданы все четыре environment; у каждого custom deployment branch policy допускает только branch `main`. Secrets пока не установлены. Новый Render service и Neon projects для этого демо ещё не созданы; наличие environment не доказывает подключение к БД или runtime/owner binding.
+
+GitHub/Render не предоставляют числовое неизменяемое secret-version binding прежнего Secret Manager. У оператора есть отдельные rotation identifiers; evidence записывает только эти имена/идентификаторы, время и binding checks, без payload. Rotation DB/session credentials выполняется отдельным разрешённым действием; session-secret rotation инвалидирует demo sessions. Rollback приложения не восстанавливает прежние secret values автоматически.
+
+## Origin, proxy и logging
+
+Production `APP_ORIGIN` совпадает с каноническим HTTPS Render URL. Staging temporary Docker допускает HTTP только на loopback (`localhost`, `127.0.0.1`, `::1`) и имеет отдельный exact origin; смена origin требует повторной проверки Origin/CSRF/cookie. HTTPS включает `Secure`; cookie остаётся `HttpOnly; SameSite=Lax`, CSRF живёт только в памяти SPA.
+
+Для первого запуска `PROXY_TRUST_MODE=observe` разрешён только на Render: CIDR allowlist отсутствует, forwarded headers не получают доверия, все `/api*` и `/health/ready` принудительно отвечают `503` до DB, даже если owner gate случайно открыт. Liveness/SPA и sanitized peer logs остаются доступны. После наблюдения реального socket peer оператор рассматривает exact IP/обоснованный CIDR, переключает `render` и выполняет обязательную chain/client-IP/spoof qualification; угадывать Render диапазон не нужно. Initial owner migration держит persistent DB gate закрытым до bootstrap + verify. Последовательность — [[deployment#Первый запуск без предположения о proxy|Deployment]].
+
+Безусловный `trustProxy=true` запрещён. Код доверяет только проверенному immediate peer из `PROXY_TRUSTED_CIDRS` и цепочке адресов из этого allowlist; localhost test не доказывает реальную Render header chain. Перед публичным запуском нужно наблюдать socket peer, добавляемые Render заголовки, client IP и spoofed XFF, включая cold start/redeploy. Неизвестная цепочка блокирует qualification, а не расширяет allowlist автоматически.
+
+Pino пишет однострочный JSON с безопасными service/version/request/command fields и техническими `remoteAddress` (socket peer), `remoteIp` (resolved client), `protocol` для квалификации proxy chain. Публикуемые observation summaries относятся к synthetic runner requests; raw visitor logs не входят в release assets. Query/body/headers/cookies, SQL, DB URL, CSRF/session tokens и raw driver messages/stack исключены. Render application logs доступны на Hobby с retention 7 дней; platform HTTP request logs требуют Pro+, поэтому $0 qualification опирается на собственный request ID/peer/IP/protocol и независимый egress IP runner, а не на недоступные request logs. Источник — [Render logging](https://render.com/docs/logging). Фактическое ingestion всё равно проверяется отдельно. Idle pool errors обрабатываются безопасно без падения процесса и без credential leakage.
+
+## Граница проверки
+
+Владелец разрешил настройку environments/secrets и создание одного Render Free service и двух Neon Free projects в рамках первого deployment. Read-only preflight GitHub и выбранного Render workspace начат; подтверждённые billing facts и границы ресурсов записаны в [[deployment]]. Создание demo targets, реальные DB operations, публикация image и hosted qualification ещё требуют фактических records. Фактический Neon Free plan и общий $0-профиль эксплуатации ещё не подтверждены. Разрешение не распространяется на посторонние БД/resources или платные опции; обычный CI сохраняет только disposable PostgreSQL. Доказанные проверки и конкретные ограничения — [[quality-gates]]; hosted checklist — [[deployment]].

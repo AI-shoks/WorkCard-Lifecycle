@@ -1,7 +1,7 @@
 import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance, FastifyRequest, FastifyServerOptions } from 'fastify';
 import pino, { type DestinationStream, type Logger, type LoggerOptions } from 'pino';
-import type { PoolConfig } from 'pg';
+import type { Pool, PoolConfig } from 'pg';
 
 import type { ProxyTrustMode } from './config.js';
 
@@ -69,7 +69,7 @@ function loggerOptions(
   return {
     base: context,
     formatters: {
-      level: (label) => ({ severity: severityByLevel[label] ?? 'DEFAULT' }),
+      level: (label, number) => ({ level: number, severity: severityByLevel[label] ?? 'DEFAULT' }),
     },
     level,
     messageKey: 'message',
@@ -107,20 +107,20 @@ function safeProcessMetadata(raw: string | undefined, fallback: string): string 
 }
 
 export function createProcessLogger(
-  command: 'migrate' | 'reset' | 'seed' | 'serve' | 'verify',
+  command: 'bootstrap' | 'release' | 'migrate' | 'reset' | 'seed' | 'serve' | 'verify',
   environment: NodeJS.ProcessEnv = process.env,
   destination?: DestinationStream,
 ): Logger {
-  const executionId = safeProcessMetadata(environment['CLOUD_RUN_EXECUTION'], 'local');
+  const executionId = safeProcessMetadata(environment['GITHUB_RUN_ID'], 'local');
   const context: RuntimeLogContext & Record<string, unknown> = {
     appVersion: safeProcessMetadata(environment['APP_VERSION'], 'unknown'),
     command,
     revision: safeProcessMetadata(
-      environment['K_REVISION'] ?? environment['CLOUD_RUN_EXECUTION'],
+      environment['RENDER_INSTANCE_ID'] ?? environment['GITHUB_RUN_ID'],
       'local',
     ),
     service: safeProcessMetadata(
-      environment['K_SERVICE'] ?? environment['CLOUD_RUN_JOB'],
+      environment['RENDER_SERVICE_ID'],
       command === 'serve' ? 'work-card-api' : `work-card-${command}`,
     ),
     ...(command === 'serve' ? {} : { executionId }),
@@ -132,13 +132,26 @@ export function createProcessLogger(
   return destination ? pino(options, destination) : pino(options);
 }
 
-export function proxyTrustPolicy(mode: ProxyTrustMode): FastifyServerOptions['trustProxy'] {
-  if (mode === 'none') return false;
+export function proxyTrustPolicy(
+  mode: ProxyTrustMode,
+  trustedCidrs: string[] = [],
+): FastifyServerOptions['trustProxy'] {
+  if (mode !== 'render') return false;
+  if (trustedCidrs.length === 0) throw new Error('Render proxy peer allowlist is required.');
+  // Fastify validates every peer against this explicit IP/CIDR allowlist. The
+  // actual Render peer/forwarding chain must be qualified before public release.
+  return trustedCidrs;
+}
 
-  // Direct run.app traffic has one application-visible proxy boundary. Trust only
-  // the socket peer, so request.ip resolves to the right-most platform-added XFF
-  // address and never to any earlier client-supplied value.
-  return (_address: string, hop: number) => hop === 0;
+export function handleIdlePoolErrors(pool: Pool, logger: Pick<Logger, 'warn'>): void {
+  // pg removes the failed idle connection. Log no driver message/client/URL and
+  // let the next operation reconnect; a DB outage still fails readiness/gates.
+  pool.on('error', () => {
+    logger.warn(
+      { event: 'database.idle_connection', outcome: 'disconnected' },
+      'idle database connection closed',
+    );
+  });
 }
 
 type RateLimitRequest = Pick<FastifyRequest, 'ip' | 'method' | 'url'>;

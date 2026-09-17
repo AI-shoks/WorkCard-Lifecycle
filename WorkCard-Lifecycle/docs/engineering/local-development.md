@@ -1,14 +1,14 @@
 ---
 artifact_id: engineering.local-development
 status: accepted
-version: 5
+version: 6
 owner: engineering
-updated: 2026-09-05
+updated: 2026-09-17
 ---
 
 # Local Development
 
-Основной локальный путь — Docker Compose. Он одинаково запускает PostgreSQL, миграцию, детерминированный seed и production-сборку приложения, не требуя локальной установки PostgreSQL.
+Основной локальный путь — Docker Compose. Он одинаково запускает PostgreSQL, owner bootstrap (migrations + initial seed + verify) и production-сборку приложения, не требуя локальной установки PostgreSQL.
 
 ## Предварительные условия
 
@@ -16,19 +16,21 @@ updated: 2026-09-05
 - для host-команд — Node.js из `.node-version` и `pnpm` из `packageManager`;
 - свободные loopback-порты `3000` и `55439` либо их переопределение в локальном `.env`.
 
-`.env.example` содержит только безопасные demo-значения. При необходимости создайте локальный файл:
+`.env.example` содержит безопасные runtime demo-значения; `.env.owner.example` — отдельные local owner values. Не загружайте owner env в API shell. При необходимости создайте локальные файлы:
 
 ```powershell
 Copy-Item .env.example .env
+Copy-Item .env.owner.example .env.owner
 ```
 
-`.env` исключён из Git.
+Оба файла исключены из Git. Runtime отвергает `MIGRATION_DATABASE_URL` и `APP_DATABASE_PASSWORD` во всех средах; при переносе прежнего объединённого `.env` сначала разделите их. Ни `.env`, ни `.env.owner` не подходят для Neon.
 
 ## Чистый запуск
 
 ```powershell
 docker compose config --quiet
 docker compose up --build --wait --wait-timeout 180
+docker compose run --rm --no-deps readiness
 ```
 
 После готовности:
@@ -39,7 +41,9 @@ docker compose up --build --wait --wait-timeout 180
 - OpenAPI: `http://localhost:3000/api/openapi.json`;
 - PostgreSQL для host-команд: `127.0.0.1:55439`.
 
-Контейнеры `migrate` и `seed` должны завершиться с кодом `0`; `database` и `app` — перейти в `healthy`.
+Owner `bootstrap` должен завершиться с кодом `0`, а `database` и `app` — перейти в `healthy` во время `up --wait`. После этого отдельный `run readiness` должен завершиться с кодом `0`. Docker HEALTHCHECK проверяет `/health/live` на фактическом `PORT`, поэтому одного `healthy` недостаточно для доказательства готовой DB/schema/gate. Compose и CI отдельно проверяют `/health/ready`.
+
+Одноразовый service `readiness` находится в профиле `checks` и вызывается явно после `up --wait`: явный target автоматически доступен без включения профиля, согласно [Compose profiles](https://docs.docker.com/compose/how-tos/profiles/). Это исключает ожидание running/healthy для уже завершившейся standalone probe; соответствующее поведение `--wait` видно в [Compose start implementation](https://raw.githubusercontent.com/docker/compose/main/pkg/compose/start.go). `bootstrap` остаётся обычной dependency приложения с `service_completed_successfully`.
 
 ## Разработка на host
 
@@ -52,11 +56,9 @@ Vite обслуживает frontend с hot reload и проксирует `/api
 
 `APP_ORIGIN=http://localhost:5173` разрешает mutation через Vite proxy. Compose передаёт отдельный `COMPOSE_APP_ORIGIN=http://localhost:3000`, поскольку production-сборка SPA и API работает под одним origin. `SESSION_SIGNING_SECRET` в `.env.example` допустим только для локального синтетического контура.
 
-DB integration tests запускаются после migrate/seed против отдельной disposable БД или CI service:
+DB integration tests запускаются после owner bootstrap против отдельной disposable БД или CI service. В отдельной test shell явно задайте `INTEGRATION_DATABASE_URL` и `INTEGRATION_MIGRATION_DATABASE_URL` только для этого локального target; application URL не используется как fallback:
 
 ```powershell
-$env:INTEGRATION_DATABASE_URL = $env:DATABASE_URL
-$env:INTEGRATION_MIGRATION_DATABASE_URL = $env:MIGRATION_DATABASE_URL
 pnpm --filter @work-card/api test:integration
 ```
 
@@ -64,27 +66,21 @@ pnpm --filter @work-card/api test:integration
 
 Если Docker недоступен, browser/API и DB integration можно проверить с PostgreSQL `18.6` на host, в том числе portable runtime на Windows. Для этого выделяют отдельный cluster с loopback listener и две чистые БД: одну для браузерного сценария, вторую для integration suite. Системный PostgreSQL, его службы и существующие данные не используются и не перенастраиваются. Порт выбирается свободным и не является частью предметной fixture.
 
-После создания отдельной пустой БД задайте owner/runtime URL и учётные данные через локальное окружение; placeholders ниже нужно заменить своими значениями, не сохраняя их в документации:
+После создания отдельной пустой DB выполняйте owner команды в отдельной shell: env names `MIGRATION_DATABASE_URL`, `APP_DATABASE_USER`, `APP_DATABASE_PASSWORD` берутся из ignored `.env.owner` для disposable target. Runtime shell имеет только `.env` с runtime `DATABASE_URL`; реальные значения/URL не публикуются.
 
 ```powershell
-$env:MIGRATION_DATABASE_URL = '<owner-url-for-disposable-database>'
-$env:DATABASE_URL = '<runtime-url-for-the-same-database>'
-$env:APP_DATABASE_USER = '<runtime-role-name>'
-$env:APP_DATABASE_PASSWORD = '<runtime-password>'
-pnpm db:migrate
-pnpm db:migrate
-pnpm db:seed
-pnpm db:seed
+pnpm db:bootstrap
+pnpm db:bootstrap
 pnpm db:verify
 ```
 
-Повторный migrate проверяет уже применённые версии и checksums, повторный seed подтверждает неизменность reference data, а `db:verify` подключается именно runtime-ролью. Выполните тот же bootstrap для второй чистой БД, направьте на неё `INTEGRATION_DATABASE_URL` и `INTEGRATION_MIGRATION_DATABASE_URL` и запустите integration suite. Не направляйте integration suite на БД активного браузерного сценария.
+Повтор проверяет SQL checksums, seed fixtures и role boundary, не продлевая reset timestamp. Owner verify использует catalog checks и не требует runtime URL. Прямой отказ mutation проверяют integration/quality suite runtime connections. Bootstrap integration target отдельно от DB активного browser сценария. Через 26 часов нужно выполнить owner `pnpm db:reset-demo`; повтор bootstrap не является заменой reset.
 
 Host PostgreSQL подтверждает работу реальной БД и API, но не проверяет Dockerfile, Compose, Linux image или clean-container startup. Контейнерный gate остаётся отдельным обязательством.
 
 ### Production SPA на host и обновление assets
 
-Для проверки собранной SPA сервер API должен раздавать текущую `apps/web/dist` под тем же origin. До запуска задайте `DATABASE_URL`, точный `APP_ORIGIN`, loopback `HOST`/свободный `PORT` и локальный `SESSION_SIGNING_SECRET` согласно [[environments]]. Путь к сборке передавайте абсолютным, потому что package script запускается из `apps/api`:
+Для проверки собранной SPA сервер API должен раздавать текущую `apps/web/dist` под тем же origin. В чистой runtime shell без owner env до запуска задайте `APP_ENV=development` либо `test`, runtime `DATABASE_URL`, точный `APP_ORIGIN`, loopback `HOST`/свободный `PORT` и локальный `SESSION_SIGNING_SECRET` согласно [[environments]]. Путь к сборке передавайте абсолютным, потому что package script запускается из `apps/api`:
 
 ```powershell
 pnpm build
@@ -118,7 +114,7 @@ docker compose down
 
 ## Изолированные проверки этапа 9
 
-Для тестов нужен отдельный PostgreSQL server/control DB и owner с правом создавать disposable БД/роли. `QUALITY_OWNER_URL` обязателен: fallback на application DB отсутствует. Каждый suite создаёт собственную `q9_*` БД и runtime-роль, удаляя только их после выполнения. Справочные fixtures не создают production batches/cards/results.
+Для тестов нужен отдельный PostgreSQL server/control DB и owner с правом создавать disposable БД/роли. `QUALITY_OWNER_URL` обязателен: fallback на application DB отсутствует. Guard разрешает только явно допустимый local/CI host; его нельзя ослаблять ради Neon. Каждый suite создаёт собственную `q9_*` БД и runtime-роль, удаляя только их после выполнения. Справочные fixtures не создают production batches/cards/results.
 
 ```powershell
 $env:QUALITY_OWNER_URL = '<owner-url-for-isolated-local-control-database>'

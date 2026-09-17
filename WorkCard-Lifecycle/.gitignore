@@ -19,6 +19,7 @@ playwright-report/
 .env
 .env.*
 !.env.example
+!.env.owner.example
 *.log
 logs/
 

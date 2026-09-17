@@ -1,12 +1,16 @@
 ---
 artifact_id: architecture.adr.0007
-status: accepted
-version: 2
+status: superseded
+version: 3
 owner: architecture
-updated: 2026-09-06
+updated: 2026-09-17
+superseded_by: "[[0009-render-free-neon-free-release]]"
 ---
 
 # ADR-0007. Cloud Run and Cloud SQL release platform
+
+
+> Заменено [[0009-render-free-neon-free-release|ADR-0009]] 2026-09-17. Ниже сохранены исторические решение, причины и ограничения GCP; действующий контракт находится в [[deployment]].
 
 ## Контекст
 

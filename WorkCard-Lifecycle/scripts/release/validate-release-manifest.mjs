@@ -40,6 +40,16 @@ async function loadValidators() {
       return {
         release: ajv.compile(JSON.parse(releaseSchemaBytes.toString('utf8'))),
         evidence: ajv.compile(JSON.parse(evidenceSchemaBytes.toString('utf8'))),
+        releaseV2: ajv.compile(
+          JSON.parse(
+            await readFile(releaseSchemaPath.replace('.schema.json', '.v2.schema.json'), 'utf8'),
+          ),
+        ),
+        evidenceV2: ajv.compile(
+          JSON.parse(
+            await readFile(evidenceSchemaPath.replace('.schema.json', '.v2.schema.json'), 'utf8'),
+          ),
+        ),
       };
     })();
   }
@@ -53,7 +63,8 @@ function repositoryFromRunUrl(value) {
 
 export async function validateReleaseManifest(manifest) {
   const validators = await loadValidators();
-  if (!validators.release(manifest)) throw schemaFailure('Release manifest', validators.release);
+  const validator = manifest.schemaVersion === 2 ? validators.releaseV2 : validators.release;
+  if (!validator(manifest)) throw schemaFailure('Release manifest', validator);
 
   if (manifest.ociRevisionLabel !== manifest.sourceSha) {
     throw new Error('OCI revision label должен совпадать с source SHA.');
@@ -81,6 +92,12 @@ export async function validateReleaseManifest(manifest) {
   ) {
     throw new Error('Source CI и build/scan evidence должны относиться к одному repository.');
   }
+  if (
+    manifest.schemaVersion === 2 &&
+    repositoryFromRunUrl(manifest.sourceBuildRunUrl) !==
+      repositoryFromRunUrl(manifest.buildScanRunUrl)
+  )
+    throw new Error('Original build must belong to the same repository.');
 
   const migrationPaths = manifest.migrationsChecksumSummary.files.map((entry) => entry.path);
   if (new Set(migrationPaths).size !== migrationPaths.length) {
@@ -197,8 +214,11 @@ export function validateTrivyScanReport(scanReportBytes, expected) {
 export async function validateReleaseEvidenceRecord(record, manifest) {
   await validateReleaseManifest(manifest);
   const validators = await loadValidators();
-  if (!validators.evidence(record)) {
-    throw schemaFailure('Release evidence record', validators.evidence);
+  if (record.schemaVersion !== manifest.schemaVersion)
+    throw new Error('Evidence schema version must match manifest.');
+  const validator = record.schemaVersion === 2 ? validators.evidenceV2 : validators.evidence;
+  if (!validator(record)) {
+    throw schemaFailure('Release evidence record', validator);
   }
   if (record.sourceSha !== manifest.sourceSha) {
     throw new Error('Evidence source SHA должен совпадать с immutable release manifest.');
@@ -210,11 +230,35 @@ export async function validateReleaseEvidenceRecord(record, manifest) {
     throw new Error('Evidence record не может предшествовать release manifest.');
   }
   if (
-    (record.kind === 'staging-deployment' || record.kind === 'production-deployment') &&
+    ['staging-deployment', 'production-deployment', 'rollback-deployment'].includes(record.kind) &&
     record.evidence.resolvedImage !== manifest.immutableImage
   ) {
     throw new Error('Deployment evidence resolved image должен совпадать с release manifest.');
   }
+  if (
+    record.schemaVersion === 2 &&
+    ['production-deployment', 'rollback-deployment'].includes(record.kind)
+  ) {
+    if (
+      record.evidence.persistentImage !== manifest.immutableImage ||
+      record.evidence.resolvedDigest !== manifest.imageDigest
+    ) {
+      throw new Error('Persistent Render reference and resolved digest must match the manifest.');
+    }
+  }
+  if (
+    record.schemaVersion === 2 &&
+    ['production-attempt', 'rollback-attempt'].includes(record.kind) &&
+    record.evidence.requestedImage !== manifest.immutableImage
+  )
+    throw new Error('Deployment attempt must bind the requested manifest image.');
+  if (
+    record.schemaVersion === 2 &&
+    record.kind === 'rollback-decision' &&
+    (record.evidence.fromImage !== manifest.immutableImage ||
+      record.evidence.toImage === manifest.immutableImage)
+  )
+    throw new Error('Rollback decision must bind its current image and a different target.');
   if (
     repositoryFromRunUrl(record.evidence.runUrl) !== repositoryFromRunUrl(manifest.buildScanRunUrl)
   ) {

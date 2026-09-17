@@ -10,167 +10,234 @@ import {
 } from './config.js';
 
 const databaseUrl = 'postgresql://runtime:local@localhost:5432/workcard';
-const cloudSqlSocket = '/cloudsql/example-project:europe-west1:work-card';
-const cloudSqlDatabaseUrl =
-  'postgresql://runtime:s%40fe@/workcard?host=%2Fcloudsql%2Fexample-project%3Aeurope-west1%3Awork-card&sslmode=disable';
-const hostedEnvironment = {
+const neonUrl =
+  'postgresql://runtime:s%40fe@ep-demo-example.eu-central-1.aws.neon.tech:5432/workcard?sslmode=verify-full';
+const neon = {
   APP_ENV: 'production',
+  NEON_DATABASE_HOST: 'ep-demo-example.eu-central-1.aws.neon.tech',
+  NEON_DATABASE_NAME: 'workcard',
+};
+const hosted = {
+  ...neon,
   APP_ORIGIN: 'https://work-card.example',
-  DATABASE_URL: cloudSqlDatabaseUrl,
-  K_REVISION: 'work-card-app-00001-example',
-  K_SERVICE: 'work-card-app',
-  PROXY_TRUST_MODE: 'cloud-run',
-  SESSION_SIGNING_SECRET: 'production-session-secret-at-least-32',
-} as const;
+  DATABASE_URL: neonUrl,
+  RENDER: 'true',
+  RENDER_INSTANCE_ID: 'srv-example-instance',
+  RENDER_SERVICE_ID: 'srv-example',
+  PROXY_TRUST_MODE: 'render',
+  PROXY_TRUSTED_CIDRS: '10.0.2.0/24',
+  SESSION_SIGNING_SECRET: 'synthetic-test-session-secret-at-least-32',
+};
 
 describe('application security config', () => {
-  it('разрешает только локальный development secret по умолчанию', () => {
-    const config = loadAppConfig({ APP_ENV: 'development', DATABASE_URL: databaseUrl });
-
-    expect(config.allowedOrigin).toBe('http://localhost:5173');
-    expect(config.cookieSecure).toBe(false);
-    expect(config.proxyTrustMode).toBe('none');
-    expect(config.maximumDemoBatches).toBe(20);
-    expect(config.maximumDemoSessions).toBe(500);
-    expect(config.revision).toBe('local');
-    expect(config.sessionSigningSecret.length).toBeGreaterThanOrEqual(32);
-  });
-
-  it('не запускает production без явного session secret', () => {
-    expect(() => loadAppConfig({ APP_ENV: 'production', DATABASE_URL: databaseUrl })).toThrow(
+  it('keeps local defaults and capacities; requires an explicit hosted secret', () => {
+    expect(loadAppConfig({ DATABASE_URL: databaseUrl })).toMatchObject({
+      allowedOrigin: 'http://localhost:5173',
+      cookieSecure: false,
+      proxyTrustMode: 'none',
+      proxyTrustedCidrs: [],
+      maximumDemoBatches: 20,
+      maximumDemoSessions: 500,
+      revision: 'local',
+    });
+    expect(() => loadAppConfig({ APP_ENV: 'production', DATABASE_URL: neonUrl })).toThrow(
       'SESSION_SIGNING_SECRET',
     );
   });
-
-  it('включает Secure cookie для точного HTTPS origin', () => {
-    const config = loadAppConfig(hostedEnvironment);
-
-    expect(config.cookieSecure).toBe(true);
-    expect(config.proxyTrustMode).toBe('cloud-run');
-    expect(config.revision).toBe('work-card-app-00001-example');
-  });
-
-  it('отклоняет origin с path', () => {
-    expect(() =>
-      loadAppConfig({
-        APP_ENV: 'test',
-        APP_ORIGIN: 'http://localhost:3000/app',
-        DATABASE_URL: databaseUrl,
-      }),
-    ).toThrow('APP_ORIGIN');
-  });
-
-  it('не разрешает Cloud Run proxy trust в local/test или без platform boundary', () => {
-    expect(() =>
-      loadAppConfig({
-        APP_ENV: 'test',
-        DATABASE_URL: databaseUrl,
-        K_SERVICE: 'spoofed-service',
-        PROXY_TRUST_MODE: 'cloud-run',
-      }),
-    ).toThrow('только для staging/production внутри Cloud Run');
-
-    expect(() =>
-      loadAppConfig({
-        APP_ENV: 'production',
-        APP_ORIGIN: 'https://work-card.example',
-        DATABASE_URL: cloudSqlDatabaseUrl,
-        PROXY_TRUST_MODE: 'cloud-run',
-        SESSION_SIGNING_SECRET: 'production-session-secret-at-least-32',
-      }),
-    ).toThrow('только для staging/production внутри Cloud Run');
-  });
-
-  it('не разрешает отключить ограниченный proxy trust внутри Cloud Run', () => {
-    expect(() => loadAppConfig({ ...hostedEnvironment, PROXY_TRUST_MODE: 'none' })).toThrow(
-      'Cloud Run service должен использовать PROXY_TRUST_MODE=cloud-run',
+  it('accepts Render HTTPS with an explicit peer allowlist, independent of K_*', () => {
+    expect(loadAppConfig(hosted)).toMatchObject({
+      cookieSecure: true,
+      proxyTrustMode: 'render',
+      revision: 'srv-example-instance',
+      serviceName: 'srv-example',
+      proxyTrustedCidrs: ['10.0.2.0/24'],
+    });
+    expect(loadAppConfig({ ...hosted, K_SERVICE: 'ignored', K_REVISION: 'ignored' }).revision).toBe(
+      'srv-example-instance',
     );
   });
-
-  it('валидирует жёсткие лимиты общего demo-контура', () => {
+  it('accepts temporary local staging app with direct TLS Neon DB', () => {
+    expect(
+      loadAppConfig({
+        ...neon,
+        APP_ENV: 'staging',
+        APP_ORIGIN: 'http://127.0.0.1:3000',
+        DATABASE_URL: neonUrl,
+        SESSION_SIGNING_SECRET: hosted.SESSION_SIGNING_SECRET,
+      }),
+    ).toMatchObject({
+      cookieSecure: false,
+      proxyTrustMode: 'none',
+    });
+  });
+  it.each([
+    { PROXY_TRUST_MODE: 'none' },
+    { PROXY_TRUST_MODE: 'true' },
+    { PROXY_TRUSTED_CIDRS: '' },
+    { PROXY_TRUSTED_CIDRS: '0.0.0.0/0' },
+    { PROXY_TRUSTED_CIDRS: '::/0' },
+    { PROXY_TRUSTED_CIDRS: '10.0.0.0/1' },
+    { PROXY_TRUSTED_CIDRS: 'loopback' },
+    { PROXY_TRUSTED_CIDRS: '10.0.0.1,10.0.0.1' },
+    { RENDER: 'false' },
+    { RENDER_SERVICE_ID: '' },
+    { APP_ENV: 'test' },
+    { APP_ORIGIN: 'http://example.test' },
+    { APP_ORIGIN: 'https://example.test/path' },
+    { APP_ORIGIN: 'https://user:pass@example.test' },
+  ])('rejects unsafe hosted proxy/origin configuration %j', (override) => {
+    expect(() => loadAppConfig({ ...hosted, ...override })).toThrow();
+  });
+  it('rejects owner credentials in runtime in local and hosted modes', () => {
+    for (const base of [hosted, { APP_ENV: 'test', DATABASE_URL: databaseUrl }]) {
+      expect(() => loadAppConfig({ ...base, MIGRATION_DATABASE_URL: neonUrl })).toThrow(
+        'Owner credentials',
+      );
+      expect(() => loadAppConfig({ ...base, APP_DATABASE_PASSWORD: 'synthetic' })).toThrow(
+        'Owner credentials',
+      );
+    }
+  });
+  it('validates hard shared-demo capacities and actual port', () => {
     expect(
       loadAppConfig({
         APP_ENV: 'test',
         DATABASE_URL: databaseUrl,
+        PORT: '10000',
         DEMO_MAX_BATCHES: '7',
         DEMO_MAX_SESSIONS: '25',
       }),
-    ).toMatchObject({ maximumDemoBatches: 7, maximumDemoSessions: 25 });
-    expect(() =>
-      loadAppConfig({ APP_ENV: 'test', DATABASE_URL: databaseUrl, DEMO_MAX_BATCHES: '0' }),
-    ).toThrow('DEMO_MAX_BATCHES');
-    expect(() =>
-      loadAppConfig({ APP_ENV: 'test', DATABASE_URL: databaseUrl, DEMO_MAX_SESSIONS: '10001' }),
-    ).toThrow('DEMO_MAX_SESSIONS');
+    ).toMatchObject({ port: 10000, maximumDemoBatches: 7, maximumDemoSessions: 25 });
+    for (const override of [
+      { PORT: '0' },
+      { DEMO_MAX_BATCHES: '101' },
+      { DEMO_MAX_SESSIONS: '10001' },
+    ]) {
+      expect(() =>
+        loadAppConfig({ APP_ENV: 'test', DATABASE_URL: databaseUrl, ...override }),
+      ).toThrow();
+    }
   });
 });
 
-describe('database connection config', () => {
-  it('детерминированно разбирает percent-encoded Cloud SQL socket текущим pg', () => {
-    expect(inspectDatabaseUrlForPg(cloudSqlDatabaseUrl)).toEqual({
-      host: cloudSqlSocket,
-      transport: 'cloud-sql-unix',
+describe('direct Neon TCP/TLS contract', () => {
+  it('matches parsed pg target and keeps certificate and hostname verification enabled', () => {
+    expect(inspectDatabaseUrlForPg(neonUrl)).toEqual({
+      host: neon.NEON_DATABASE_HOST,
+      database: 'workcard',
+      transport: 'tcp',
     });
-
-    const pgClient = new Client({ connectionString: cloudSqlDatabaseUrl });
-    expect(pgClient.host).toBe(cloudSqlSocket);
-    expect(pgClient.port).toBe(5432);
-    expect(pgClient.ssl).toBe(false);
+    const client = new Client({ connectionString: loadAppConfig(hosted).databaseUrl });
+    expect(client.host).toBe(neon.NEON_DATABASE_HOST);
+    expect(client.database).toBe('workcard');
+    expect(client.ssl).toBeTruthy();
+    expect(client.ssl).not.toMatchObject({ rejectUnauthorized: false });
+    expect(client.ssl).not.toHaveProperty('checkServerIdentity');
   });
-
-  it('требует Cloud SQL socket для hosted app, migrate и verify', () => {
-    expect(() => loadAppConfig({ ...hostedEnvironment, DATABASE_URL: databaseUrl })).toThrow(
-      'Cloud SQL Unix socket',
-    );
-    expect(() =>
+  it('owner seed/reset/verify config requires only owner URL and target metadata', () => {
+    expect(loadMaintenanceConfig({ ...neon, MIGRATION_DATABASE_URL: neonUrl })).toEqual({
+      migrationDatabaseUrl: neonUrl,
+    });
+    expect(
       loadMigrationConfig({
-        APP_DATABASE_PASSWORD: 'runtime-password',
+        ...neon,
+        MIGRATION_DATABASE_URL: neonUrl,
         APP_DATABASE_USER: 'runtime',
-        APP_ENV: 'staging',
-        CLOUD_RUN_JOB: 'work-card-migrate',
-        MIGRATION_DATABASE_URL: databaseUrl,
+        APP_DATABASE_PASSWORD: 'synthetic',
       }),
-    ).toThrow('Cloud SQL Unix socket');
-    expect(() =>
+    ).toMatchObject({ appDatabaseUser: 'runtime', migrationDatabaseUrl: neonUrl });
+    expect(
       loadVerificationConfig({
+        ...neon,
+        MIGRATION_DATABASE_URL: neonUrl,
         APP_DATABASE_USER: 'runtime',
-        APP_ENV: 'staging',
-        CLOUD_RUN_JOB: 'work-card-verify',
-        DATABASE_URL: databaseUrl,
       }),
-    ).toThrow('Cloud SQL Unix socket');
-    expect(() =>
-      loadMaintenanceConfig({
-        APP_ENV: 'production',
-        CLOUD_RUN_JOB: 'work-card-reset',
-        MIGRATION_DATABASE_URL: databaseUrl,
-      }),
-    ).toThrow('Cloud SQL Unix socket');
+    ).toMatchObject({ migrationDatabaseUrl: neonUrl });
   });
-
-  it('отклоняет raw, неоднозначный и неверный Cloud SQL host без раскрытия URL', () => {
-    const rawHostUrl =
-      'postgresql://runtime:safe@/workcard?host=/cloudsql/example-project:europe-west1:work-card&sslmode=disable';
-    const extraOptionUrl = `${cloudSqlDatabaseUrl}&options=-c%20search_path%3Dprivate`;
-    const malformedSocketUrl = cloudSqlDatabaseUrl.replace(
-      'example-project%3Aeurope-west1%3Awork-card',
-      'example-project%3Aeurope-west1%3Awork-card%2Fextra',
-    );
-
-    expect(() => inspectDatabaseUrlForPg(rawHostUrl)).toThrow('percent-encoded host');
-    expect(() => inspectDatabaseUrlForPg(extraOptionUrl)).toThrow(
-      'неподдерживаемые query parameters',
-    );
-    expect(() => inspectDatabaseUrlForPg(malformedSocketUrl)).toThrow(
-      '/cloudsql/<project>:<region>:<instance>',
-    );
-    for (const value of [rawHostUrl, extraOptionUrl, malformedSocketUrl]) {
+  it.each([
+    neonUrl.replace('verify-full', 'require'),
+    neonUrl.replace('verify-full', 'verify-ca'),
+    neonUrl.replace('verify-full', 'disable'),
+    neonUrl.replace('verify-full', 'no-verify'),
+    neonUrl.replace('?sslmode=verify-full', ''),
+    neonUrl.replace('ep-demo-example.', 'ep-demo-example-pooler.'),
+    neonUrl.replace('/workcard?', '/wrong?'),
+    neonUrl.replace('ep-demo-example.', 'ep-other.'),
+    neonUrl.replace(':5432/', ':6432/'),
+    neonUrl + '&sslmode=disable',
+    neonUrl + '&ssl=true',
+    neonUrl + '&host=localhost',
+    neonUrl + '&database=wrong',
+    neonUrl + '&user=owner',
+    neonUrl + '&sslrootcert=/tmp/cert',
+    neonUrl + '&sslcert=/tmp/cert',
+    neonUrl + '&uselibpqcompat=true',
+    neonUrl + '&options=-c%20statement_timeout%3D0',
+    neonUrl + '#fragment',
+    'postgresql://runtime:synthetic@/workcard?host=%2Fcloudsql%2Fexample&sslmode=disable',
+  ])('rejects downgrade, pooler and ambiguous overrides without exposing URL %#', (value) => {
+    for (const run of [
+      () => loadAppConfig({ ...hosted, DATABASE_URL: value }),
+      () => loadMaintenanceConfig({ ...neon, MIGRATION_DATABASE_URL: value }),
+    ]) {
+      expect(run).toThrow();
       try {
-        inspectDatabaseUrlForPg(value);
+        run();
       } catch (error) {
-        expect(String(error)).not.toContain('runtime:safe');
-        expect(String(error)).not.toContain('s%40fe');
+        expect(String(error)).not.toMatch(/s%40fe|runtime:|postgresql:\/\//);
       }
     }
+  });
+  it.each([
+    'PGHOST',
+    'PGPORT',
+    'PGDATABASE',
+    'PGUSER',
+    'PGPASSWORD',
+    'PGSSLMODE',
+    'PGOPTIONS',
+    'PGSSLROOTCERT',
+    'PGSERVICE',
+  ])('rejects %s env override', (key) => {
+    expect(() => loadAppConfig({ ...hosted, [key]: 'ignored' })).toThrow('PG*');
+  });
+  it('requires exact expected target and refuses env TLS downgrade or remote local-test targets', () => {
+    expect(() => loadAppConfig({ ...hosted, NEON_DATABASE_HOST: '' })).toThrow(
+      'NEON_DATABASE_HOST',
+    );
+    expect(() => loadAppConfig({ ...hosted, NEON_DATABASE_NAME: 'wrong' })).toThrow('ожидаемые');
+    expect(() => loadAppConfig({ ...hosted, NODE_TLS_REJECT_UNAUTHORIZED: '0' })).toThrow('TLS');
+    expect(() =>
+      loadMaintenanceConfig({ APP_ENV: 'test', MIGRATION_DATABASE_URL: neonUrl }),
+    ).toThrow('локальным');
+    expect(() => inspectDatabaseUrlForPg('postgresql://runtime@localhost/workcard')).toThrow();
+  });
+});
+
+describe('initial Render observation mode', () => {
+  it('does not trust forwarding or require a guessed CIDR before peer observation', () => {
+    expect(
+      loadAppConfig({ ...hosted, PROXY_TRUST_MODE: 'observe', PROXY_TRUSTED_CIDRS: '' }),
+    ).toMatchObject({ proxyTrustMode: 'observe', proxyTrustedCidrs: [] });
+    expect(() => loadAppConfig({ ...hosted, PROXY_TRUST_MODE: 'observe' })).toThrow(
+      'PROXY_TRUSTED_CIDRS',
+    );
+    expect(() =>
+      loadAppConfig({
+        ...hosted,
+        RENDER: '',
+        PROXY_TRUST_MODE: 'observe',
+        PROXY_TRUSTED_CIDRS: '',
+      }),
+    ).toThrow('внутри Render');
+    expect(() =>
+      loadAppConfig({
+        ...hosted,
+        RENDER: '',
+        PROXY_TRUST_MODE: 'none',
+        PROXY_TRUSTED_CIDRS: '',
+        APP_ORIGIN: 'http://localhost:3000',
+      }),
+    ).toThrow('HTTPS');
   });
 });

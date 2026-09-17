@@ -94,10 +94,7 @@ function parseJsonWebToken(token) {
   }
 }
 
-export function validateSmokeIdentityToken(
-  token,
-  { audience, now = Date.now(), serviceAccount },
-) {
+export function validateSmokeIdentityToken(token, { audience, now = Date.now(), serviceAccount }) {
   const payload = parseJsonWebToken(token);
   const nowSeconds = Math.floor(now / 1000);
   if (payload.iss !== 'https://accounts.google.com') {
@@ -144,7 +141,11 @@ export function createSmokeTokenProvider({
   if (!/^https:\/\/[a-z0-9.-]+\.run\.app$/.test(audience)) {
     throw new Error('Smoke token audience должен быть canonical staging origin.');
   }
-  if (!/^work-card-smoke@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$/.test(serviceAccount)) {
+  if (
+    !/^work-card-smoke@[a-z][a-z0-9-]{4,28}[a-z0-9]\.iam\.gserviceaccount\.com$/.test(
+      serviceAccount,
+    )
+  ) {
     throw new Error('Smoke token target не является ожидаемой smoke-only service account.');
   }
   if (
@@ -168,10 +169,7 @@ export function createSmokeTokenProvider({
   ) {
     throw new Error('GitHub OIDC token source имеет неожиданный origin.');
   }
-  requestUrl.searchParams.set(
-    'audience',
-    `https://iam.googleapis.com/${workloadIdentityProvider}`,
-  );
+  requestUrl.searchParams.set('audience', `https://iam.googleapis.com/${workloadIdentityProvider}`);
 
   let cached;
   let refreshPromise;
@@ -339,8 +337,10 @@ function readyCondition(metadata) {
 
 export function validateRevisionBinding(metadata, manifest, expectedRevision, expectations = {}) {
   if (!isRecord(metadata)) throw new Error('Cloud Run revision metadata должен быть JSON object.');
-  if (!revisionPattern.test(expectedRevision)) throw new Error('Некорректное имя staging revision.');
-  if (!imagePattern.test(manifest.immutableImage)) throw new Error('Manifest image не является exact digest.');
+  if (!revisionPattern.test(expectedRevision))
+    throw new Error('Некорректное имя staging revision.');
+  if (!imagePattern.test(manifest.immutableImage))
+    throw new Error('Manifest image не является exact digest.');
 
   const actualName = resourceName(metadata.metadata?.name ?? metadata.name);
   if (actualName !== expectedRevision) {
@@ -417,7 +417,11 @@ export function validateRevisionBinding(metadata, manifest, expectedRevision, ex
   for (const [name, [expectedSecret, expectedVersion]] of Object.entries(runtimeSecrets)) {
     const entry = environment.find((candidate) => candidate?.name === name);
     const reference = secretReference(entry);
-    if (!reference || reference.secret !== expectedSecret || !/^[1-9][0-9]*$/.test(reference.version)) {
+    if (
+      !reference ||
+      reference.secret !== expectedSecret ||
+      !/^[1-9][0-9]*$/.test(reference.version)
+    ) {
       throw new Error(`Staging revision ${name} не закреплён на ожидаемый numeric secret ref.`);
     }
     if (expectedVersion !== undefined && reference.version !== String(expectedVersion)) {
@@ -465,7 +469,7 @@ export function validateRevisionBinding(metadata, manifest, expectedRevision, ex
 
 function authenticatedHeaders(idToken, additions = {}) {
   return {
-    'X-Serverless-Authorization': `Bearer ${idToken}`,
+    ...(idToken ? { 'X-Serverless-Authorization': `Bearer ${idToken}` } : {}),
     ...additions,
   };
 }
@@ -504,9 +508,11 @@ async function fetchWithTimeout(fetchImplementation, url, init = {}) {
 }
 
 function assertProblem(result, expectedStatus, expectedCode) {
-  assert.equal(result.response.status, expectedStatus, result.body);
-  assert.equal(result.json?.status, expectedStatus);
-  assert.equal(result.json?.code, expectedCode);
+  assert.equal(result.response.status, expectedStatus, 'Hosted negative probe status mismatch.');
+  assert(
+    result.json?.status === expectedStatus && result.json?.code === expectedCode,
+    'Hosted negative probe problem contract mismatch.',
+  );
 }
 
 function localAssets(html, origin) {
@@ -517,6 +523,30 @@ function localAssets(html, origin) {
     if (url.origin === origin && /\.(?:css|js)$/.test(url.pathname)) assets.add(url.pathname);
   }
   return [...assets].sort((left, right) => left.localeCompare(right, 'en'));
+}
+
+function sessionFromResponse(result, origin) {
+  assert.equal(result.response.status, 201, 'Hosted session creation status mismatch.');
+  const [cookie, ...attributes] = (result.response.headers.get('set-cookie') ?? '')
+    .split(';')
+    .map((value) => value.trim());
+  assert(
+    cookie?.startsWith('work_card_demo=') && cookie.length > 'work_card_demo='.length,
+    'Hosted demo session did not return the expected cookie.',
+  );
+  const normalized = attributes.map((value) => value.toLowerCase());
+  const names = normalized.map((value) => value.split('=')[0]);
+  assert.equal(new Set(names).size, names.length, 'Hosted session cookie repeats attributes.');
+  assert(
+    normalized.includes('path=/') &&
+      normalized.includes('httponly') &&
+      normalized.includes('samesite=lax') &&
+      !names.includes('domain') &&
+      normalized.includes('secure') === (new globalThis.URL(origin).protocol === 'https:'),
+    'Hosted session cookie security attributes mismatch.',
+  );
+  assert.equal(typeof result.json?.csrfToken, 'string', 'Hosted session has no CSRF token.');
+  return { cookie, csrfToken: result.json.csrfToken };
 }
 
 async function createSession(fetchImplementation, origin, tokenProvider, demoUserId, requestIds) {
@@ -530,12 +560,9 @@ async function createSession(fetchImplementation, origin, tokenProvider, demoUse
       method: 'POST',
     }),
   );
-  assert.equal(result.response.status, 201, result.body);
+  const session = sessionFromResponse(result, origin);
   requestIdFrom(result.response, requestIds);
-  const cookie = result.response.headers.get('set-cookie')?.split(';')[0];
-  assert(cookie, 'Hosted demo session не вернула cookie.');
-  assert.equal(typeof result.json?.csrfToken, 'string');
-  return { cookie, csrfToken: result.json.csrfToken };
+  return session;
 }
 
 async function listBatchIds(fetchImplementation, origin, tokenProvider, cookie, requestIds) {
@@ -544,7 +571,7 @@ async function listBatchIds(fetchImplementation, origin, tokenProvider, cookie, 
       headers: authenticatedHeaders(await tokenProvider.getToken(), { Cookie: cookie }),
     }),
   );
-  assert.equal(result.response.status, 200, result.body);
+  assert.equal(result.response.status, 200, 'Hosted batch list status mismatch.');
   requestIdFrom(result.response, requestIds);
   assert(Array.isArray(result.json?.items), 'Hosted batch list не содержит items.');
   return result.json.items.map((item) => item.id).sort();
@@ -559,7 +586,7 @@ async function deleteSession(fetchImplementation, origin, tokenProvider, session
     }),
     method: 'DELETE',
   });
-  assert.equal(response.status, 204, await response.text());
+  assert.equal(response.status, 204, 'Hosted session deletion status mismatch.');
   requestIdFrom(response, requestIds);
 }
 
@@ -569,15 +596,23 @@ export async function probeHostedSurface({
   origin,
   runBrowser = true,
   tokenProvider,
+  platform = 'cloud-run',
+  browserRunner,
 }) {
   const parsedOrigin = new globalThis.URL(origin);
+  const local = platform === 'local';
   if (
-    parsedOrigin.protocol !== 'https:' ||
+    parsedOrigin.protocol !== (local ? 'http:' : 'https:') ||
     parsedOrigin.origin !== origin ||
-    !/^[a-z0-9.-]+\.run\.app$/.test(parsedOrigin.hostname)
+    !(local
+      ? ['127.0.0.1', 'localhost'].includes(parsedOrigin.hostname)
+      : platform === 'render'
+        ? /^[a-z0-9-]+\.onrender\.com$/.test(parsedOrigin.hostname)
+        : /^[a-z0-9.-]+\.run\.app$/.test(parsedOrigin.hostname))
   ) {
-    throw new Error('Hosted smoke origin должен быть canonical HTTPS *.run.app без path.');
+    throw new Error('Hosted smoke origin does not match the selected platform contract.');
   }
+  if (platform !== 'cloud-run') tokenProvider = { getToken: async () => null };
   if (!tokenProvider) {
     if (!idToken || /\s/.test(idToken)) {
       throw new Error('Hosted smoke ID token отсутствует или повреждён.');
@@ -600,10 +635,16 @@ export async function probeHostedSurface({
   const anonymous = await fetchWithTimeout(fetchImplementation, `${origin}/health/live`, {
     redirect: 'manual',
   });
-  if (![401, 403].includes(anonymous.status)) {
+  if (platform === 'cloud-run' && ![401, 403].includes(anonymous.status)) {
     throw new Error(`Private staging IAM probe получил неожиданный status ${anonymous.status}.`);
   }
-  checks.add('private-iam-denial');
+  if (platform !== 'cloud-run')
+    assert.equal(
+      anonymous.status,
+      200,
+      'Public liveness must not require platform authentication.',
+    );
+  checks.add(platform === 'cloud-run' ? 'private-iam-denial' : 'public-liveness');
 
   for (const path of ['/health/live', '/health/ready']) {
     const result = await readResponse(
@@ -611,8 +652,11 @@ export async function probeHostedSurface({
         headers: authenticatedHeaders(await tokenProvider.getToken()),
       }),
     );
-    assert.equal(result.response.status, 200, result.body);
-    assert.deepEqual(result.json, { status: 'ok' });
+    assert.equal(result.response.status, 200, `${path} status mismatch.`);
+    assert(
+      result.json?.status === 'ok' && Object.keys(result.json).length === 1,
+      'Hosted health response is not sanitized.',
+    );
     assert.match(result.response.headers.get('content-type') ?? '', /^application\/json\b/i);
     requestIdFrom(result.response, requestIds);
   }
@@ -624,10 +668,14 @@ export async function probeHostedSurface({
       headers: authenticatedHeaders(await tokenProvider.getToken()),
     }),
   );
-  assert.equal(root.response.status, 200, root.body);
+  assert.equal(root.response.status, 200, 'Hosted SPA status mismatch.');
   assert.match(root.response.headers.get('content-type') ?? '', /^text\/html\b/i);
-  assert.match(root.response.headers.get('strict-transport-security') ?? '', /max-age=/i);
-  assert.match(root.response.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/);
+  if (!local)
+    assert.match(root.response.headers.get('strict-transport-security') ?? '', /max-age=/i);
+  assert.match(
+    root.response.headers.get('content-security-policy') ?? '',
+    /frame-ancestors 'none'/,
+  );
   assert.equal(root.response.headers.get('referrer-policy'), 'no-referrer');
   assert.equal(root.response.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(
@@ -638,13 +686,19 @@ export async function probeHostedSurface({
   checks.add('tls-and-security-headers');
 
   const assets = localAssets(root.body, origin);
-  assert(assets.some((path) => path.endsWith('.js')), 'SPA root не содержит JavaScript asset.');
-  assert(assets.some((path) => path.endsWith('.css')), 'SPA root не содержит CSS asset.');
+  assert(
+    assets.some((path) => path.endsWith('.js')),
+    'SPA root не содержит JavaScript asset.',
+  );
+  assert(
+    assets.some((path) => path.endsWith('.css')),
+    'SPA root не содержит CSS asset.',
+  );
   for (const path of assets) {
     const response = await fetchWithTimeout(fetchImplementation, `${origin}${path}`, {
       headers: authenticatedHeaders(await tokenProvider.getToken()),
     });
-    assert.equal(response.status, 200, `${path}: ${await response.text()}`);
+    assert.equal(response.status, 200, 'Hosted static asset status mismatch.');
     const contentType = response.headers.get('content-type') ?? '';
     if (path.endsWith('.js')) assert.match(contentType, /^(?:text|application)\/javascript\b/i);
     if (path.endsWith('.css')) assert.match(contentType, /^text\/css\b/i);
@@ -657,7 +711,7 @@ export async function probeHostedSurface({
       headers: authenticatedHeaders(await tokenProvider.getToken()),
     }),
   );
-  assert.equal(usersResult.response.status, 200, usersResult.body);
+  assert.equal(usersResult.response.status, 200, 'Hosted demo user list status mismatch.');
   requestIdFrom(usersResult.response, requestIds);
   const users = usersResult.json?.items;
   assert(Array.isArray(users), 'Hosted demo users не содержат items.');
@@ -687,6 +741,7 @@ export async function probeHostedSurface({
     worker.id,
     requestIds,
   );
+  checks.add('session-cookie-security');
   try {
     const before = await listBatchIds(
       fetchImplementation,
@@ -702,7 +757,7 @@ export async function probeHostedSurface({
         }),
       }),
     );
-    assert.equal(passportResult.response.status, 200, passportResult.body);
+    assert.equal(passportResult.response.status, 200, 'Hosted passport list status mismatch.');
     requestIdFrom(passportResult.response, requestIds);
     const passportId = passportResult.json?.items?.[0]?.id;
     assert.equal(typeof passportId, 'string');
@@ -786,7 +841,8 @@ export async function probeHostedSurface({
   // bucket. The runner and Chromium normally share one egress IP, so reversing
   // this order would make the canonical browser fail at its first role login.
   if (runBrowser) {
-    await runCanonicalBrowser(origin, tokenProvider);
+    if (browserRunner) await browserRunner(origin);
+    else await runCanonicalBrowser(origin, tokenProvider);
     checks.add('canonical-browser-112-3-250');
     checks.add('three-first-article-gates');
     checks.add('250-of-250-closed');
@@ -817,15 +873,23 @@ export async function probeHostedSurface({
         limitedStatus = 429;
         break;
       }
-      assert.equal(result.response.status, 201, result.body);
+      currentSession = sessionFromResponse(result, origin);
       successfulSessionAttempts += 1;
-      const cookie = result.response.headers.get('set-cookie')?.split(';')[0];
-      assert(cookie && typeof result.json?.csrfToken === 'string');
-      currentSession = { cookie, csrfToken: result.json.csrfToken };
     }
-    assert.equal(limitedStatus, 429, 'Varying spoofed X-Forwarded-For bypassed session rate limit.');
-    assert(successfulSessionAttempts > 0, 'Session rate-limit probe не выполнил ни одного запроса.');
-    checks.add('cloud-run-proxy-rate-limit-key');
+    assert.equal(
+      limitedStatus,
+      429,
+      'Varying spoofed X-Forwarded-For bypassed session rate limit.',
+    );
+    assert(
+      successfulSessionAttempts > 0,
+      'Session rate-limit probe не выполнил ни одного запроса.',
+    );
+    checks.add(
+      platform === 'cloud-run'
+        ? 'cloud-run-proxy-rate-limit-key'
+        : 'spoof-resistant-session-rate-limit',
+    );
   } finally {
     if (currentSession) {
       await deleteSession(fetchImplementation, origin, tokenProvider, currentSession, requestIds);

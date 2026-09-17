@@ -17,7 +17,7 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from './app.js';
-import { resetDemoData } from './demo-maintenance.js';
+import { runOwnerOperation } from './owner-operations.js';
 import { demoPassport, demoUsers } from './demo-fixtures.js';
 import type { ReadinessService } from './readiness.js';
 
@@ -41,7 +41,7 @@ describe.skipIf(!integrationEnabled).sequential('backend vertical slice', () => 
   const runtimePool = new Pool({ connectionString: integrationDatabaseUrl });
   const ownerPool = new Pool({ connectionString: integrationOwnerDatabaseUrl });
   const readiness: ReadinessService = {
-    check: async () => ({ database: 'up', migrationVersion: 3 }),
+    check: async () => ({ database: 'up', migrationVersion: 4 }),
   };
   let app: Awaited<ReturnType<typeof buildApp>>;
   let planner: Session;
@@ -1083,9 +1083,7 @@ describe.skipIf(!integrationEnabled).sequential('backend vertical slice', () => 
 
     const resetClient = await ownerPool.connect();
     try {
-      const removed = await resetDemoData(resetClient);
-      expect(removed.productionBatches).toBe(batchCount);
-      expect(removed.demoSessions).toBeGreaterThan(0);
+      await runOwnerOperation(resetClient, 'reset');
     } finally {
       resetClient.release();
     }

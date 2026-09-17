@@ -17,6 +17,7 @@ x-application-security: &application-security
     - no-new-privileges:true
 
 x-owner-environment: &owner-environment
+  APP_ENV: test
   APP_DATABASE_USER: ${APP_DATABASE_USER:-workcard_app}
   APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:-workcard_app_local}
   MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-workcard_owner}:${POSTGRES_PASSWORD:-workcard_owner_local}@database:5432/${POSTGRES_DB:-workcard}
@@ -40,9 +41,9 @@ services:
       start_period: 10s
     stop_grace_period: 20s
 
-  migrate:
+  bootstrap:
     <<: [*application-image, *application-security]
-    command: ['node', 'dist/migrate.js']
+    command: ['node', 'dist/owner-maintenance.js', 'bootstrap']
     environment:
       <<: *owner-environment
       NODE_ENV: production
@@ -51,22 +52,11 @@ services:
         condition: service_healthy
     restart: 'no'
 
-  seed:
-    <<: [*application-image, *application-security]
-    command: ['node', 'dist/seed.js']
-    environment:
-      <<: *owner-environment
-      NODE_ENV: production
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    restart: 'no'
-
   app:
     <<: [*application-image, *application-security]
     environment:
       APP_DATABASE_USER: ${APP_DATABASE_USER:-workcard_app}
-      APP_ENV: production
+      APP_ENV: test
       APP_VERSION: ${APP_VERSION:-0.1.0}
       APP_ORIGIN: ${COMPOSE_APP_ORIGIN:-http://localhost:3000}
       DATABASE_URL: postgresql://${APP_DATABASE_USER:-workcard_app}:${APP_DATABASE_PASSWORD:-workcard_app_local}@database:5432/${POSTGRES_DB:-workcard}
@@ -82,9 +72,23 @@ services:
     ports:
       - 127.0.0.1:${PORT:-3000}:3000
     depends_on:
-      seed:
+      bootstrap:
         condition: service_completed_successfully
     stop_grace_period: 10s
+
+  readiness:
+    <<: [*application-image, *application-security]
+    profiles: ['checks']
+    command:
+      [
+        'node',
+        '-e',
+        "fetch('http://app:3000/health/ready',{signal:AbortSignal.timeout(12000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+      ]
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: 'no'
 
 volumes:
   postgres-data:

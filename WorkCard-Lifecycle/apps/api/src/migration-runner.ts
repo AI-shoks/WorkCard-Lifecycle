@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 
 import type { MigrationConfig } from './config.js';
+import { assertRuntimeRoleBoundary } from './role-boundary.js';
 
 const migrationLockKey = '7342910001';
 const migrationsDirectory = fileURLToPath(new URL('../migrations/', import.meta.url));
@@ -22,7 +23,7 @@ type MigrationLogger = {
   info(fields: Record<string, unknown>, message: string): void;
 };
 
-async function readMigrations(directory: string): Promise<Migration[]> {
+export async function readMigrations(directory = migrationsDirectory): Promise<Migration[]> {
   const names = (await readdir(directory))
     .filter((name) => migrationNamePattern.test(name))
     .sort((left, right) => left.localeCompare(right));
@@ -59,8 +60,8 @@ async function formatRoleStatement(
 ): Promise<string> {
   const template =
     operation === 'create'
-      ? 'CREATE ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOINHERIT PASSWORD %L'
-      : 'ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOINHERIT PASSWORD %L';
+      ? 'CREATE ROLE %I WITH LOGIN NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD %L'
+      : 'ALTER ROLE %I WITH PASSWORD %L';
   const result = await client.query<{ statement: string }>(
     'SELECT format($1::text, $2::text, $3::text) AS statement',
     [template, username, password],
@@ -81,8 +82,11 @@ async function ensureRuntimeRole(
     [username],
   );
   const operation = roleResult.rows[0]?.exists ? 'alter' : 'create';
+  // Existing privilege/ownership mistakes are an operator decision, never silently repaired.
+  if (operation === 'alter') await assertRuntimeRoleBoundary(client, username);
   const statement = await formatRoleStatement(client, operation, username, password);
   await client.query(statement);
+  await assertRuntimeRoleBoundary(client, username);
 
   const identifierResult = await client.query<{ identifier: string }>(
     "SELECT format('%I', $1::text) AS identifier",
@@ -100,6 +104,10 @@ async function applyRuntimeGrants(client: Client, roleIdentifier: string): Promi
   await client.query(
     `GRANT SELECT ON schema_migrations, demo_users, production_passports, operation_plans TO ${roleIdentifier}`,
   );
+  const state = await client.query("SELECT to_regclass('demo_maintenance_state') AS name");
+  if (state.rows[0]?.name) {
+    await client.query(`GRANT SELECT ON demo_maintenance_state TO ${roleIdentifier}`);
+  }
   await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON demo_sessions TO ${roleIdentifier}`);
   await client.query(
     `GRANT SELECT, INSERT, UPDATE ON production_batches, work_card_sets, work_cards, command_receipts TO ${roleIdentifier}`,
@@ -113,12 +121,13 @@ export async function runMigrations(
   config: MigrationConfig,
   directory = migrationsDirectory,
   logger?: MigrationLogger,
+  ownerClient?: Client,
 ): Promise<void> {
   const migrations = await readMigrations(directory);
-  const client = new Client({ connectionString: config.migrationDatabaseUrl });
+  const client = ownerClient ?? new Client({ connectionString: config.migrationDatabaseUrl });
   let locked = false;
 
-  await client.connect();
+  if (!ownerClient) await client.connect();
   try {
     await client.query('SELECT pg_advisory_lock($1::bigint)', [migrationLockKey]);
     locked = true;
@@ -151,6 +160,20 @@ export async function runMigrations(
       )
     ) {
       throw new Error('Нельзя добавлять миграцию перед уже применённой версией.');
+    }
+    const existingState = await client.query<{ name: string | null }>(
+      "SELECT to_regclass('demo_maintenance_state') AS name",
+    );
+    if (existingState.rows[0]?.name) {
+      const registered = await client.query<{ runtime_role_name: string | null }>(
+        'SELECT runtime_role_name FROM demo_maintenance_state WHERE singleton',
+      );
+      if (
+        registered.rows[0]?.runtime_role_name &&
+        registered.rows[0].runtime_role_name !== config.appDatabaseUser
+      ) {
+        throw new Error('Runtime-роль maintenance state не соответствует конфигурации.');
+      }
     }
     const roleIdentifier = await ensureRuntimeRole(
       client,
@@ -207,6 +230,22 @@ export async function runMigrations(
     await client.query('BEGIN');
     try {
       await applyRuntimeGrants(client, roleIdentifier);
+      const state = await client.query("SELECT to_regclass('demo_maintenance_state') AS name");
+      if (state.rows[0]?.name) {
+        const registered = await client.query<{ runtime_role_name: string | null }>(
+          'SELECT runtime_role_name FROM demo_maintenance_state WHERE singleton',
+        );
+        if (
+          registered.rows[0]?.runtime_role_name &&
+          registered.rows[0].runtime_role_name !== config.appDatabaseUser
+        ) {
+          throw new Error('Runtime-роль maintenance state не соответствует конфигурации.');
+        }
+        await client.query(
+          'UPDATE demo_maintenance_state SET runtime_role_name = $1 WHERE singleton',
+          [config.appDatabaseUser],
+        );
+      }
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -214,6 +253,6 @@ export async function runMigrations(
     }
   } finally {
     if (locked) await client.query('SELECT pg_advisory_unlock($1::bigint)', [migrationLockKey]);
-    await client.end();
+    if (!ownerClient) await client.end();
   }
 }

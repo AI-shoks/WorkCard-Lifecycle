@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import type { Client } from 'pg';
 
+import { runtimeBarrierKey } from './database-gate.js';
 import { demoOperations, demoPassport, demoUsers } from './demo-fixtures.js';
 
 export const defaultDemoCapacity = Object.freeze({
@@ -88,7 +89,11 @@ async function verifyReferenceFixtures(client: QueryClient): Promise<void> {
 export async function resetDemoData(client: QueryClient): Promise<DemoDataCounts> {
   await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
   try {
-    await client.query('SELECT pg_advisory_xact_lock($1::bigint)', [demoMaintenanceLockKey]);
+    await client.query('SELECT pg_advisory_xact_lock($1::bigint)', [runtimeBarrierKey]);
+    const state = await client.query<{ maintenance: boolean }>(
+      'SELECT maintenance FROM demo_maintenance_state WHERE singleton',
+    );
+    assert.equal(state.rows[0]?.maintenance, true, 'Reset требует закрытого persistent gate.');
     const before = await readDemoDataCounts(client);
     await client.query(`
       TRUNCATE TABLE

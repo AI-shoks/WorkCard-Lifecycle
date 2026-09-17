@@ -1,9 +1,9 @@
 services:
   app:
     image: ${QUALITY_PROJECT:?Set a unique QUALITY_PROJECT}-app:local
-  migrate:
+  bootstrap:
     image: ${QUALITY_PROJECT:?Set a unique QUALITY_PROJECT}-app:local
-  seed:
+  readiness:
     image: ${QUALITY_PROJECT:?Set a unique QUALITY_PROJECT}-app:local
 
 volumes:

@@ -10,6 +10,7 @@ import { createDatabaseReadiness } from './readiness.js';
 import {
   createProcessLogger,
   databaseBudgets,
+  handleIdlePoolErrors,
   proxyTrustPolicy,
   safeLogger,
 } from './runtime-protection.js';
@@ -22,8 +23,10 @@ async function main(): Promise<void> {
     connectionString: config.databaseUrl,
     ...databaseBudgets,
   });
+  handleIdlePoolErrors(pool, processLogger);
   const app = await buildApp({
     appVersion: config.appVersion,
+    observationOnly: config.proxyTrustMode === 'observe',
     demoCapacity: {
       maximumBatches: config.maximumDemoBatches,
       maximumSessions: config.maximumDemoSessions,
@@ -40,7 +43,7 @@ async function main(): Promise<void> {
       cookieSecure: config.cookieSecure,
       signingSecret: config.sessionSigningSecret,
     },
-    trustProxy: proxyTrustPolicy(config.proxyTrustMode),
+    trustProxy: proxyTrustPolicy(config.proxyTrustMode, config.proxyTrustedCidrs),
     ...(config.webDistPath ? { webDistPath: resolve(config.webDistPath) } : {}),
   });
 

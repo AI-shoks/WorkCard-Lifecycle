@@ -24,21 +24,15 @@ import type { Pool } from 'pg';
 
 import { registerApiRoutes } from './api-routes.js';
 import { DomainError } from './domain-error.js';
+import { currentMigrationVersion as expectedMigrationVersion } from './database-gate.js';
 import { defaultDemoCapacity } from './demo-maintenance.js';
 import type { ReadinessService } from './readiness.js';
 import { registerRateLimits } from './runtime-protection.js';
 import type { SessionManagerOptions } from './session-manager.js';
 
-const expectedMigrationVersion = 3;
-const cloudTraceContextPattern = /^([0-9a-f]{32})(?:\/[0-9]+)?(?:;o=[01])?$/;
-
-function cloudTraceId(header: string | string[] | undefined): string | undefined {
-  const value = Array.isArray(header) ? header[0] : header;
-  return value?.match(cloudTraceContextPattern)?.[1];
-}
-
 export type BuildAppOptions = {
   appVersion: string;
+  observationOnly?: boolean;
   demoCapacity?: {
     maximumBatches: number;
     maximumSessions: number;
@@ -104,18 +98,30 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
     );
     reply.header('X-Request-Id', request.id);
+    if (options.observationOnly) {
+      const path = request.url.split('?')[0] ?? '';
+      if (path === '/health/ready') return reply.code(503).send({ status: 'unavailable' });
+      if (path === '/api' || path.startsWith('/api/')) {
+        throw new DomainError({
+          code: 'DEMO_MAINTENANCE',
+          status: 503,
+          title: 'Выполняется обслуживание',
+          detail: 'Демонстрационный контур временно недоступен. Повторите попытку позднее.',
+        });
+      }
+    }
   });
 
   app.addHook('onResponse', async (request, reply) => {
-    const traceId = cloudTraceId(request.headers['x-cloud-trace-context']);
     const fields = {
       durationMs: reply.elapsedTime,
       method: request.method,
       remoteIp: request.ip,
+      remoteAddress: request.socket.remoteAddress,
+      protocol: request.protocol,
       requestId: request.id,
       routeTemplate: request.routeOptions.url ?? '[unmatched]',
       status: reply.statusCode,
-      ...(traceId ? { traceId } : {}),
     };
     if (reply.statusCode >= 500) {
       request.log.error(fields, 'request completed');

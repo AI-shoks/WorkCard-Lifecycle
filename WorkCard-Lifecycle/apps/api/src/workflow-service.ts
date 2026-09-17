@@ -35,6 +35,13 @@ import type {
 import type { Pool, PoolClient } from 'pg';
 
 import {
+  acquireRuntimeAdmission,
+  assertCurrentSession,
+  createRuntimeReader,
+  type SqlClient,
+} from './database-gate.js';
+
+import {
   DomainError,
   demoCapacityReached,
   gateClosed,
@@ -47,7 +54,7 @@ import { defaultDemoCapacity, demoMaintenanceLockKey } from './demo-maintenance.
 import { decodeCursor, encodeCursor, pageLimit, type PageInput } from './pagination.js';
 import type { ActorContext } from './session-manager.js';
 
-type Queryable = Pick<Pool, 'query'> | Pick<PoolClient, 'query'>;
+type Queryable = SqlClient;
 
 type CommandExecution<T> = {
   body: T;
@@ -385,11 +392,14 @@ async function executeCommand<T>(
   ) => Promise<CommandOutcome<T>>,
 ): Promise<CommandExecution<T>> {
   const client = await pool.connect();
+  let discard = false;
   const requestFingerprint = fingerprint(options.request);
   const correlationId = randomUUID();
   const occurredAt = new Date().toISOString();
   try {
-    await client.query('BEGIN');
+    await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+    const admission = await acquireRuntimeAdmission(client);
+    await assertCurrentSession(client, options.actor, admission);
     const inserted = await client.query(
       `INSERT INTO command_receipts(
          command_id, command_type, actor_id, actor_role, request_fingerprint,
@@ -455,10 +465,11 @@ async function executeCommand<T>(
       await client.query('ROLLBACK');
     } catch {
       // The original error remains authoritative.
+      discard = true;
     }
     throw error;
   } finally {
-    client.release();
+    client.release(discard);
   }
 }
 
@@ -466,9 +477,10 @@ export function createWorkflowService(
   pool: Pool,
   maximumBatches: number = defaultDemoCapacity.maximumBatches,
 ) {
+  const reads = createRuntimeReader(pool);
   return {
     async listPassports(): Promise<ProductionPassportSummary[]> {
-      const result = await pool.query<{
+      const result = await reads.query<{
         code: string;
         id: string;
         operation_count: number;
@@ -496,7 +508,7 @@ export function createWorkflowService(
     },
 
     async getPassport(passportId: string): Promise<ProductionPassportDetail> {
-      const passportResult = await pool.query<{
+      const passportResult = await reads.query<{
         code: string;
         id: string;
         product_name: string;
@@ -508,7 +520,7 @@ export function createWorkflowService(
       );
       const passport = passportResult.rows[0];
       if (!passport) throw resourceNotFound();
-      const operationsResult = await pool.query<{
+      const operationsResult = await reads.query<{
         id: string;
         norm_hours: string;
         operation_name: string;
@@ -1726,7 +1738,7 @@ export function createWorkflowService(
       }
       values.push(limit + 1);
       const limitParameter = `$${values.length}`;
-      const result = await pool.query<
+      const result = await reads.query<
         BatchRow & {
           actual_card_count: number;
           closed_card_count: number;
@@ -1791,7 +1803,7 @@ export function createWorkflowService(
     },
 
     async getBatch(actor: ActorContext, batchId: string): Promise<ProductionBatchDetail> {
-      const batchResult = await pool.query<
+      const batchResult = await reads.query<
         BatchRow & {
           actual_card_count: number;
           closed_card_count: number;
@@ -1828,7 +1840,7 @@ export function createWorkflowService(
       );
       const batch = batchResult.rows[0];
       if (!batch) throw resourceNotFound();
-      const operationPlanResult = await pool.query<{
+      const operationPlanResult = await reads.query<{
         id: string;
         norm_hours: string;
         planned_card_count: number;
@@ -1853,7 +1865,7 @@ export function createWorkflowService(
       if (operationPlan.length === 0) {
         throw new Error('Снимок плана операций партии не найден.');
       }
-      const setsResult = await pool.query<
+      const setsResult = await reads.query<
         SetRow & { actual_card_count: number; closed_card_count: number }
       >(
         `SELECT card_set.id, card_set.batch_id, card_set.scope_code_snapshot,
@@ -1882,7 +1894,7 @@ export function createWorkflowService(
       }));
       let finalAcceptance: FinalBatchAcceptance | null = null;
       if (batch.final_acceptance_id) {
-        const acceptanceResult = await pool.query<{
+        const acceptanceResult = await reads.query<{
           accepted_at: Date | string;
           batch_id: string;
           command_id: string;
@@ -1957,7 +1969,7 @@ export function createWorkflowService(
     },
 
     async getWorkCardSet(actor: ActorContext, setId: string): Promise<WorkCardSetDetail> {
-      const setResult = await pool.query<SetRow & { actual_card_count: number }>(
+      const setResult = await reads.query<SetRow & { actual_card_count: number }>(
         `SELECT card_set.id, card_set.batch_id, card_set.scope_code_snapshot,
                 card_set.scope_name_snapshot, card_set.norm_hours_snapshot::text,
                 card_set.planned_card_count, card_set.gate_status,
@@ -1971,7 +1983,7 @@ export function createWorkflowService(
       );
       const cardSet = setResult.rows[0];
       if (!cardSet) throw resourceNotFound();
-      const statusResult = await pool.query<{ count: number; status: WorkCardStatus }>(
+      const statusResult = await reads.query<{ count: number; status: WorkCardStatus }>(
         `SELECT status, COUNT(*)::integer AS count
          FROM work_cards WHERE work_card_set_id = $1 GROUP BY status`,
         [setId],
@@ -1990,7 +2002,7 @@ export function createWorkflowService(
         assignmentValues.push(actor.id);
         assignmentVisibility = 'AND card.assignee_id = $2';
       }
-      const assignmentResult = await pool.query<{
+      const assignmentResult = await reads.query<{
         assignee_id: string;
         count: number;
         display_name: string;
@@ -2041,7 +2053,7 @@ export function createWorkflowService(
       setId: string,
       input: PageInput & { assigneeId?: string; status?: WorkCardStatus },
     ): Promise<{ items: WorkCard[]; nextCursor: string | null }> {
-      const setExists = await pool.query('SELECT 1 FROM work_card_sets WHERE id = $1', [setId]);
+      const setExists = await reads.query('SELECT 1 FROM work_card_sets WHERE id = $1', [setId]);
       if (setExists.rowCount === 0) throw resourceNotFound();
       if (actor.role === 'WORKER' && input.assigneeId && input.assigneeId !== actor.id) {
         throw resourceNotFound();
@@ -2064,7 +2076,7 @@ export function createWorkflowService(
         clauses.push(`card.assignee_id = $${values.length}::uuid`);
       }
       values.push(limit + 1);
-      const result = await pool.query<CardRow>(
+      const result = await reads.query<CardRow>(
         `SELECT card.id, card.work_card_set_id, card.batch_id,
                 card.batch_quantity_snapshot, card.scope_code_snapshot,
                 card.scope_name_snapshot, card.norm_hours_snapshot::text,
@@ -2089,7 +2101,7 @@ export function createWorkflowService(
     },
 
     async getWorkCard(actor: ActorContext, workCardId: string): Promise<WorkCard> {
-      const card = await loadCard(pool, workCardId);
+      const card = await loadCard(reads, workCardId);
       if (!card || (actor.role === 'WORKER' && card.assignee_id !== actor.id)) {
         throw resourceNotFound();
       }
@@ -2103,7 +2115,7 @@ export function createWorkflowService(
       events: AuditEvent[];
       nextCursor: string | null;
     }> {
-      const exists = await pool.query('SELECT 1 FROM work_cards WHERE id = $1', [workCardId]);
+      const exists = await reads.query('SELECT 1 FROM work_cards WHERE id = $1', [workCardId]);
       if (exists.rowCount === 0) throw resourceNotFound();
       const limit = pageLimit(input);
       const cursor = decodeCursor(input.cursor);
@@ -2123,7 +2135,7 @@ export function createWorkflowService(
         cursorSql = `AND (aggregate_version, id) > ($2::integer, $3::uuid)`;
       }
       values.push(limit + 1);
-      const result = await pool.query<AuditRow>(
+      const result = await reads.query<AuditRow>(
         `SELECT id, event_type, aggregate_type, aggregate_id, aggregate_version,
                 occurred_at, actor_id, actor_role, command_id, correlation_id, payload
          FROM audit_events
@@ -2155,7 +2167,7 @@ export function createWorkflowService(
       nextCursor: string | null;
       totalEventCount: number;
     }> {
-      const receiptResult = await pool.query<{
+      const receiptResult = await reads.query<{
         command_id: string;
         command_type: CommandName;
         event_count: number;
@@ -2167,7 +2179,7 @@ export function createWorkflowService(
       );
       const receipt = receiptResult.rows[0];
       if (!receipt) throw resourceNotFound();
-      const totalResult = await pool.query<{ count: number }>(
+      const totalResult = await reads.query<{ count: number }>(
         'SELECT COUNT(*)::integer AS count FROM audit_events WHERE correlation_id = $1',
         [correlationId],
       );
@@ -2197,7 +2209,7 @@ export function createWorkflowService(
         cursorSql = `AND (occurred_at, id) > ($2::timestamptz, $3::uuid)`;
       }
       values.push(limit + 1);
-      const eventsResult = await pool.query<AuditRow>(
+      const eventsResult = await reads.query<AuditRow>(
         `SELECT id, event_type, aggregate_type, aggregate_id, aggregate_version,
                 occurred_at, actor_id, actor_role, command_id, correlation_id, payload
          FROM audit_events
@@ -2223,7 +2235,7 @@ export function createWorkflowService(
     },
 
     async getPayrollRecord(workCardId: string): Promise<PayrollRecord> {
-      const record = await loadPayrollRecord(pool, workCardId);
+      const record = await loadPayrollRecord(reads, workCardId);
       if (!record) throw resourceNotFound();
       return toPayrollRecord(record);
     },

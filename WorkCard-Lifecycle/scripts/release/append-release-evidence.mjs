@@ -131,8 +131,11 @@ if (
 }
 
 const record = {
-  $schema: '../../release-evidence.schema.json',
-  schemaVersion: 1,
+  $schema:
+    manifestFile.value.schemaVersion === 2
+      ? '../../release-evidence.v2.schema.json'
+      : '../../release-evidence.schema.json',
+  schemaVersion: manifestFile.value.schemaVersion,
   sequence: existingRecords.length + 1,
   recordedAt: candidate.recordedAt,
   sourceSha: candidate.sourceSha,
