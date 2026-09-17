@@ -136,6 +136,7 @@ jobs:
             -e DATABASE_URL -e SESSION_SIGNING_SECRET -e NEON_DATABASE_HOST -e NEON_DATABASE_NAME "$IMAGE"
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:3000/health/ready > /dev/null; then exit 0; fi
+            printf 'Waiting for staging readiness (%s/60).\n' "$attempt"
             sleep 2
           done
           exit 1

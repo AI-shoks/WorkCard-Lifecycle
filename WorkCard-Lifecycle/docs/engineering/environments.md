@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.environments
 status: accepted
-version: 11
+version: 12
 owner: engineering
 updated: 2026-09-17
 ---
@@ -77,7 +77,7 @@ Direct endpoint необходим из-за session advisory locks и startup t
 
 GitHub Environments разделены: `staging-owner`, `staging-runtime`, `production-owner`, `production`; последний обслуживает Render adapter. Owner secrets передаются только соответствующим owner steps/containers; наследовать их browser process запрещено. Runtime и browser не должны работать на self-hosted shared runner с сохранёнными owner credentials.
 
-Фактическое состояние на 2026-09-17: через `gh` в точном repository `AI-shoks/WorkCard-Lifecycle` созданы все четыре environment; у каждого custom deployment branch policy допускает только branch `main`. Secrets пока не установлены. Новый Render service и Neon projects для этого демо ещё не созданы; наличие environment не доказывает подключение к БД или runtime/owner binding.
+Фактическое состояние на 2026-09-17: через `gh` в точном repository `AI-shoks/WorkCard-Lifecycle` созданы все четыре environment; у каждого custom deployment branch policy допускает только branch `main`. В `staging-owner` и `production-owner` установлены разные `APP_DATABASE_PASSWORD`, в `staging-runtime` — отдельный `SESSION_SIGNING_SECRET`; значения сгенерированы CSPRNG и не выводились. Локальная резервная копия зашифрована Windows DPAPI вне Git и OneDrive. Настроены несекретные `APP_DATABASE_USER`, production `RENDER_OWNER_ID` и `CONFIGURATION_REVISION`. DB URLs и постоянный Render API key пока отсутствуют. Новый Render service и Neon projects для этого демо ещё не созданы; наличие environment не доказывает подключение к БД или runtime/owner binding.
 
 GitHub/Render не предоставляют числовое неизменяемое secret-version binding прежнего Secret Manager. У оператора есть отдельные rotation identifiers; evidence записывает только эти имена/идентификаторы, время и binding checks, без payload. Rotation DB/session credentials выполняется отдельным разрешённым действием; session-secret rotation инвалидирует demo sessions. Rollback приложения не восстанавливает прежние secret values автоматически.
 

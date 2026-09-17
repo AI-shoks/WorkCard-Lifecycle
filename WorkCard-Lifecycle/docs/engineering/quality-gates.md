@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 20
+version: 21
 owner: engineering
 updated: 2026-09-17
 ---
@@ -33,11 +33,15 @@ pnpm check
 
 Фактический Git root — родительский каталог `WorkCard-Lifecycle`, remote — `AI-shoks/WorkCard-Lifecycle`; подготовка ведётся в `codex/render-neon-first-deployment`. Посторонние `Codex Workflow/`, соседние portfolio artifacts и ранее подготовленные Terraform HCL/scripts/backend templates сохраняются вне scoped commit.
 
-- GitHub: доступ к публичному repository подтверждён; созданы `staging-owner`, `staging-runtime`, `production-owner`, `production` с deployment branch policy только для `main`. Секреты ещё не установлены.
+- GitHub: доступ к публичному repository подтверждён; созданы `staging-owner`, `staging-runtime`, `production-owner`, `production` с deployment branch policy только для `main`. Разные runtime-role passwords установлены только в owner environments, staging session secret — только в `staging-runtime`; остальные bindings ожидают созданных targets, см. [[environments]].
 - Render: `My Workspace` (`tea-d8q4f1cvikkc73al6vq0`), Hobby, `No card on file`, начисления/прогноз `$0`, использование `0.75/750` instance hours и `0/5 GB` bandwidth подтверждены в Billing. Квоты общие с существующими сторонними services; они не изменялись. WorkCard service ещё не создан.
 - Docker Desktop восстановлен обратимым сохранением служебных socket directories и остановкой только `docker-desktop`; factory reset, удаление WSL disk/контейнеров/volumes не выполнялись. Engine `29.7.2`, `linux/amd64` отвечает; перед новым container gate сохранён inventory существующих ресурсов.
-- Повторные локальные lint/typecheck и API `69` tests прошли. Frontend: `140` tests прошли, worker для `interactive-screens.test.tsx` дважды не стартовал в ограниченной оболочке; повтор с одним worker не устранил startup timeout. Assertions/timeouts не менялись, полный frontend gate не объявляется успешным. На host во время WSL startup оставалось менее `200 MiB` свободной RAM; полная проверка кандидата остаётся обязательной в CI.
+- Повторные локальные lint/typecheck и API `69` tests прошли. Frontend: `140` tests прошли, worker для `interactive-screens.test.tsx` дважды не стартовал в ограниченной оболочке; повтор с одним worker не устранил startup timeout. После cleanup и восстановления свободной RAM до `1.01 GiB` один прямой запуск pinned Node/Vitest вне ограниченной оболочки прошёл `18/18` оставшихся tests за `9.41 s`; все `158` frontend tests покрыты раздельными локальными прогонами. Assertions/timeouts не менялись. Последующий production build PASS. Полный удалённый code/database CI gate также прошёл на `18ecf1783ee72863ec38e1b83e24ebf5d7125b92`.
 - Release review: `85/85` release и `2/2` Render tests PASS на Node `24.20.0`; contract checker, actionlint `1.7.12` всех пяти workflows, focused ESLint/Prettier и diff check PASS. Исправлены environment origin для browser, containerd config digest, запрет registry credentials и безопасные cookie/error checks. Clean container build/startup, repeat bootstrap/verify, отдельная readiness и HTTP/assets прошли; runtime UID `65532:65532`, read-only root, `cap_drop=ALL`, `no-new-privileges` и отсутствие owner credentials подтверждены. Trivy `0.74.0` с новой CVE DB: `14` OS и `100` Node packages, `0 HIGH/CRITICAL`. Проверен actual config digest `sha256:28c30dc584a44f20c6993b8b354679ca80fc770677f72eda9125eb26ec49158e`; это локальный QA image, не опубликованный release. Полный formatter exact scoped index PASS; hosted qualification ожидает prerequisites. Публичные URL/digest/release record ещё отсутствуют; rollback не проверен.
+
+Текущий clean-container профиль также повторно подтвердил PostgreSQL integration `6/6` с non-superuser owner, quality `31/31`, Gitleaks `8.30.1` (история и current source) `0` findings. После удаления только собственных QA containers/network/нового volume исходные `4` containers, `2` volumes и `8` images совпали с inventory; `101` build-source hashes не изменились. Локальные logs/repro scripts/image tar сохранены в ignored `.quality-results/render-neon-20260917-container/`; exact commit snapshot отдельно прошёл Gitleaks `0` findings и strict docs audit `59/0/0`.
+
+Создан [PR #3](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/3). Первый [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35208854588) завершился: code/database, security, clean container/Trivy, compact browser, canonical browser и performance прошли; release contract выявил Linux ShellCheck `SC2034` в счётчике ожидания staging readiness. Добавлена диагностика номера попытки без изменения readiness/assertions/deadline. До полного успешного CI нового SHA merge и публикация запрещены. GitHub Releases пока отсутствуют, поэтому предыдущий совместимый release image для реального rollback не установлен.
 
 ## Render Free / Neon Free — предшествующий локальный переход 2026-09-17
 
