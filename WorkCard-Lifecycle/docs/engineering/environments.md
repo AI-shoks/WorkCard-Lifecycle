@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.environments
 status: accepted
-version: 12
+version: 13
 owner: engineering
 updated: 2026-09-17
 ---
@@ -77,7 +77,13 @@ Direct endpoint необходим из-за session advisory locks и startup t
 
 GitHub Environments разделены: `staging-owner`, `staging-runtime`, `production-owner`, `production`; последний обслуживает Render adapter. Owner secrets передаются только соответствующим owner steps/containers; наследовать их browser process запрещено. Runtime и browser не должны работать на self-hosted shared runner с сохранёнными owner credentials.
 
-Фактическое состояние на 2026-09-17: через `gh` в точном repository `AI-shoks/WorkCard-Lifecycle` созданы все четыре environment; у каждого custom deployment branch policy допускает только branch `main`. В `staging-owner` и `production-owner` установлены разные `APP_DATABASE_PASSWORD`, в `staging-runtime` — отдельный `SESSION_SIGNING_SECRET`; значения сгенерированы CSPRNG и не выводились. Локальная резервная копия зашифрована Windows DPAPI вне Git и OneDrive. Настроены несекретные `APP_DATABASE_USER`, production `RENDER_OWNER_ID` и `CONFIGURATION_REVISION`. DB URLs и постоянный Render API key пока отсутствуют. Новый Render service и Neon projects для этого демо ещё не созданы; наличие environment не доказывает подключение к БД или runtime/owner binding.
+Фактическое состояние на 2026-09-17: через `gh` в точном repository `AI-shoks/WorkCard-Lifecycle` созданы все четыре environment; у каждого custom deployment branch policy допускает только branch `main`. В `staging-owner` и `production-owner` установлены разные `APP_DATABASE_PASSWORD`, в `staging-runtime` — отдельный `SESSION_SIGNING_SECRET`; значения сгенерированы CSPRNG и не выводились. Локальная резервная копия зашифрована Windows DPAPI вне Git и OneDrive. Настроены несекретные `APP_DATABASE_USER` и `CONFIGURATION_REVISION`.
+
+После выбора пользователем отдельного Render аккаунта UI подтвердил account `usr-dalsn92d0e5s738gnrbg` и workspace `tea-dalsn92d0e5s738gnr60`. В GitHub environment `production` установлен новый `RENDER_OWNER_ID=tea-dalsn92d0e5s738gnr60`; `RenderOwnerId` локального DPAPI bundle обновлён на тот же ID с сохранением repository binding и четырёх исходных `SecureString`. Вход нового аккаунта — email/password; при первичном UI preflight 2FA была выключена, Git credentials и API keys отсутствовали. Billing: Hobby, без payment method, pending charges и invoices; использование `0/750` instance hours, `0/5 GB` bandwidth и `0/500` pipeline minutes. Workspace пуст, services отсутствуют. Прежний workspace остаётся только историческим target и не используется для deployment.
+
+После UI preflight в новом аккаунте создан постоянный key `workcard-lifecycle-production-deploy`. Он сохранён отдельным `SecureString` в том же DPAPI bundle; ACL допускает только текущего Windows пользователя, `SYSTEM` и `Administrators`, наследование отключено. Значение передано точными байтами stdin в GitHub environment `production`, secret `RENDER_API_KEY`, без вывода и без secret в аргументах команды; список secret metadata подтвердил обновление 2026-09-17 в 13:06 UTC. Официальный Render API подтвердил binding: `GET /users` вернул ожидаемый account, `/owners` — ровно один ожидаемый workspace, запрос `/services` для exact owner — пустой список. Ключ остаётся только в deployment/log-verification boundary.
+
+DB URLs и bindings `RENDER_SERVICE_ID`/`RENDER_ORIGIN` ещё не подтверждены. Новый Render service и Neon projects для этого демо ещё не созданы; наличие environment, API key и owner binding не доказывает подключение к БД или runtime/owner binding. Перед первой promotion нужен reviewed `CONFIGURATION_REVISION` для фактической конфигурации нового service; proxy allowlist определяется заново через observe.
 
 GitHub/Render не предоставляют числовое неизменяемое secret-version binding прежнего Secret Manager. У оператора есть отдельные rotation identifiers; evidence записывает только эти имена/идентификаторы, время и binding checks, без payload. Rotation DB/session credentials выполняется отдельным разрешённым действием; session-secret rotation инвалидирует demo sessions. Rollback приложения не восстанавливает прежние secret values автоматически.
 
@@ -93,4 +99,4 @@ Pino пишет однострочный JSON с безопасными service/
 
 ## Граница проверки
 
-Владелец разрешил настройку environments/secrets и создание одного Render Free service и двух Neon Free projects в рамках первого deployment. Read-only preflight GitHub и выбранного Render workspace начат; подтверждённые billing facts и границы ресурсов записаны в [[deployment]]. Создание demo targets, реальные DB operations, публикация image и hosted qualification ещё требуют фактических records. Фактический Neon Free plan и общий $0-профиль эксплуатации ещё не подтверждены. Разрешение не распространяется на посторонние БД/resources или платные опции; обычный CI сохраняет только disposable PostgreSQL. Доказанные проверки и конкретные ограничения — [[quality-gates]]; hosted checklist — [[deployment]].
+Владелец разрешил настройку environments/secrets и создание одного Render Free service и двух Neon Free projects в рамках первого deployment. Read-only preflight GitHub и отдельного Render аккаунта подтверждён; billing facts и точные границы ресурсов записаны в [[deployment]]. Один public image и постоянный release record опубликованы для SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7`; смена Render аккаунта не требует повторной сборки. Создание demo targets, реальные DB operations и hosted qualification ещё требуют фактических records. Фактический Neon Free plan и общий $0-профиль эксплуатации ещё не подтверждены. Разрешение не распространяется на посторонние БД/resources или платные опции; обычный CI сохраняет только disposable PostgreSQL. Доказанные проверки и конкретные ограничения — [[quality-gates]]; hosted checklist — [[deployment]].

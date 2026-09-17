@@ -1,7 +1,7 @@
 ---
 artifact_id: project.plan
 status: active
-version: 28
+version: 29
 owner: project
 updated: 2026-09-17
 ---
@@ -19,7 +19,7 @@ updated: 2026-09-17
 
 ## Прогресс
 
-**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]; read-only preflight начат. Локальная реализация не заменяет ещё не завершённые hosted qualification и release evidence.**
+**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]. Один image и постоянный release record опубликованы; отдельный Render аккаунт с пустым Hobby workspace без payment method проверен, owner binding и защищённый API key настроены. Neon, создание сервиса и hosted qualification ещё не подтверждены.**
 
 | № | Этап | Статус | Результат |
 |---:|---|---|---|
@@ -93,7 +93,7 @@ updated: 2026-09-17
 
 **Этап 9 закрыт, 2026-09-05:** implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` — все 6/6 в каждом запуске. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review также пройдены; результаты этапа 9 и ссылки на каждую job сохранены отдельно от этапов 7–8 в [[quality-gates]]. Воспроизводимые проверки описаны в [[test-strategy]].
 
-**Этап 10 «Релиз»: `[-]` в работе, 4/7.** Текущий контракт — [[0009-render-free-neon-free-release|ADR-0009]] и [[deployment]]: Render Free, public GHCR, отдельные Neon Free targets, DB maintenance barrier и owner orchestration. Исторические GCP/foundation/backend изменения сохранены в [[deployment-gcp-history]], незакоммиченные Terraform HCL/scripts/templates остаются вне текущей публикации. Владелец разрешил scoped Git/cloud/DB действия для первого deployment после обязательных gates. Read-only preflight аккаунтов начат; создание ресурсов, реальные TLS/proxy/digest/cold start, deployment и recovery ещё должны получить hosted evidence.
+**Этап 10 «Релиз»: `[-]` в работе, 4/7.** Текущий контракт — [[0009-render-free-neon-free-release|ADR-0009]] и [[deployment]]: Render Free, public GHCR, отдельные Neon Free targets, DB maintenance barrier и owner orchestration. Исторические GCP/foundation/backend изменения сохранены в [[deployment-gcp-history]], незакоммиченные Terraform HCL/scripts/templates остаются вне текущей публикации. Владелец разрешил scoped Git/cloud/DB действия для первого deployment после обязательных gates. По его выбору вместо прежнего общего Render workspace проверен отдельный account `usr-dalsn92d0e5s738gnrbg` / workspace `tea-dalsn92d0e5s738gnr60`: Hobby, пустой, без payment method, pending charges и invoices; GitHub production и DPAPI bundle привязаны к новому owner. Постоянный Render API key создан в новом аккаунте, защищён DPAPI/ACL и передан в GitHub `production.RENDER_API_KEY`; официальные API reads подтвердили exact account, единственный owner и отсутствие services. Neon prerequisites, создание ресурсов, реальные TLS/proxy/digest/cold start, deployment и recovery ещё должны получить hosted evidence. Опубликованный SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` и его digest сохраняются без повторной сборки.
 
 - **Frontend vertical slice — выполнено:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
 - **Качество — выполнено:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
