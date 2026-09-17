@@ -1,7 +1,7 @@
 ---
 artifact_id: release.deployment
 status: accepted
-version: 12
+version: 13
 owner: release
 updated: 2026-09-17
 ---
@@ -108,4 +108,6 @@ node dist/owner-maintenance.js release
 5. Выполнить staging initial bootstrap + verify и exact-digest browser/security qualification; production сначала проходит closed-gate observe, затем initial bootstrap + verify и production promotion. Выполнить compatible rollback drill при наличии предыдущего совместимого image; без такого образа не заявлять rollback проверенным. Проверить maintenance races/cancellation, cold start, role/TLS/logging и clean recovery на hosted targets.
 6. Назначить владельца daily/manual reset, quota checks, secret rotation и retention; убедиться в 26h fail-closed. Только фактическое evidence закрывает этап 10.
 
-Read-only preflight 2026-09-17 подтвердил публичный repository `AI-shoks/WorkCard-Lifecycle` и рабочий GitHub login. В Render workspace `tea-d8q4f1cvikkc73al6vq0` UI Billing показал Hobby, отсутствие payment method, начисление и прогноз $0, использование 0.75/750 Free instance hours и 0/5 GB bandwidth. Это снимок общей квоты workspace, где уже есть посторонние services: они не входят в задачу и не изменяются. Neon Free organization/targets, новые ресурсы, publication, реальные DB operations и hosted qualification ещё должны получить отдельное фактическое evidence; read-only preflight их не подтверждает. По репозиторию GCP deployment не выполнялся; отсутствие GCP ресурсов в аккаунте не утверждается, их удаление не планируется. Текущие результаты и оставшиеся проверки — [[quality-gates]].
+Preflight 2026-09-17 подтвердил публичный repository `AI-shoks/WorkCard-Lifecycle` и рабочий GitHub login. В Render workspace `tea-d8q4f1cvikkc73al6vq0` UI Billing показал Hobby, отсутствие payment method, начисление и прогноз $0, использование 0.75/750 Free instance hours и 0/5 GB bandwidth. Это снимок общей квоты workspace, где уже есть посторонние services: они не входят в задачу и не изменяются. После scoped PR/merge и полного CI main SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` image опубликован один раз: [release record](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7), exact digest `sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057`. Anonymous pull и опубликованный scan прошли; resume не потребовался. При следующем manual deploy явно выбирать этот `release_sha`, не собирать повторно.
+
+Neon Free organization/targets, новые ресурсы, реальные DB operations и hosted qualification ещё не подтверждены: Neon login и постоянный Render API key ожидают конкретных ответов оператора. Публичный URL приложения пока отсутствует. Предыдущего совместимого опубликованного image нет, rollback не проверен. По репозиторию GCP deployment не выполнялся; отсутствие GCP ресурсов в аккаунте не утверждается, их удаление не планируется. Полные фактические результаты и оставшиеся проверки — [[quality-gates]].

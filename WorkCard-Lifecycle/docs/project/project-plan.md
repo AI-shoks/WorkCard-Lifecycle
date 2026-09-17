@@ -1,7 +1,7 @@
 ---
 artifact_id: project.plan
 status: active
-version: 27
+version: 28
 owner: project
 updated: 2026-09-17
 ---
@@ -97,7 +97,7 @@ updated: 2026-09-17
 
 - **Frontend vertical slice — выполнено:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
 - **Качество — выполнено:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
-- **Релиз — в работе, 4/7:** Render/Neon design/config, GHCR workflows и runtime/owner controls реализуются локально; публикация, provisioning, staging/production qualification и hosted evidence ещё предстоят.
+- **Релиз — в работе, 4/7:** Render/Neon design/config, workflows и runtime/owner controls прошли полный CI main SHA; первый public GHCR digest и постоянный release record опубликованы, см. [[quality-gates]]. Provisioning, staging/production qualification и hosted evidence ещё предстоят.
 - **Упаковка портфолио — не начато:** README, диаграммы, demo script, скриншоты, ограничения и ретроспектива.
 - **Финальный аудит — не начато:** сверка scope, критериев готовности, документации и воспроизводимости.
 
