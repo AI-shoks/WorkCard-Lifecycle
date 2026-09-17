@@ -1,10 +1,12 @@
 import { Writable } from 'node:stream';
+import { Pool } from 'pg';
 
 import { describe, expect, it } from 'vitest';
 
 import { buildApp } from './app.js';
 import {
   createProcessLogger,
+  handleIdlePoolErrors,
   proxyTrustPolicy,
   rateLimitKey,
   safeLogger,
@@ -19,7 +21,7 @@ function parseLines(lines: string[]): Record<string, unknown>[] {
 }
 
 describe('structured runtime logs', () => {
-  it('сопоставляет все Pino levels с Cloud Logging severity', () => {
+  it('сопоставляет все Pino levels с JSON severity и числовой Pino level', () => {
     const lines: string[] = [];
     const logger = createProcessLogger(
       'serve',
@@ -53,7 +55,7 @@ describe('structured runtime logs', () => {
     });
   });
 
-  it('пишет Cloud Logging severity и безопасный request context без секретных данных', async () => {
+  it('пишет JSON severity и числовой Pino level и безопасный request context без секретных данных', async () => {
     const lines: string[] = [];
     const logger = safeLogger('info', {
       appVersion: '0123456789abcdef',
@@ -139,9 +141,11 @@ describe('structured runtime logs', () => {
         service: 'work-card-app',
         severity: 'ERROR',
         status: 500,
-        traceId: '0123456789abcdef0123456789abcdef',
+        remoteAddress: '198.51.100.20',
+        protocol: 'http',
       });
-      expect(completion).not.toHaveProperty('level');
+      expect(completion).toHaveProperty('level', 50);
+      expect(completion).not.toHaveProperty('traceId');
       expect(completion?.['durationMs']).toEqual(expect.any(Number));
       expect(completion?.['time']).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
@@ -183,7 +187,7 @@ describe('structured runtime logs', () => {
         expect.objectContaining({
           databaseStatus: 'up',
           event: 'health.readiness',
-          expectedMigrationVersion: 3,
+          expectedMigrationVersion: 4,
           migrationVersion: 2,
           severity: 'WARNING',
         }),
@@ -193,7 +197,7 @@ describe('structured runtime logs', () => {
     }
   });
 
-  it('добавляет безопасный Cloud Run Job execution context без raw driver error', () => {
+  it('добавляет безопасный Actions owner execution context без raw driver error', () => {
     const lines: string[] = [];
     const destination = new Writable({
       write(chunk, _encoding, done) {
@@ -205,8 +209,8 @@ describe('structured runtime logs', () => {
       'migrate',
       {
         APP_VERSION: '0123456789abcdef',
-        CLOUD_RUN_EXECUTION: 'work-card-migrate-example',
-        CLOUD_RUN_JOB: 'work-card-migrate',
+        GITHUB_RUN_ID: 'work-card-migrate-example',
+        RENDER_SERVICE_ID: 'work-card-migrate',
         LOG_LEVEL: 'info',
       },
       destination,
@@ -243,7 +247,7 @@ describe('proxy trust and rate-limit identity', () => {
   it('игнорирует произвольный X-Forwarded-For вне hosted режима', async () => {
     const app = await buildApp({
       appVersion: 'test',
-      readiness: { check: async () => ({ database: 'up', migrationVersion: 3 }) },
+      readiness: { check: async () => ({ database: 'up', migrationVersion: 4 }) },
       trustProxy: proxyTrustPolicy('none'),
     });
     app.get('/ip-probe', async (request) => ({
@@ -266,11 +270,11 @@ describe('proxy trust and rate-limit identity', () => {
     }
   });
 
-  it('доверяет только непосредственному Cloud Run proxy и связывает rate limit с client IP', async () => {
+  it('доверяет только непосредственному разрешённому Render proxy и связывает rate limit с client IP', async () => {
     const app = await buildApp({
       appVersion: 'test',
-      readiness: { check: async () => ({ database: 'up', migrationVersion: 3 }) },
-      trustProxy: proxyTrustPolicy('cloud-run'),
+      readiness: { check: async () => ({ database: 'up', migrationVersion: 4 }) },
+      trustProxy: proxyTrustPolicy('render', ['169.254.1.1/32']),
     });
     app.post('/api/v1/demo-session', async (request) => ({
       ip: request.ip,
@@ -303,6 +307,52 @@ describe('proxy trust and rate-limit identity', () => {
         ip: '203.0.113.8',
         rateLimitKey: '203.0.113.8:session',
       });
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe('idle pool failures', () => {
+  it('handles idle disconnects without leaking driver data or suppressing future work', async () => {
+    const pool = new Pool();
+    const events: unknown[] = [];
+    handleIdlePoolErrors(pool, {
+      warn: ((...args: unknown[]) => events.push(args)) as ReturnType<
+        typeof createProcessLogger
+      >['warn'],
+    });
+    expect(() =>
+      pool.emit('error', new Error('postgresql://owner:SECRET@database SELECT secret')),
+    ).not.toThrow();
+    expect(events).toEqual([
+      [
+        { event: 'database.idle_connection', outcome: 'disconnected' },
+        'idle database connection closed',
+      ],
+    ]);
+    expect(JSON.stringify(events)).not.toContain('SECRET');
+    await pool.end();
+  });
+});
+
+describe('Render proxy peer boundary', () => {
+  it('ignores spoofed forwarding from a direct untrusted peer and rejects empty allowlists', async () => {
+    expect(() => proxyTrustPolicy('render')).toThrow('allowlist');
+    const app = await buildApp({
+      appVersion: 'test',
+      readiness: { check: async () => ({ database: 'up', migrationVersion: 4 }) },
+      trustProxy: proxyTrustPolicy('render', ['10.2.3.0/24']),
+    });
+    app.get('/peer-probe', async (request) => ({ ip: request.ip, protocol: request.protocol }));
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/peer-probe',
+        remoteAddress: '198.51.100.20',
+        headers: { 'x-forwarded-for': '1.1.1.1', 'x-forwarded-proto': 'https' },
+      });
+      expect(response.json()).toEqual({ ip: '198.51.100.20', protocol: 'http' });
     } finally {
       await app.close();
     }

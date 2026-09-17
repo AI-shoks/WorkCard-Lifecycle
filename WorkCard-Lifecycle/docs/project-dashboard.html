@@ -1454,14 +1454,14 @@
 
         <div class="sidebar-note">
           <span class="label">Срез состояния</span>
-          <strong>6 сентября 2026</strong>
-          <p>Этапы 1–9 закрыты. Этап 10 «Релиз» в работе: design, reviewable Terraform и release-image workflow готовы, deployment ещё нет.</p>
+          <strong>17 сентября 2026</strong>
+          <p>Этапы 1–9 закрыты. Этап 10 «Релиз» в работе: текущая локальная реализация — Render Free + Neon Free, публичный GHCR и восстановление чистого демо. Развёртывание ещё не выполнено.</p>
         </div>
       </aside>
 
       <main>
         <div class="topbar">
-          <span class="live-state">Этапы 1–9 закрыты · этап 10 в работе · IaC без apply</span>
+          <span class="live-state">Этапы 1–9 закрыты · этап 10 в работе · Render/Neon локально</span>
           <div class="toolbar" aria-label="Настройки отображения">
             <button class="icon-button" id="theme-toggle" type="button" aria-label="Переключить цветовую тему" title="Переключить тему">◐</button>
             <button class="icon-button" id="print-button" type="button" aria-label="Распечатать или сохранить в PDF" title="Печать / PDF">⇩</button>
@@ -1485,9 +1485,9 @@
                   <span class="stage-kicker">● Этап 10 в работе</span>
                   <span class="stage-number">Релиз — этап 10 из дорожной карты 0–12</span>
                 </div>
-                <h2>Runtime pre-deploy controls готовы. Облачные ресурсы ещё не созданы.</h2>
+                <h2>Переход на Render Free + Neon Free реализован локально.</h2>
                 <p>
-                  Полный браузерный процесс подтверждён для implementation SHA <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc"><code>3ee6570</code></a>. На этапе 10 Terraform описывает 167 resource changes; локальный hardening добавляет bounded shared demo, owner-only reset, узкий production IAM operator, отдельный deployer WIF и teardown guards. `apply` и workflows не запускались, поэтому registry и hosted IAM/reset/proxy/socket/logging evidence отсутствуют.
+                  Полный браузерный процесс подтверждён для implementation SHA <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc"><code>3ee6570</code></a>. Текущий этап 10 сохраняет общий ограниченный демо-контур и добавляет прямой Neon TLS, барьер обслуживания в БД, отдельные owner-команды и GHCR digest без повторной сборки. Публикация, удалённые workflows и deployment не выполнялись. GCP Terraform сохранён как история; GitHub-доступ и Render Hobby без карты подтверждены. Проверки Neon и hosted поведения ещё предстоят.
                 </p>
                 <div class="progress-labels">
                   <span>10 этапов завершено, включая этап 0</span>
@@ -1502,15 +1502,15 @@
               <aside class="next-gate">
                 <span class="gate-icon" aria-hidden="true">10</span>
                 <h3>Ближайшая контрольная точка</h3>
-                <p>Реализовать hosted smoke runner и получить clean staging evidence для одного exact digest.</p>
-                <p class="small-note">Runtime controls локально проверены, но фактические Cloud Run proxy chain, Cloud Logging ingestion и Cloud SQL socket connection ещё не квалифицированы.</p>
+                <p>После разрешённой публикации проверить один digest во временном staging, затем квалифицировать Render/Neon.</p>
+                <p class="small-note">Локальные проверки не подтверждают реальную Render proxy chain, Neon TLS/роли, сон сервиса и resolved digest. Контейнерный gate остаётся обязательным.</p>
               </aside>
             </div>
 
             <div class="metrics-grid" aria-label="Ключевые показатели проекта">
               <article class="metric-card"><strong class="accent">10</strong><span>этапов завершены, включая инициализацию 0</span></article>
               <article class="metric-card"><strong class="amber">10</strong><span>этап релиза в работе</span></article>
-              <article class="metric-card"><strong class="cyan">56</strong><span>документов прошли строгий аудит без ошибок и предупреждений</span></article>
+              <article class="metric-card"><strong class="cyan">59</strong><span>документов прошли строгий аудит без ошибок и предупреждений</span></article>
               <article class="metric-card"><strong class="blue">23</strong><span>маршрута серверного сценария и demo-сессии</span></article>
             </div>
           </section>
@@ -1591,7 +1591,7 @@
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">7</span><div class="roadmap-body"><h3>Серверный вертикальный срез</h3><p class="roadmap-question">Работают ли ключевые правила независимо от интерфейса?</p><p class="roadmap-result"><strong>Результат:</strong> implementation SHA прошёл интеграционные тесты, local clean-container, push CI и PR CI.</p></div><span class="chip done">Завершено</span></article>
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">8</span><div class="roadmap-body"><h3>Браузерный вертикальный срез</h3><p class="roadmap-question">Может ли пользователь пройти сценарий через реальный API?</p><p class="roadmap-result"><strong>Результат:</strong> 7 ролевых экранов и полный процесс 250 карточек; <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf">b00ff294</a>, <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130">push</a> / <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414">PR CI</a> — 2/2.</p></div><span class="chip done">Завершено</span></article>
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">9</span><div class="roadmap-body"><h3>Качество</h3><p class="roadmap-question">Защищены ли критические правила на всех уровнях?</p><p class="roadmap-result"><strong>Результат:</strong> браузерные, PostgreSQL, security/performance проверки; <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc">3ee6570</a>, <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850">push</a> / <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850">PR CI</a> — 6/6.</p></div><span class="chip done">Завершено</span></article>
-              <article class="roadmap-card current" data-status="current"><span class="roadmap-no">10</span><div class="roadmap-body"><h3>Релиз</h3><p class="roadmap-question">Можно ли воспроизводимо развернуть и наблюдать приложение?</p><p class="roadmap-result"><strong>В работе:</strong> release design, reviewable Terraform, release-image workflow и runtime pre-deploy controls с IAM/demo hardening приняты локально; provisioning, staging/production и hosted evidence ещё впереди.</p></div><span class="chip current">В работе · 4/7 задач</span></article>
+              <article class="roadmap-card current" data-status="current"><span class="roadmap-no">10</span><div class="roadmap-body"><h3>Релиз</h3><p class="roadmap-question">Можно ли воспроизводимо развернуть и наблюдать приложение?</p><p class="roadmap-result"><strong>В работе:</strong> Render/Neon design, конфигурация, GHCR workflows и DB maintenance реализованы локально; staging/production и фактические hosted evidence ещё впереди.</p></div><span class="chip current">В работе · 4/7 задач</span></article>
               <article class="roadmap-card" data-status="planned"><span class="roadmap-no">11</span><div class="roadmap-body"><h3>Упаковка портфолио</h3><p class="roadmap-question">Поймёт ли работодатель ценность и глубину работы?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> ясный README, демонстрационный сценарий, изображения, ограничения и ретроспектива.</p></div><span class="chip planned">Не начато</span></article>
               <article class="roadmap-card" data-status="planned"><span class="roadmap-no">12</span><div class="roadmap-body"><h3>Финальный аудит</h3><p class="roadmap-question">Соответствуют ли обещания реальному результату?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> проверены scope, документация, тесты, воспроизводимость и честность демонстрации.</p></div><span class="chip planned">Не начато</span></article>
             </div>
@@ -1690,7 +1690,7 @@
 │  └─ <span class="folder">web/</span>        <span class="done">● браузерный срез</span>
 ├─ <span class="folder">packages/</span>
 │  └─ <span class="folder">contracts/</span>  <span class="done">● общие схемы</span>
-├─ <span class="folder">docs/</span>           <span class="done">● 56 документов</span>
+├─ <span class="folder">docs/</span>           <span class="done">● 59 документов</span>
 ├─ <span class="folder">scripts/</span>        <span class="done">● UX-аудит</span>
 ├─ <span class="file">compose.yaml</span>      <span class="done">● локальный контур</span>
 ├─ <span class="file">Dockerfile</span>        <span class="done">● production-образ</span>
@@ -1741,7 +1741,7 @@
             </div>
 
             <div class="evidence-grid">
-              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено</span><span class="evidence-value">56 / 0 / 0</span></div><h3>Документация</h3><p>56 документов, 0 структурных ошибок и 0 предупреждений. Дополнительно выполнена смысловая сверка runtime contracts и границы hosted evidence.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено</span><span class="evidence-value">59 / 0 / 0</span></div><h3>Документация</h3><p>59 документов, 0 структурных ошибок и 0 предупреждений. Дополнительно выполнена смысловая сверка runtime contracts и границы hosted evidence.</p></article>
               <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этап 7 · история</span><span class="evidence-value">11 + 5</span></div><h3>Серверные тесты на 02.09.2026</h3><p>11 обычных и 5 PostgreSQL integration tests покрывают порядок защиты routes, роли, инварианты, конфликты, масштабный выпуск и компактный API-only workflow. SHA и CI этапа 7 сохранены выше.</p></article>
               <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этап 9 · пройдено</span><span class="evidence-value">157 + 25</span></div><h3>Локальные тесты этапа 9</h3><p>157 frontend, 10 обычных API, 5 PostgreSQL integration и 10 новых PostgreSQL regression tests — PASS. Условия и границы результатов сохранены в <a href="engineering/quality-gates.md">проверках качества</a>.</p></article>
               <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено локально</span><span class="evidence-value">3</span></div><h3>Миграции базы</h3><p>Чистая база применяет миграции 0001–0003, повторный seed и runtime verification.</p></article>
@@ -1767,7 +1767,7 @@
                 <p class="eyebrow">Риски и разрывы</p>
                 <h3>Что важно не потерять дальше</h3>
                 <ul>
-                  <li><strong>Релиз ещё не выполнен:</strong> design, Terraform plan и workflow code готовы, но `apply`, manual image publish и hosted smoke не запускались.</li>
+                  <li><strong>Релиз ещё не выполнен:</strong> Render/Neon code и workflows проверяются локально; публикация image, deployment и hosted smoke не выполнялись. Ограничения — в актуальных quality gates.</li>
                   <li><strong>Большой workflow-service:</strong> около 2,2 тыс. строк уже требуют дисциплины модульных границ при росте.</li>
                   <li><strong>Граница performance-проверки:</strong> профиль 10 000 карточек пройден; длительная production-нагрузка и бизнес-SLA им не подтверждаются.</li>
                   <li><strong>Runtime GitHub Actions:</strong> maintenance item для setup-node/pnpm закрыт в этапе 9; закреплённые actions с Node.js 24 подтверждены обоими CI runs.</li>
@@ -1782,12 +1782,12 @@
                 <p class="eyebrow">Маршрут к готовому MVP</p>
                 <h2 id="next-title">Что делать дальше</h2>
               </div>
-              <p>Этапы 1–9 закрыты. Этап 10 «Релиз» в работе на 4/7: завершены design, reviewable IaC, release-image workflow и runtime pre-deploy controls с локальным IAM/demo hardening; затем остаются provisioning/hosted evidence, production promotion и финальная синхронизация evidence.</p>
+              <p>Этапы 1–9 закрыты. Этап 10 «Релиз» в работе на 4/7: локальный переход на Render Free + Neon Free сохраняет security, browser, container и performance gates. Создание ресурсов, публикация, hosted qualification, promotion и совместимый rollback разрешены; завершение требует успешных обязательных проверок.</p>
             </div>
 
             <div class="next-actions">
-              <article class="result-card"><span class="action-no">ШАГ 01</span><h3>Квалифицировать staging</h3><p>Реализовать hosted smoke runner без DB/owner credentials и пройти clean staging для одного exact digest.</p><p class="definition">Готово, когда реальные proxy/socket/logging observations сохранены как staging evidence.</p></article>
-              <article class="result-card"><span class="action-no">ШАГ 02</span><h3>Подтвердить релизный контур</h3><p>После отдельного разрешения создать foundation, опубликовать exact digest и выполнить clean staging jobs/smoke.</p><p class="definition">Готово, когда фактические digest, revision и smoke evidence совпадают.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 01</span><h3>Квалифицировать staging</h3><p>Пройти временный Docker staging на отдельном Neon project тем же exact digest; browser не получает DB/owner credentials.</p><p class="definition">Готово, когда readiness, owner/runtime границы и browser/security evidence подтверждены на staging.</p></article>
+              <article class="result-card"><span class="action-no">ШАГ 02</span><h3>Подтвердить релизный контур</h3><p>После отдельного разрешения опубликовать публичный GHCR image, подготовить один Render Free service и пройти закрытое наблюдение proxy, bootstrap и полный smoke.</p><p class="definition">Готово, когда Render status/resolved digest, proxy/TLS, reset и rollback подтверждены сохранённым evidence.</p></article>
               <article class="result-card"><span class="action-no">ШАГ 03</span><h3>Упаковать портфолио · этап 11</h3><p>Подготовить README, диаграммы, demo script, изображения, ограничения и ретроспективу.</p><p class="definition">Статус: не начат; следует после релиза.</p></article>
               <article class="result-card"><span class="action-no">ШАГ 04</span><h3>Финальный аудит · этап 12</h3><p>Сверить scope, критерии готовности, документацию и воспроизводимость демонстрации.</p><p class="definition">Статус: не начат; завершает дорожную карту.</p></article>
             </div>
@@ -1816,7 +1816,7 @@
 
           <footer>
             <span>Production Work Card Workflow · независимый portfolio case study</span>
-            <span>Срез на 05.09.2026: этап 9, implementation SHA 3ee6570, push/PR CI 6/6</span>
+            <span>Срез на 17.09.2026: этап 10 локально; CI этапа 9 относится к SHA 3ee6570</span>
           </footer>
         </div>
       </main>
@@ -1869,13 +1869,13 @@
       });
 
       const summary = [
-        'Production Work Card Workflow — статус на 05.09.2026.',
+        'Production Work Card Workflow — статус на 17.09.2026.',
         'Закрыты этапы 1–9 и инициализация 0.',
         'Этап 9: implementation SHA 3ee65709966f5775928de87783fd2946d085e2bc подтверждён локально, push CI и PR CI.',
         'Все 6 обязательных jobs успешны в каждом запуске: quality, container с image scan, security, browser (compact), browser (canonical), performance.',
         'Push CI: https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850.',
         'PR CI: https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850.',
-        'Этап 10 «Релиз» в работе на 4/7: release design, reviewable Terraform, release-image workflow и runtime pre-deploy controls готовы; apply, workflow run и hosted deployment не выполнялись.',
+        'Этап 10 «Релиз» в работе на 4/7: текущий target Render Free + Neon Free и публичный GHCR; код, owner maintenance и workflows проверяются локально. Публикация и deployment ещё не выполнены; GitHub-доступ и Render Hobby без карты подтверждены, hosted qualification остаётся обязательной.',
       ].join(' ');
 
       copyButton.addEventListener('click', async () => {

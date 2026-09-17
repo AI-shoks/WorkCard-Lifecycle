@@ -51,6 +51,8 @@ async function makeReleaseRoot() {
     process.execPath,
     [
       manifestScript,
+      '--schema-version',
+      '1',
       '--root',
       root,
       '--source-sha',

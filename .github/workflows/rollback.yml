@@ -1,0 +1,163 @@
+name: Roll back previous compatible Render digest
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type ROLLBACK PREVIOUS COMPATIBLE DIGEST
+        required: true
+        type: string
+      current_sha:
+        description: Full SHA of the current live release
+        required: true
+        type: string
+      target_sha:
+        description: Full SHA of its recorded previous compatible release
+        required: true
+        type: string
+      deployment_record_sequence:
+        description: Four-digit current release evidence record identifying the previous image
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: work-card-owner-and-release
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+    working-directory: WorkCard-Lifecycle
+jobs:
+  rollback:
+    name: Verify compatibility, journal and restore the recorded previous digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      origin: ${{ steps.deployment.outputs.origin }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - name: Verify explicit main-only authorization and retained releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          CURRENT_SHA: ${{ inputs.current_sha }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+          RECORD_SEQUENCE: ${{ inputs.deployment_record_sequence }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$CONFIRMATION" == 'ROLLBACK PREVIOUS COMPATIBLE DIGEST' ]]
+          [[ "$CURRENT_SHA" =~ ^[0-9a-f]{40}$ && "$TARGET_SHA" =~ ^[0-9a-f]{40}$ && "$CURRENT_SHA" != "$TARGET_SHA" ]]
+          [[ "$RECORD_SEQUENCE" =~ ^[0-9]{4}$ && "$RECORD_SEQUENCE" != 0000 ]]
+          node scripts/release/fetch-release.mjs "$CURRENT_SHA"
+          image="$(node scripts/release/fetch-release.mjs "$TARGET_SHA")"
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect "$image" | jq -e --arg sha "$TARGET_SHA" '.[0] | .Os == "linux" and .Architecture == "amd64" and .Config.Labels["org.opencontainers.image.revision"] == $sha' >/dev/null
+          mkdir -p .quality-results/rollback-source
+          gh release download "work-card-${CURRENT_SHA}" --pattern "evidence-${RECORD_SEQUENCE}.json" --dir .quality-results/rollback-source
+      - name: Persist rollback intent before mutation and live evidence before smoke
+        id: deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKCARD_ROLLBACK_AUTHORIZATION: ${{ inputs.confirmation }}
+          CURRENT_SHA: ${{ inputs.current_sha }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+          RECORD_SEQUENCE: ${{ inputs.deployment_record_sequence }}
+          CONFIGURATION_REVISION: ${{ vars.CONFIGURATION_REVISION }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          RENDER_OWNER_ID: ${{ vars.RENDER_OWNER_ID }}
+          RENDER_ORIGIN: ${{ vars.RENDER_ORIGIN }}
+        run: |
+          set -euo pipefail
+          node scripts/release/rollback-render.mjs "docs/release/manifests/${CURRENT_SHA}.json" \
+            "docs/release/manifests/${TARGET_SHA}.json" \
+            ".quality-results/rollback-source/evidence-${RECORD_SEQUENCE}.json" .quality-results/render-rollback.json
+          printf 'origin=%s\n' "$RENDER_ORIGIN" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rollback-manifests
+          path: WorkCard-Lifecycle/docs/release/manifests/*.json
+          if-no-files-found: error
+          retention-days: 3
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: rollback-deployment
+          path: WorkCard-Lifecycle/.quality-results/render-rollback.json*
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 3
+
+  smoke:
+    name: Public rollback verification without DB or provider credentials
+    needs: rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: rollback-manifests
+          path: WorkCard-Lifecycle/docs/release/manifests
+      - name: Run complete security and canonical browser probes
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          RENDER_ORIGIN: ${{ needs.rollback.outputs.origin }}
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install --with-deps chromium
+          node scripts/release/public-smoke.mjs "docs/release/manifests/${TARGET_SHA}.json" \
+            "$RENDER_ORIGIN" render .quality-results/render-smoke.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rollback-smoke
+          path: WorkCard-Lifecycle/.quality-results/render-smoke.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
+
+  evidence:
+    name: Verify proxy observations and retain completed rollback
+    needs: [rollback, smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: rollback-manifests
+          path: WorkCard-Lifecycle/docs/release/manifests
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: rollback-deployment
+          path: WorkCard-Lifecycle/.quality-results
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: rollback-smoke
+          path: WorkCard-Lifecycle/.quality-results
+      - name: Check actual Render proxy and logging observations
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          RENDER_OWNER_ID: ${{ vars.RENDER_OWNER_ID }}
+          PROXY_TRUSTED_CIDRS: ${{ vars.PROXY_TRUSTED_CIDRS }}
+        run: node scripts/release/render-observations.mjs .quality-results/render-smoke.json .quality-results/render-observations.json
+      - name: Retain passed smoke and mark rollback completed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_SHA: ${{ inputs.current_sha }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+          CONFIGURATION_REVISION: ${{ vars.CONFIGURATION_REVISION }}
+        run: node scripts/release/retain-evidence.mjs "$TARGET_SHA" "$CURRENT_SHA"

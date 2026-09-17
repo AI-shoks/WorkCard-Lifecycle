@@ -13,7 +13,7 @@ it('actual DB budgets bound a blocked command and roll back its receipt; subsequ
   const app = await buildApp({
     appVersion: 'budgets',
     pool,
-    readiness: { check: async () => ({ database: 'up', migrationVersion: 3 }) },
+    readiness: { check: async () => ({ database: 'up', migrationVersion: 4 }) },
     security: {
       allowedOrigin: 'http://budget.test',
       cookieSecure: false,

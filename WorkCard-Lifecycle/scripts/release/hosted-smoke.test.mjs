@@ -59,9 +59,7 @@ function revisionMetadata(overrides = {}) {
         },
       ],
       serviceAccountName: `work-card-app@${project}.iam.gserviceaccount.com`,
-      volumes: [
-        { cloudSqlInstance: { instances: [`${project}:europe-west1:work-card-staging`] } },
-      ],
+      volumes: [{ cloudSqlInstance: { instances: [`${project}:europe-west1:work-card-staging`] } }],
     },
     status: { conditions: [{ status: 'True', type: 'Ready' }] },
     ...overrides,
@@ -85,13 +83,16 @@ function unsignedToken(payload) {
   return `${header}.${body}.signature`;
 }
 
-function hostedFetch() {
+function hostedFetch({
+  platform = 'cloud-run',
+  cookieAttributes = '; Path=/; HttpOnly; SameSite=Lax; Secure',
+} = {}) {
   let rateAttempts = 0;
   let sessionNumber = 0;
   return async (input, init = {}) => {
     const url = new globalThis.URL(String(input));
     const headers = new globalThis.Headers(init.headers);
-    const authenticated = headers.has('x-serverless-authorization');
+    const authenticated = platform !== 'cloud-run' || headers.has('x-serverless-authorization');
     const method = init.method ?? 'GET';
     if (!authenticated) return new globalThis.Response('Forbidden', { status: 403 });
 
@@ -133,10 +134,7 @@ function hostedFetch() {
       });
     }
     if (url.pathname === '/api/v1/production-passports' && !headers.has('cookie')) {
-      return jsonResponse(
-        { code: 'AUTHENTICATION_REQUIRED', status: 401 },
-        401,
-      );
+      return jsonResponse({ code: 'AUTHENTICATION_REQUIRED', status: 401 }, 401);
     }
     if (url.pathname === '/api/v1/production-passports') {
       return jsonResponse({ items: [{ id: randomUUID() }] });
@@ -154,7 +152,9 @@ function hostedFetch() {
       });
     }
     if (url.pathname === '/api/v1/demo-session' && method === 'POST') {
-      const isRateProbe = headers.has('x-forwarded-for') && Number(headers.get('x-forwarded-for')?.split('.').at(-1)) >= 100;
+      const isRateProbe =
+        headers.has('x-forwarded-for') &&
+        Number(headers.get('x-forwarded-for')?.split('.').at(-1)) >= 100;
       if (isRateProbe) {
         rateAttempts += 1;
         if (rateAttempts === 3) {
@@ -162,11 +162,9 @@ function hostedFetch() {
         }
       }
       sessionNumber += 1;
-      return jsonResponse(
-        { csrfToken: `csrf-token-${sessionNumber}-${'x'.repeat(32)}` },
-        201,
-        { 'set-cookie': `work_card_demo=session-${sessionNumber}; Path=/; HttpOnly` },
-      );
+      return jsonResponse({ csrfToken: `csrf-token-${sessionNumber}-${'x'.repeat(32)}` }, 201, {
+        'set-cookie': `work_card_demo=session-${sessionNumber}${cookieAttributes}`,
+      });
     }
     throw new Error(`Unexpected hosted request: ${method} ${url.pathname}`);
   };
@@ -335,11 +333,78 @@ test('probes private IAM, sanitized HTTPS surface and negative controls without 
   assert.deepEqual(result.assets, ['/assets/app.css', '/assets/app.js']);
   assert(result.checks.includes('private-iam-denial'));
   assert(result.checks.includes('origin-csrf-permission-no-side-effect'));
+  assert(result.checks.includes('session-cookie-security'));
   assert(result.checks.includes('cloud-run-proxy-rate-limit-key'));
   assert(!result.checks.includes('canonical-browser-112-3-250'));
   assert.equal(result.sessionRateLimit.limitedStatus, 429);
   assert.equal(result.sessionRateLimit.successfulSessionAttempts, 2);
   assert(result.requestIds.length >= 15);
+});
+
+test('public Render smoke requires secure host-only session cookies', async () => {
+  const renderOrigin = 'https://work-card-demo.onrender.com';
+  const options = { origin: renderOrigin, platform: 'render', runBrowser: false };
+  const result = await probeHostedSurface({
+    ...options,
+    fetchImplementation: hostedFetch({ platform: 'render' }),
+  });
+  assert(result.checks.includes('session-cookie-security'));
+  for (const cookieAttributes of [
+    '; Path=/; HttpOnly; SameSite=Lax',
+    '; Path=/; SameSite=Lax; Secure',
+    '; Path=/; HttpOnly; SameSite=None; Secure',
+    '; Path=/api; HttpOnly; SameSite=Lax; Secure',
+    '; Path=/; HttpOnly; SameSite=Lax; Secure; Domain=.onrender.com',
+    '; Path=/; HttpOnly; SameSite=Lax; Secure; SameSite=None',
+  ]) {
+    await assert.rejects(
+      probeHostedSurface({
+        ...options,
+        fetchImplementation: hostedFetch({ platform: 'render', cookieAttributes }),
+      }),
+      /Hosted session cookie/,
+    );
+  }
+});
+
+test('temporary localhost staging validates session cookies without requiring HTTPS', async () => {
+  const result = await probeHostedSurface({
+    origin: 'http://127.0.0.1:3000',
+    platform: 'local',
+    runBrowser: false,
+    fetchImplementation: hostedFetch({
+      platform: 'local',
+      cookieAttributes: '; Path=/; HttpOnly; SameSite=Lax',
+    }),
+  });
+  assert(result.checks.includes('session-cookie-security'));
+});
+
+test('failed hosted probes never include response bodies or leaked health fields in errors', async () => {
+  const marker = 'RESPONSE_SECRET_MUST_NOT_BE_LOGGED';
+  for (const [path, status] of [
+    ['/health/ready', 500],
+    ['/health/ready', 200],
+    ['/', 500],
+    ['/assets/app.js', 500],
+    ['/api/v1/demo-users', 500],
+    ['/api/v1/demo-session', 500],
+    ['/api/v1/production-passports', 500],
+  ]) {
+    const original = hostedFetch({ platform: 'render' });
+    await assert.rejects(
+      probeHostedSurface({
+        origin: 'https://work-card-demo.onrender.com',
+        platform: 'render',
+        runBrowser: false,
+        fetchImplementation: (input, init) =>
+          new globalThis.URL(input).pathname === path
+            ? Promise.resolve(jsonResponse({ status: 'ok', csrfToken: marker }, status))
+            : original(input, init),
+      }),
+      (error) => !error.stack.includes(marker) && !JSON.stringify(error).includes(marker),
+    );
+  }
 });
 
 test('accepts only schema-complete passed hosted reports', async () => {

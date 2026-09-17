@@ -8,8 +8,9 @@ import { validateReleaseManifest, validateTrivyScanReport } from './validate-rel
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
-const imageRepositoryPattern =
+const legacyImageRepositoryPattern =
   /^europe-west1-docker\.pkg\.dev\/[a-z][a-z0-9-]{4,28}[a-z0-9]\/work-card\/work-card$/;
+const imageRepositoryPattern = /^ghcr\.io\/[a-z0-9][a-z0-9_.-]*\/[a-z0-9][a-z0-9_./-]*$/;
 const scannerImagePattern = /^aquasec\/trivy:\d+\.\d+\.\d+@sha256:[0-9a-f]{64}$/;
 
 function parseOptions(arguments_) {
@@ -68,6 +69,9 @@ function sha256(value) {
 }
 
 const options = parseOptions(process.argv.slice(2));
+// v1 is retained solely to validate/reproduce historical GCP evidence offline.
+const schemaVersion = Number(options.get('--schema-version') ?? '2');
+if (![1, 2].includes(schemaVersion)) throw new Error('Unsupported release schema version.');
 const root = resolve(options.get('--root') ?? scriptRoot);
 const sourceSha = requireOption(options, '--source-sha');
 const imageTag = requireOption(options, '--image-tag');
@@ -76,6 +80,7 @@ const imageConfigDigest = requireOption(options, '--image-config-digest');
 const ociRevisionLabel = requireOption(options, '--oci-revision-label');
 const sourceCiRunUrl = requireOption(options, '--source-ci-run-url');
 const buildScanRunUrl = requireOption(options, '--build-scan-run-url');
+const sourceBuildRunUrl = options.get('--source-build-run-url') ?? buildScanRunUrl;
 const scannerImage = requireOption(options, '--scanner-image');
 const generatedAt = requireOption(options, '--generated-at');
 
@@ -96,14 +101,19 @@ if (!imageTag.endsWith(tagSuffix)) {
   throw new Error('Immutable image tag должен оканчиваться полным source SHA.');
 }
 const imageRepository = imageTag.slice(0, -tagSuffix.length);
-if (!imageRepositoryPattern.test(imageRepository)) {
-  throw new Error('Image tag должен указывать на канонический Artifact Registry repository.');
+if (
+  !(schemaVersion === 2 ? imageRepositoryPattern : legacyImageRepositoryPattern).test(
+    imageRepository,
+  )
+) {
+  throw new Error('Image tag должен указывать на канонический repository для версии schema.');
 }
 if (!scannerImagePattern.test(scannerImage)) {
   throw new Error('Scanner image должен быть Trivy, закреплённым одновременно tag и digest.');
 }
 assertRunUrl(sourceCiRunUrl, 'source CI run URL');
 assertRunUrl(buildScanRunUrl, 'build/scan run URL');
+assertRunUrl(sourceBuildRunUrl, 'source build run URL');
 if (
   !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(generatedAt) ||
   Number.isNaN(Date.parse(generatedAt))
@@ -132,8 +142,9 @@ const reportSummary = validateTrivyScanReport(scanReportBytes, {
   sourceSha,
 });
 const manifest = {
-  $schema: '../release-manifest.schema.json',
-  schemaVersion: 1,
+  $schema:
+    schemaVersion === 2 ? '../release-manifest.v2.schema.json' : '../release-manifest.schema.json',
+  schemaVersion,
   generatedAt,
   sourceSha,
   sourceCiRunUrl,
@@ -144,6 +155,7 @@ const manifest = {
   ociRevisionLabel,
   platform: 'linux/amd64',
   buildScanRunUrl,
+  ...(schemaVersion === 2 ? { sourceBuildRunUrl } : {}),
   scan: {
     status: 'passed',
     image: immutableImage,
@@ -161,7 +173,10 @@ const manifest = {
   lifecycleEvidence: {
     mode: 'append-only-files',
     directory: `docs/release/evidence/${sourceSha}`,
-    recordSchema: 'docs/release/release-evidence.schema.json',
+    recordSchema:
+      schemaVersion === 2
+        ? 'docs/release/release-evidence.v2.schema.json'
+        : 'docs/release/release-evidence.schema.json',
   },
 };
 

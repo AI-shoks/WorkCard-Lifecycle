@@ -1,0 +1,70 @@
+{
+  "previews": {
+    "generation": "off"
+  },
+  "services": [
+    {
+      "type": "web",
+      "name": "work-card-demo",
+      "runtime": "image",
+      "plan": "free",
+      "region": "frankfurt",
+      "numInstances": 1,
+      "autoDeploy": false,
+      "healthCheckPath": "/health/live",
+      "image": {
+        "url": "ghcr.io/ai-shoks/workcard-lifecycle/work-card@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "envVars": [
+        {
+          "key": "APP_ENV",
+          "value": "production"
+        },
+        {
+          "key": "HOST",
+          "value": "0.0.0.0"
+        },
+        {
+          "key": "PORT",
+          "value": "10000"
+        },
+        {
+          "key": "PROXY_TRUST_MODE",
+          "value": "render"
+        },
+        {
+          "key": "DEMO_MAX_BATCHES",
+          "value": "20"
+        },
+        {
+          "key": "DEMO_MAX_SESSIONS",
+          "value": "500"
+        },
+        {
+          "key": "APP_ORIGIN",
+          "sync": false
+        },
+        {
+          "key": "DATABASE_URL",
+          "sync": false
+        },
+        {
+          "key": "SESSION_SIGNING_SECRET",
+          "sync": false
+        },
+        {
+          "key": "NEON_DATABASE_HOST",
+          "sync": false
+        },
+        {
+          "key": "NEON_DATABASE_NAME",
+          "sync": false
+        },
+        {
+          "key": "PROXY_TRUSTED_CIDRS",
+          "sync": false
+        }
+      ]
+    }
+  ]
+}

@@ -46,7 +46,7 @@ describe('health routes', () => {
   });
 
   it('подтверждает readiness только для доступной и мигрированной БД', async () => {
-    const app = await buildApp({ appVersion: 'test', readiness: readiness('up', 3) });
+    const app = await buildApp({ appVersion: 'test', readiness: readiness('up', 4) });
     apps.push(app);
 
     const response = await app.inject({ method: 'GET', url: '/health/ready' });
@@ -75,5 +75,30 @@ describe('health routes', () => {
 
     expect(response.statusCode).toBe(503);
     expect(response.json()).toEqual({ status: 'unavailable' });
+  });
+});
+
+describe('initial proxy observation safety', () => {
+  it('keeps liveness available and blocks readiness and every API before DB access', async () => {
+    let databaseCalls = 0;
+    const app = await buildApp({
+      appVersion: 'test',
+      observationOnly: true,
+      readiness: {
+        check: async () => {
+          databaseCalls++;
+          return { database: 'up', migrationVersion: 4 };
+        },
+      },
+    });
+    apps.push(app);
+    expect((await app.inject('/health/live')).statusCode).toBe(200);
+    expect((await app.inject('/health/ready')).json()).toEqual({ status: 'unavailable' });
+    expect((await app.inject('/health/ready')).statusCode).toBe(503);
+    expect((await app.inject('/api/openapi.json')).statusCode).toBe(503);
+    expect((await app.inject({ method: 'POST', url: '/api/v1/demo-session' })).statusCode).toBe(
+      503,
+    );
+    expect(databaseCalls).toBe(0);
   });
 });

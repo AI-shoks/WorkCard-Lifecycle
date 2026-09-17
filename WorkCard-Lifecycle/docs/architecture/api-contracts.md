@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 5
+version: 6
 owner: architecture
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # API Contracts
@@ -249,7 +249,7 @@ Errors используют `application/problem+json` (RFC 9457):
 | `422` | schema валидна, business input недопустим | `INVALID_QUANTITY`, `MIXED_WORK_CARD_SET`, `INVALID_ASSIGNEE` |
 | `429` | превышен лимит запросов IP/категории; `Retry-After` задаёт паузу в секундах | `TOO_MANY_REQUESTS` |
 | `500` | непредвиденная ошибка | `INTERNAL_ERROR`, без stack/SQL detail |
-| `503` | DB/readiness недоступны или исчерпан handler/DB budget | `SERVICE_UNAVAILABLE` |
+| `503` | DB/readiness недоступны, maintenance закрыт, reset старше 26h или исчерпан handler/DB budget | `SERVICE_UNAVAILABLE` |
 
 Технический `code` используется UI для детерминированного русского текста, но не показывается производственной роли на верхнем уровне. На conflict UI перечитывает ресурсы и требует нового осознанного действия.
 

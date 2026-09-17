@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
 
 const canonical = process.env['QUALITY_CANONICAL'] === '1';
@@ -16,11 +15,18 @@ const roleIds = {
 
 test.beforeEach(async ({ context }) => {
   if (!hosted) return;
-  const idTokenFile = process.env['HOSTED_SMOKE_ID_TOKEN_FILE'];
   const baseUrl = process.env['QUALITY_BASE_URL'];
-  if (!idTokenFile)
-    throw new Error('HOSTED_SMOKE_ID_TOKEN_FILE is required for hosted browser smoke.');
   if (!baseUrl) throw new Error('QUALITY_BASE_URL is required for hosted browser smoke.');
+  for (const name of [
+    'DATABASE_URL',
+    'MIGRATION_DATABASE_URL',
+    'APP_DATABASE_PASSWORD',
+    'SESSION_SIGNING_SECRET',
+    'RENDER_API_KEY',
+  ]) {
+    if (process.env[name])
+      throw new Error('Browser runner must not receive runtime, owner or deploy credentials.');
+  }
   const hostedOrigin = new URL(baseUrl).origin;
   await context.route('**/*', async (route) => {
     const request = route.request();
@@ -29,19 +35,9 @@ test.beforeEach(async ({ context }) => {
       return;
     }
 
-    const idToken = (await readFile(idTokenFile, 'utf8')).trim();
-    if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(idToken)) {
-      throw new Error('Hosted smoke ID token file is missing or malformed.');
-    }
-    // route.continue() carries header overrides across redirects. Fetch exactly
-    // one hop and fulfill it instead, so an IAM token can never follow a 3xx to
-    // a different origin. Same-origin redirects are routed and authenticated
-    // again by the browser as fresh requests.
+    // Probe the public service without platform credentials. Fetch one hop so
+    // redirects remain subject to the same-origin browser boundary.
     const response = await route.fetch({
-      headers: {
-        ...(await request.allHeaders()),
-        'x-serverless-authorization': `Bearer ${idToken}`,
-      },
       maxRedirects: 0,
     });
     await route.fulfill({ response });

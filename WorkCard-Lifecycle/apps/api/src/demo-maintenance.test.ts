@@ -20,6 +20,7 @@ describe('demo maintenance', () => {
   it('очищает mutable rows в одной транзакции и сохраняет reference fixtures', async () => {
     let countRead = 0;
     const query = vi.fn(async (statement: string) => {
+      if (statement.includes('SELECT maintenance')) return { rows: [{ maintenance: true }] };
       if (statement.includes('AS demo_sessions')) {
         return { rows: [countRead++ === 0 ? populatedCounts : emptyCounts] };
       }
@@ -58,6 +59,7 @@ describe('demo maintenance', () => {
 
   it('откатывает транзакцию при ошибке очистки', async () => {
     const query = vi.fn(async (statement: string) => {
+      if (statement.includes('SELECT maintenance')) return { rows: [{ maintenance: true }] };
       if (statement.includes('AS demo_sessions')) return { rows: [populatedCounts] };
       if (statement.includes('TRUNCATE TABLE')) throw new Error('reset failed');
       return { rows: [] };

@@ -19,7 +19,7 @@ const imageDigest = `sha256:${'b'.repeat(64)}`;
 const otherImageDigest = `sha256:${'f'.repeat(64)}`;
 const imageConfigDigest = `sha256:${'e'.repeat(64)}`;
 const scannerImage = `aquasec/trivy:0.74.0@sha256:${'c'.repeat(64)}`;
-const imageRepository = 'europe-west1-docker.pkg.dev/work-card-release/work-card/work-card';
+const imageRepository = 'ghcr.io/ai-shoks/workcard-lifecycle/work-card';
 const immutableImage = `${imageRepository}@${imageDigest}`;
 const temporaryRoots = new Set();
 let validRoot;
@@ -153,7 +153,7 @@ test('creates and independently validates an immutable release image manifest', 
   assert.deepEqual(validManifest.lifecycleEvidence, {
     mode: 'append-only-files',
     directory: `docs/release/evidence/${sourceSha}`,
-    recordSchema: 'docs/release/release-evidence.schema.json',
+    recordSchema: 'docs/release/release-evidence.v2.schema.json',
   });
   for (const obsoleteField of [
     'secretVersions',

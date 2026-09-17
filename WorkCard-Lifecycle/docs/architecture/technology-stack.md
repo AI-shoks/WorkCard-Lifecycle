@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.technology-stack
 status: accepted
-version: 3
+version: 4
 owner: architecture
-updated: 2026-09-05
+updated: 2026-09-17
 ---
 
 # Technology Stack
@@ -35,9 +35,11 @@ updated: 2026-09-05
 | DB integration | Vitest + PostgreSQL container | реальные constraints, транзакции, конкурентность и миграции; SQLite не подменяет PostgreSQL |
 | Browser E2E | Playwright | core demo sequence, permissions, conflict recovery, desktop/mobile |
 | Наблюдаемость | Pino JSON logs, request/correlation IDs, health endpoints | без внешнего APM в MVP |
-| Доставка | multi-stage OCI image + PostgreSQL; Docker Compose локально | frontend собирается отдельно и раздаётся API под тем же origin |
+| Доставка | один nonroot multi-stage OCI image в Render Free, отдельные Neon Free PostgreSQL 18 projects; Docker Compose локально | frontend собирается отдельно и раздаётся API под тем же origin; public GHCR build once и immutable digest по [ADR-0009](adr/0009-render-free-neon-free-release.md) |
 
 Точные patch-версии принадлежат lockfile и digest/tag контейнеров. Архитектурные документы фиксируют поддерживаемые линии, чтобы обновление patch не требовало нового ADR.
+
+Hosted PostgreSQL patch управляется Neon; фактическая версия, TLS, proxy chain Render и resolved image требуют разрешённой проверки по [[deployment]]. Отдельный staging API существует только локально или временно на Actions runner, обычные CI-тесты используют disposable локальную PostgreSQL. Подготовленный GCP Terraform сохраняется неактивным историческим вариантом.
 
 ### Уточнение frontend-реализации этапа 8
 

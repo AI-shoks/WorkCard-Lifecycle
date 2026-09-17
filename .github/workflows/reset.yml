@@ -1,0 +1,88 @@
+name: Verified daily demo reset
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type RESET SYNTHETIC PRODUCTION DEMO
+        required: true
+        type: string
+permissions: {}
+concurrency:
+  group: work-card-owner-and-release
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+    working-directory: WorkCard-Lifecycle
+jobs:
+  current:
+    name: Resolve configured production image without owner credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      image: ${{ steps.current.outputs.image }}
+      sha: ${{ steps.current.outputs.sha }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - name: Check schedule/manual authorization
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$GITHUB_EVENT_NAME" == schedule || ( "$GITHUB_EVENT_NAME" == workflow_dispatch && "$CONFIRMATION" == 'RESET SYNTHETIC PRODUCTION DEMO' ) ]]
+      - name: Resolve current immutable image, public pull, and retained successful release
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          RENDER_OWNER_ID: ${{ vars.RENDER_OWNER_ID }}
+          RENDER_ORIGIN: ${{ vars.RENDER_ORIGIN }}
+        run: |
+          set -euo pipefail
+          image="$(node scripts/release/current-render-image.mjs)"
+          docker pull --platform linux/amd64 "$image"
+          sha="$(docker image inspect "$image" | jq -er '.[0].Config.Labels["org.opencontainers.image.revision"]')"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          release_image="$(node scripts/release/fetch-release.mjs "$sha")"
+          [[ "$release_image" == "$image" ]]
+          {
+            echo "image=$image"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+
+  reset:
+    name: Close gate, reset synthetic history, verify, then reopen
+    needs: current
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-owner
+    permissions:
+      contents: read
+    steps:
+      - name: Execute the fixed owner reset from the current image
+        env:
+          IMAGE: ${{ needs.current.outputs.image }}
+          APP_ENV: production
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+          NEON_DATABASE_HOST: ${{ vars.NEON_DATABASE_HOST }}
+          NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME }}
+          STAGING_NEON_HOST: ${{ vars.STAGING_NEON_HOST }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          [[ -n "$STAGING_NEON_HOST" && "$NEON_DATABASE_HOST" != "$STAGING_NEON_HOST" ]]
+          [[ "$IMAGE" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_./-]+@sha256:[0-9a-f]{64}$ ]]
+          docker pull --platform linux/amd64 "$IMAGE"
+          # Failure/TERM requires explicit owner recovery; cleanup never changes the gate.
+          timeout --signal=TERM --kill-after=30s 600s docker run --rm --init \
+            -e APP_ENV -e MIGRATION_DATABASE_URL -e NEON_DATABASE_HOST -e NEON_DATABASE_NAME \
+            "$IMAGE" node dist/owner-maintenance.js reset

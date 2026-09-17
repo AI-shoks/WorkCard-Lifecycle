@@ -2,11 +2,16 @@ name: Release image
 
 on:
   workflow_dispatch:
+    inputs:
+      resume_run_id:
+        description: Original failed run after first GHCR publication; reuses its digest without rebuilding
+        required: false
+        type: string
 
 permissions: {}
 
 concurrency:
-  group: release-image
+  group: work-card-release-image
   cancel-in-progress: false
 
 defaults:
@@ -111,261 +116,137 @@ jobs:
           echo "ci-run-url=$ci_run_url" >> "$GITHUB_OUTPUT"
 
   publish:
-    name: Build, publish, verify, and scan
+    name: Build once, publish public GHCR digest, scan and retain
     needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
-      contents: read
-      id-token: write
+      actions: read
+      contents: write
+      packages: write
     env:
-      GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT: ${{ vars.GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT }}
-      GCP_RELEASE_PROJECT_ID: ${{ vars.GCP_RELEASE_PROJECT_ID }}
-      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      REGION: europe-west1
-      SOURCE_CI_RUN_URL: ${{ needs.preflight.outputs.ci-run-url }}
       SOURCE_SHA: ${{ needs.preflight.outputs.source-sha }}
+      SOURCE_CI_RUN_URL: ${{ needs.preflight.outputs.ci-run-url }}
       TRIVY_IMAGE: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
     steps:
-      - name: Checkout the verified source SHA
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ needs.preflight.outputs.source-sha }}
-
-      - name: Set up the pinned release workspace
-        uses: ./.github/actions/setup-workspace
-
-      - name: Validate keyless release configuration
+      - uses: ./.github/actions/setup-workspace
+      - name: Authenticate publisher and reject any previously published source tag
+        if: inputs.resume_run_id == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-
-          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "The release candidate is not a full lowercase commit SHA." >&2
-            exit 1
-          }
-          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]] || {
-            echo "The publish checkout does not match the verified candidate." >&2
-            exit 1
-          }
-          [[ -z "$(git status --porcelain --untracked-files=all)" ]] || {
-            echo "Release build requires a clean checkout." >&2
-            exit 1
-          }
-          [[ "$GCP_RELEASE_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]] || {
-            echo "GCP_RELEASE_PROJECT_ID is missing or invalid." >&2
-            exit 1
-          }
-          [[ "$GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT" == "work-card-publisher@${GCP_RELEASE_PROJECT_ID}.iam.gserviceaccount.com" ]] || {
-            echo "GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT does not match the Terraform publisher identity." >&2
-            exit 1
-          }
-          [[ "$GCP_WORKLOAD_IDENTITY_PROVIDER" =~ ^projects/[0-9]+/locations/global/workloadIdentityPools/github-actions/providers/work-card-release$ ]] || {
-            echo "GCP_WORKLOAD_IDENTITY_PROVIDER is missing or invalid." >&2
-            exit 1
-          }
-
-          image_repository="${REGION}-docker.pkg.dev/${GCP_RELEASE_PROJECT_ID}/work-card/work-card"
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          [[ -z "$(git status --porcelain --untracked-files=all)" ]]
+          image_repository="ghcr.io/${GITHUB_REPOSITORY,,}/work-card"
           image_tag="${image_repository}:${SOURCE_SHA}"
-          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          if docker manifest inspect "$image_tag" > "$RUNNER_TEMP/existing-image.json" 2> "$RUNNER_TEMP/manifest-error"; then
+            echo "This source SHA already has an image; promotion must reuse its recorded digest." >&2
+            exit 1
+          fi
+          grep -Eiq 'manifest unknown|no such manifest|not found' "$RUNNER_TEMP/manifest-error" || {
+            echo "Cannot prove the source tag is absent; refusing a rebuild." >&2
+            exit 1
+          }
           {
             echo "IMAGE_REPOSITORY=$image_repository"
             echo "IMAGE_TAG=$image_tag"
-            echo "BUILD_SCAN_RUN_URL=$run_url"
+            echo "BUILD_SCAN_RUN_URL=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
           } >> "$GITHUB_ENV"
-
-      - name: Build the release image once
-        id: build
+      - name: Build the release image exactly once
+        if: inputs.resume_run_id == ''
         run: |
           set -euo pipefail
-
-          docker build \
-            --platform linux/amd64 \
-            --pull \
-            --no-cache \
-            --build-arg "APP_VERSION=$SOURCE_SHA" \
-            --tag "$IMAGE_TAG" \
-            .
-          local_image_id="$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')"
-          [[ "$local_image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || {
-            echo "The local release image has an invalid image ID." >&2
-            exit 1
-          }
-          echo "local-image-id=$local_image_id" >> "$GITHUB_OUTPUT"
-
-      - name: Authenticate to Google Cloud through Workload Identity
-        id: auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        with:
-          create_credentials_file: true
-          project_id: ${{ env.GCP_RELEASE_PROJECT_ID }}
-          service_account: ${{ env.GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT }}
-          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-
-      - name: Set up the pinned Google Cloud CLI
-        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-        with:
-          project_id: ${{ env.GCP_RELEASE_PROJECT_ID }}
-          version: 582.0.0
-
-      - name: Authenticate Docker and reject an existing immutable tag
+          docker build --platform linux/amd64 --pull --no-cache --build-arg "APP_VERSION=$SOURCE_SHA" --tag "$IMAGE_TAG" .
+          docker save "$IMAGE_TAG" --output "$RUNNER_TEMP/built-image.tar"
+          image_config_digest="$(node scripts/release/verify-image-config.mjs "$RUNNER_TEMP/built-image.tar" "$SOURCE_SHA")"
+          echo "LOCAL_IMAGE_CONFIG_DIGEST=$image_config_digest" >> "$GITHUB_ENV"
+      - name: Push source tag and resolve digest
+        if: inputs.resume_run_id == ''
         run: |
           set -euo pipefail
-
-          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-
-          error_file="$(mktemp)"
-          if existing_digest="$(gcloud artifacts docker images describe "$IMAGE_TAG" \
-            --project "$GCP_RELEASE_PROJECT_ID" \
-            --format='value(image_summary.digest)' 2>"$error_file")"; then
-            echo "Immutable release tag already exists with digest $existing_digest; refusing to rebuild or overwrite it." >&2
-            exit 1
-          fi
-          if ! grep -Eiq 'NOT_FOUND|not found|does not exist' "$error_file"; then
-            echo "Could not prove that the immutable release tag is absent." >&2
-            sed -E 's/(ya29\.[A-Za-z0-9._-]+)/[REDACTED]/g' "$error_file" >&2
-            exit 1
-          fi
-
-      - name: Publish the full-SHA tag and capture its registry digest
-        id: publish
-        run: |
-          set -euo pipefail
-
-          docker push "$IMAGE_TAG"
-          image_digest="$(gcloud artifacts docker images describe "$IMAGE_TAG" \
-            --project "$GCP_RELEASE_PROJECT_ID" \
-            --format='value(image_summary.digest)')"
-          [[ "$image_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
-            echo "Artifact Registry returned an invalid image digest." >&2
-            exit 1
-          }
-
-          immutable_image="${IMAGE_REPOSITORY}@${image_digest}"
-          {
-            echo "IMAGE_DIGEST=$image_digest"
-            echo "IMMUTABLE_IMAGE=$immutable_image"
-          } >> "$GITHUB_ENV"
-          {
-            echo "image-digest=$image_digest"
-            echo "immutable-image=$immutable_image"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Pull and verify the published image by digest
-        env:
-          LOCAL_IMAGE_ID: ${{ steps.build.outputs.local-image-id }}
-        run: |
-          set -euo pipefail
-
-          docker pull --platform linux/amd64 "$IMMUTABLE_IMAGE"
-          published_metadata="$(docker image inspect "$IMMUTABLE_IMAGE")"
-          published_image_id="$(jq -er '.[0].Id' <<<"$published_metadata")"
-          oci_revision="$(jq -er '.[0].Config.Labels["org.opencontainers.image.revision"]' <<<"$published_metadata")"
-          app_version="$(jq -er '.[0].Config.Env | map(select(startswith("APP_VERSION="))) | select(length == 1) | .[0][12:]' <<<"$published_metadata")"
-          platform="$(jq -er '.[0] | "\(.Os)/\(.Architecture)"' <<<"$published_metadata")"
-
-          [[ "$published_image_id" == "$LOCAL_IMAGE_ID" ]] || {
-            echo "The published image config does not match the single local build." >&2
-            exit 1
-          }
-          [[ "$oci_revision" == "$SOURCE_SHA" ]] || {
-            echo "The published OCI revision label does not match the source SHA." >&2
-            exit 1
-          }
-          [[ "$app_version" == "$SOURCE_SHA" ]] || {
-            echo "The published APP_VERSION does not match the source SHA." >&2
-            exit 1
-          }
-          [[ "$platform" == "linux/amd64" ]] || {
-            echo "The published image platform is not linux/amd64." >&2
-            exit 1
-          }
-
           mkdir -p .quality-results/release
-          docker save "$IMMUTABLE_IMAGE" --output .quality-results/release/published-image.tar
+          docker push "$IMAGE_TAG"
+          docker pull --platform linux/amd64 "$IMAGE_TAG"
+          immutable_image="$(docker image inspect "$IMAGE_TAG" | jq -er --arg repository "$IMAGE_REPOSITORY" '.[0].RepoDigests | map(select(startswith($repository + "@sha256:"))) | unique | select(length == 1) | .[0]')"
+          image_digest="${immutable_image##*@}"
+          [[ "$image_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           {
-            echo "IMAGE_CONFIG_DIGEST=$published_image_id"
-            echo "OCI_REVISION_LABEL=$oci_revision"
+            echo "IMMUTABLE_IMAGE=$immutable_image"
+            echo "IMAGE_DIGEST=$image_digest"
+            echo "SOURCE_BUILD_RUN_URL=$BUILD_SCAN_RUN_URL"
           } >> "$GITHUB_ENV"
-
+          jq -n --arg sha "$SOURCE_SHA" --arg image "$immutable_image" --arg config "$LOCAL_IMAGE_CONFIG_DIGEST" --arg run "$BUILD_SCAN_RUN_URL" '{sourceSha:$sha, immutableImage:$image, imageConfigDigest:$config, sourceBuildRunUrl:$run}' > .quality-results/release/published-identity.json
+      - name: Retain original publication identity before anonymous pull
+        if: inputs.resume_run_id == ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: published-identity-${{ needs.preflight.outputs.source-sha }}-${{ github.run_attempt }}
+          path: WorkCard-Lifecycle/.quality-results/release/published-identity.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+      - name: Resume the originally built digest after public visibility is configured
+        if: inputs.resume_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+        run: node scripts/release/resume-publication.mjs
+      - name: Prove anonymous public pull and exact image identity
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/public-docker" .quality-results/release
+          docker --config "$RUNNER_TEMP/public-docker" pull --platform linux/amd64 "$IMMUTABLE_IMAGE"
+          docker image inspect "$IMMUTABLE_IMAGE" | jq -e --arg sha "$SOURCE_SHA" '
+            .[0] | .Os == "linux" and .Architecture == "amd64" and
+            .Config.Labels["org.opencontainers.image.revision"] == $sha and
+            ([.Config.Env[] | select(startswith("APP_VERSION="))] == ["APP_VERSION=" + $sha]) and
+            (.Config.User != "" and .Config.User != "root" and .Config.User != "0")' >/dev/null
+          docker save "$IMMUTABLE_IMAGE" --output .quality-results/release/published-image.tar
+          node scripts/release/verify-image-config.mjs .quality-results/release/published-image.tar "$SOURCE_SHA" "$LOCAL_IMAGE_CONFIG_DIGEST"
       - name: Scan the pulled published digest
         run: |
           set -euo pipefail
-
-          docker run --rm \
-            -v "$PWD/.quality-results/release:/scan" \
-            "$TRIVY_IMAGE" image \
-            --input /scan/published-image.tar \
-            --scanners vuln \
-            --parallel 1 \
-            --no-progress \
-            --severity HIGH,CRITICAL \
-            --exit-code 1 \
-            --format json \
-            --output /scan/image-vulnerabilities.json
-
-      - name: Refresh the short-lived Workload Identity credential
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        with:
-          create_credentials_file: true
-          project_id: ${{ env.GCP_RELEASE_PROJECT_ID }}
-          service_account: ${{ env.GCP_ARTIFACT_PUBLISHER_SERVICE_ACCOUNT }}
-          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-
-      - name: Recheck tag and digest in Artifact Registry
+          docker run --rm -v "$PWD/.quality-results/release:/scan" "$TRIVY_IMAGE" image \
+            --input /scan/published-image.tar --scanners vuln --parallel 1 --no-progress \
+            --severity HIGH,CRITICAL --exit-code 1 --format json --output /scan/image-vulnerabilities.json
+      - name: Generate and validate versioned release manifest and migration checksums
         run: |
           set -euo pipefail
-
-          tag_digest="$(gcloud artifacts docker images describe "$IMAGE_TAG" \
-            --project "$GCP_RELEASE_PROJECT_ID" \
-            --format='value(image_summary.digest)')"
-          exact_digest="$(gcloud artifacts docker images describe "$IMMUTABLE_IMAGE" \
-            --project "$GCP_RELEASE_PROJECT_ID" \
-            --format='value(image_summary.digest)')"
-          [[ "$tag_digest" == "$IMAGE_DIGEST" && "$exact_digest" == "$IMAGE_DIGEST" ]] || {
-            echo "Artifact Registry digest recheck failed." >&2
-            exit 1
-          }
-
-      - name: Create the non-secret release manifest
-        run: |
-          set -euo pipefail
-
-          generated_at="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
           node scripts/release/create-release-manifest.mjs \
-            --source-sha "$SOURCE_SHA" \
-            --image-tag "$IMAGE_TAG" \
-            --image-digest "$IMAGE_DIGEST" \
-            --image-config-digest "$IMAGE_CONFIG_DIGEST" \
-            --oci-revision-label "$OCI_REVISION_LABEL" \
-            --source-ci-run-url "$SOURCE_CI_RUN_URL" \
-            --build-scan-run-url "$BUILD_SCAN_RUN_URL" \
-            --scanner-image "$TRIVY_IMAGE" \
-            --generated-at "$generated_at"
-
-          manifest_path="docs/release/manifests/${SOURCE_SHA}.json"
-          node scripts/release/validate-release-manifest.mjs \
-            --manifest "$manifest_path" \
-            --scan-report .quality-results/release/image-vulnerabilities.json
-
-          {
-            echo "### Release image candidate"
-            echo
-            echo "- Source SHA: \`$SOURCE_SHA\`"
-            echo "- Immutable image: \`$IMMUTABLE_IMAGE\`"
-            echo "- Manifest artifact path: \`WorkCard-Lifecycle/$manifest_path\`"
-            echo "- Terraform apply and deployment: not performed"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload release evidence
+            --source-sha "$SOURCE_SHA" --image-tag "$IMAGE_TAG" --image-digest "$IMAGE_DIGEST" \
+            --image-config-digest "$LOCAL_IMAGE_CONFIG_DIGEST" --oci-revision-label "$SOURCE_SHA" \
+            --source-ci-run-url "$SOURCE_CI_RUN_URL" --build-scan-run-url "$BUILD_SCAN_RUN_URL" \
+            --source-build-run-url "$SOURCE_BUILD_RUN_URL" \
+            --scanner-image "$TRIVY_IMAGE" --generated-at "$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
+          node scripts/release/validate-release-manifest.mjs --manifest "docs/release/manifests/${SOURCE_SHA}.json" --scan-report .quality-results/release/image-vulnerabilities.json
+          tar -czf "$RUNNER_TEMP/release-record.tar.gz" \
+            "docs/release/manifests/${SOURCE_SHA}.json" docs/release/release-manifest.v2.schema.json \
+            docs/release/release-evidence.v2.schema.json .quality-results/release/image-vulnerabilities.json
+          sha256sum "$RUNNER_TEMP/release-record.tar.gz" | awk '{print $1 "  release-record.tar.gz"}' > "$RUNNER_TEMP/release-record.sha256"
+      - name: Retain immutable release records for service lifetime and rollback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Releases and GHCR versions have no automatic retention/deletion policy here.
+          # Do not add --clobber: an existing record is immutable evidence.
+          gh release create "work-card-${SOURCE_SHA}" --target "$SOURCE_SHA" \
+            --title "Work Card ${SOURCE_SHA}" --notes "Public GHCR image and validated release evidence. Deployment is a separate manual workflow." \
+            "$RUNNER_TEMP/release-record.tar.gz" "$RUNNER_TEMP/release-record.sha256"
+      - name: Upload temporary diagnostic scan evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-image-${{ needs.preflight.outputs.source-sha }}
           path: |
             WorkCard-Lifecycle/docs/release/manifests/${{ needs.preflight.outputs.source-sha }}.json
-            WorkCard-Lifecycle/docs/release/release-manifest.schema.json
-            WorkCard-Lifecycle/docs/release/release-evidence.schema.json
             WorkCard-Lifecycle/.quality-results/release/image-vulnerabilities.json
-          if-no-files-found: warn
+            WorkCard-Lifecycle/.quality-results/release/published-identity.json
           include-hidden-files: true
+          if-no-files-found: warn
           retention-days: 30

@@ -5,3 +5,6 @@ coverage
 docs
 scripts
 pnpm-lock.yaml
+
+# Strict JSON subset of YAML: offline Render contract parses this without YAML overrides.
+render.yaml

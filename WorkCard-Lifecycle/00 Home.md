@@ -6,9 +6,9 @@ tags:
   - case-study
   - workcard
 status: active
-version: 18
+version: 22
 owner: navigation
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # Production Work Card Workflow
@@ -17,7 +17,7 @@ updated: 2026-09-06
 
 ## Сейчас
 
-**Этапы 1–9 закрыты. Этап 10 «Релиз» остаётся в работе на 4/7:** [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment|релизный runbook]] дополнили release design ограниченным public demo, owner-only reset и раздельными publisher/deployment WIF. В текущей ветке подготовлены `deploy.yml`, exact-digest staging validators и HTTPS-only hosted smoke без DB/owner credentials; Terraform review-plan содержит `167/0/0`. Это локальная code/config/plan проверка, а не hosted qualification: `apply`/workflows не запускались, cloud resources, image/manifest, реальные IAM/reset/proxy/socket/logging observations и staging evidence отсутствуют. Implementation SHA этапа 9 [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) подтверждён только прежними [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850); текущие изменения удалённо не запускались. Локальные результаты и ограничения — [[quality-gates]].
+**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]; read-only preflight начат. Локальная реализация не заменяет ещё не завершённые hosted qualification и release evidence.**
 
 ### Подтверждения предыдущих этапов
 
@@ -32,7 +32,7 @@ updated: 2026-09-06
 - [Repository](https://github.com/AI-shoks/WorkCard-Lifecycle)
 - [Наглядная карта проекта](docs/project-dashboard.html)
 - [README](README.md)
-- [Reviewable Terraform](infra/terraform/README.md)
+- [Render configuration](infra/render/README.md) и [исторический Terraform](infra/terraform/README.md)
 - [[project-plan|Канонический roadmap]]
 - [[backlog|Backlog]]
 - [[decision-log|Журнал решений]]

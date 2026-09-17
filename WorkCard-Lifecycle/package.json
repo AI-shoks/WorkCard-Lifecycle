@@ -15,6 +15,7 @@
     "compose:down": "docker compose down",
     "compose:logs": "docker compose logs --follow app database",
     "compose:up": "docker compose up --build",
+    "db:bootstrap": "pnpm --filter @work-card/api db:bootstrap",
     "db:migrate": "pnpm --filter @work-card/api db:migrate",
     "db:reset-demo": "pnpm --filter @work-card/api db:reset-demo",
     "db:seed": "pnpm --filter @work-card/api db:seed",

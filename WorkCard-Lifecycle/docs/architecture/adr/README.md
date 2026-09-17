@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.adr-index
 status: active
-version: 4
+version: 5
 owner: architecture
-updated: 2026-09-06
+updated: 2026-09-17
 aliases:
   - adr-index
 ---
@@ -35,7 +35,9 @@ aliases:
 
 | ADR | Статус | Решение |
 |---|---|---|
-| [[0007-cloud-run-and-cloud-sql-release|ADR-0007]] | accepted | Cloud Run service/jobs, Artifact Registry и отдельные Cloud SQL staging/production |
-| [[0008-bounded-public-demo-operations|ADR-0008]] | accepted | Ограниченный общий public demo, daily reset, узкий IAM operator и конечный lifetime |
+| [[0007-cloud-run-and-cloud-sql-release|ADR-0007]] | superseded by ADR-0009 | Cloud Run service/jobs, Artifact Registry и отдельные Cloud SQL staging/production |
+| [[0008-bounded-public-demo-operations|ADR-0008]] | superseded by ADR-0009 | Ограниченный общий public demo, daily reset, узкий IAM operator и конечный lifetime |
+
+| [[0009-render-free-neon-free-release|ADR-0009]] | accepted | Render Free + Neon Free, public GHCR, persistent maintenance и clean synthetic recovery |
 
 State machine и предметные границы уже приняты в [[work-card-state-machine]], [[domain-model]] и решениях `D-014`–`D-021`; ADR-0002 фиксирует их физическое отображение, не создавая конкурирующую предметную модель.

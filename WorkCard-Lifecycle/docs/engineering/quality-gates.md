@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 15
+version: 21
 owner: engineering
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # Quality Gates
@@ -25,11 +25,155 @@ pnpm check
 | Unit/API | `pnpm test` | Vitest проверяет frontend API client, формы, permissions, session/role switch, selection, command/read-back и recovery states; API проверяет health/config/security. DB suite запускается отдельно с явным integration URL |
 | Build | `pnpm build` | contracts, API и SPA собираются для production |
 
-Markdown не переписывается Prettier: документация имеет собственную metadata/link проверку через `project-docs-auditor` и обязательный semantic pass. Это сохраняет осознанное форматирование Obsidian-артефактов и не скрывает их отдельный quality gate.
+Каталог `docs/` исключён из Prettier: governed documentation имеет собственную metadata/link проверку через `project-docs-auditor` и обязательный semantic pass. Корневые README/Home и прочие Markdown вне исключённых каталогов продолжают участвовать в formatter gate.
 
-## Интеграционный gate
+## Первый публичный deployment — подготовка 2026-09-17
 
-Перед принятием инфраструктурного изменения выполняются:
+Пользователь разрешил scoped commit/push/PR/merge после обязательных checks, один Render Free image service, два отдельных Neon Free PG18 projects, необходимые secrets/environments, публикацию GHCR, owner operations и hosted qualification. Платные планы/overage, GCP apply/destroy и удаление чужих данных запрещены. Разрешение не является свидетельством выполненного deployment.
+
+Фактический Git root — родительский каталог `WorkCard-Lifecycle`, remote — `AI-shoks/WorkCard-Lifecycle`; подготовка ведётся в `codex/render-neon-first-deployment`. Посторонние `Codex Workflow/`, соседние portfolio artifacts и ранее подготовленные Terraform HCL/scripts/backend templates сохраняются вне scoped commit.
+
+- GitHub: доступ к публичному repository подтверждён; созданы `staging-owner`, `staging-runtime`, `production-owner`, `production` с deployment branch policy только для `main`. Разные runtime-role passwords установлены только в owner environments, staging session secret — только в `staging-runtime`; остальные bindings ожидают созданных targets, см. [[environments]].
+- Render: `My Workspace` (`tea-d8q4f1cvikkc73al6vq0`), Hobby, `No card on file`, начисления/прогноз `$0`, использование `0.75/750` instance hours и `0/5 GB` bandwidth подтверждены в Billing. Квоты общие с существующими сторонними services; они не изменялись. WorkCard service ещё не создан.
+- Docker Desktop восстановлен обратимым сохранением служебных socket directories и остановкой только `docker-desktop`; factory reset, удаление WSL disk/контейнеров/volumes не выполнялись. Engine `29.7.2`, `linux/amd64` отвечает; перед новым container gate сохранён inventory существующих ресурсов.
+- Повторные локальные lint/typecheck и API `69` tests прошли. Frontend: `140` tests прошли, worker для `interactive-screens.test.tsx` дважды не стартовал в ограниченной оболочке; повтор с одним worker не устранил startup timeout. После cleanup и восстановления свободной RAM до `1.01 GiB` один прямой запуск pinned Node/Vitest вне ограниченной оболочки прошёл `18/18` оставшихся tests за `9.41 s`; все `158` frontend tests покрыты раздельными локальными прогонами. Assertions/timeouts не менялись. Последующий production build PASS. Полный удалённый code/database CI gate также прошёл на `18ecf1783ee72863ec38e1b83e24ebf5d7125b92`.
+- Release review: `85/85` release и `2/2` Render tests PASS на Node `24.20.0`; contract checker, actionlint `1.7.12` всех пяти workflows, focused ESLint/Prettier и diff check PASS. Исправлены environment origin для browser, containerd config digest, запрет registry credentials и безопасные cookie/error checks. Clean container build/startup, repeat bootstrap/verify, отдельная readiness и HTTP/assets прошли; runtime UID `65532:65532`, read-only root, `cap_drop=ALL`, `no-new-privileges` и отсутствие owner credentials подтверждены. Trivy `0.74.0` с новой CVE DB: `14` OS и `100` Node packages, `0 HIGH/CRITICAL`. Проверен actual config digest `sha256:28c30dc584a44f20c6993b8b354679ca80fc770677f72eda9125eb26ec49158e`; это локальный QA image, не опубликованный release. Полный formatter exact scoped index PASS; hosted qualification ожидает prerequisites. Публичные URL/digest/release record ещё отсутствуют; rollback не проверен.
+
+Текущий clean-container профиль также повторно подтвердил PostgreSQL integration `6/6` с non-superuser owner, quality `31/31`, Gitleaks `8.30.1` (история и current source) `0` findings. После удаления только собственных QA containers/network/нового volume исходные `4` containers, `2` volumes и `8` images совпали с inventory; `101` build-source hashes не изменились. Локальные logs/repro scripts/image tar сохранены в ignored `.quality-results/render-neon-20260917-container/`; exact commit snapshot отдельно прошёл Gitleaks `0` findings и strict docs audit `59/0/0`.
+
+Создан [PR #3](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/3). Первый [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35208854588) завершился: code/database, security, clean container/Trivy, compact browser, canonical browser и performance прошли; release contract выявил Linux ShellCheck `SC2034` в счётчике ожидания staging readiness. Добавлена диагностика номера попытки без изменения readiness/assertions/deadline. До полного успешного CI нового SHA merge и публикация запрещены. GitHub Releases пока отсутствуют, поэтому предыдущий совместимый release image для реального rollback не установлен.
+
+## Render Free / Neon Free — предшествующий локальный переход 2026-09-17
+
+Текущий target задан [[0009-render-free-neon-free-release|ADR-0009]]. Изменены runtime/owner TCP/TLS contract, SQL roles, постоянный maintenance/generation barrier, health/Docker contract и GHCR/Render workflows. GCP Terraform/foundation/backend files сохранены неактивными; GCP-only часть deployment gate заменена новым contract. Остальные code, DB, security, browser compact/canonical, container scan и performance gates остаются обязательными.
+
+В предшествующем локальном проходе были разрешены только изменения файлов и безопасные локальные проверки. Подключения к hosted БД, resource/account/billing/secret changes, публикация image, remote workflow/deployment и commit/push тогда не выполнялись. Этот исторический scope не отменяет последующее разрешение на первый deployment, описанное выше. Заявление «GCP deployment ещё не выполнялся» основано на репозитории; GCP аккаунты в текущей задаче не проверяются.
+
+Список обязательной локальной проверки: bootstrap/repeat с non-superuser owner, privileged role rejection, runtime grants, immutable migration checksums; TLS expected-target/downgrade/override negatives; reads/session/command maintenance races, auth-reset race, cancellation, 26h fail-closed; versioned manifest/scan/evidence, deployment contract и workflow actionlint. Реальные hosted TLS/roles, Render proxy chain/client IP, deployment resolved digest, cold start, reset/recovery и account/$0 settings остаются будущей qualification по [[deployment]].
+
+Проверки выполнены на заданных репозиторием Node `24.20.0`, pnpm `11.19.0` и отдельной disposable PostgreSQL `18.6` на loopback; установленная пользовательская БД не использовалась. Полный quality suite — `31/31 PASS`, включая `26` PostgreSQL tests и `5` local target guards. Результаты текущего рабочего дерева:
+
+| Проверка | Локальный результат и граница |
+|---|---|
+| API unit/config/runtime/health | `69 PASS`; `6` DB integration cases пропущены только в обычном unit run и проверены отдельно с явными local URLs |
+| Frontend | `158 PASS` |
+| PostgreSQL integration | `6 PASS` с non-superuser owner; owner/runtime credentials раздельны |
+| PostgreSQL quality | `26 PASS`: bootstrap/repeat, privilege/migration boundaries (включая column ACL/PUBLIC/grant options), maintenance/read/session/command/auth-reset races, cancellation, fail-closed и DB budgets |
+| Local DB helper guards | `5 PASS`: remote targets и URL overrides отвергаются до connection; guard не ослаблен для Neon |
+| Browser compact | `4 PASS`, desktop/mobile lifecycle и recovery; первый одновременный с тяжёлыми проверками запуск имел desktop timeouts, последовательный повтор прошёл без ослабления assertions/timeouts |
+| Browser canonical | `2 PASS` в отдельном повторе на Node `24.20.0` / PostgreSQL `18.6`: полный процесс `250` cards, `762` UI commands и recovery, около `10.5` минут. Assertions/deadlines/retries не менялись. Первый запуск имел timeout ожидания clickable button при успешных API responses; его trace сохранён отдельно |
+| Performance | PASS: `40` batches, `120` sets, `10 000` cards, `12 800` audit events, `40` samples; это воспроизводимый профиль, не business SLA |
+| Dependencies | `pnpm audit --audit-level=high`: известных уязвимостей не найдено |
+| Secrets | Gitleaks `8.30.1`: финальный снимок текущего source `2.51 MB` — `0` находок; история `44` commits также дала `0` и после проверки не менялась. Последующая документационная правка фиксирует только результаты, без новых конфигураций/secret values |
+| Static code / build | API/quality typecheck, полный ESLint и итоговый полный production build PASS |
+| Release / Render contract | `80 PASS` offline tests; actionlint `1.7.12` всех пяти workflows PASS. Это fixtures/validators, не provider execution |
+| Compose model | `docker compose config --quiet` PASS; readiness вынесена в профиль `checks` и отдельный `run` после `up --wait`. Проверена модель, не запуск Linux image |
+
+Текущие container build/startup и Trivy image scan **недоступны**: установленный Docker Desktop не смог поднять engine из-за ошибки переименования stale `sailor-ingest.sock`/доступа к файлу. Factory reset, удаление Docker state и изменение чужих ресурсов не выполнялись. Реальная PostgreSQL на host не заменяет обязательный container gate; сохранённые ниже старые image scans не относятся к текущему diff.
+
+Полный formatter gate не зелёный из-за трёх существовавших до задачи untracked документов в `Codex Workflow/`: `00 Codex Workflow.md`, `IMPLEMENTATION-BOARD.md`, `templates/TASK-CAPTURE.md`. Посторонние файлы не изменяются и не исключаются из gate ради результата. Поэтому `pnpm check` не объявляется полностью успешным даже при отдельных успешных lint/typecheck/tests/build.
+
+Структурный audit после обновления связанных документов: **59 документов, 0 errors, 0 warnings**, `--fail-on-warning`. Semantic pass устранил противоречия между текущими deployment/environments/security/CI/project docs и прежним GCP выбором: ADR-0007/0008 имеют reciprocal supersession к ADR-0009; GCP runbook, результаты и IaC остаются историческими. Отсутствие structural findings само по себе не доказывает поведение приложения.
+
+Все разделы ниже — сохранённые результаты **предыдущих дат и SHA**, включая прежние ограничения локального shell и GCP account observations. Они не являются повторными тестами текущего Render/Neon diff или текущей проверкой внешних аккаунтов.
+
+## Docker, security gates и Google Cloud CLI — 2026-09-09
+
+Проверено текущее рабочее дерево без commit/push. Исходные 21 изменённый tracked file, шесть untracked IaC files и соседние untracked artifacts сохранены. Применены пользовательские корневые инструкции и `WorkCard-Lifecycle/AGENTS.md`; других вложенных `AGENTS.md` не найдено. Дата раздела — локальная `Europe/Moscow`; логи контейнеров используют UTC.
+
+Docker Desktop `4.89.0` уже был установлен в `%LOCALAPPDATA%/Programs/DockerDesktop`, а его CLI уже входил в пользовательский PATH. Ограниченная оболочка не видела этот каталог; повторная проверка от имени пользователя нашла установку, Compose `5.5.0`, Buildx `0.36.1-desktop.1`, WSL `2.7.13.0` и существующий остановленный `docker-desktop`. Переустановка Docker, изменение WSL/Windows features и reboot не потребовались.
+
+Запуск выявил недоступные старые AF_UNIX sockets `Docker/run/sailor-ingest.sock`, затем `docker-secrets-engine/engine.sock`. Остановлены только процессы собственных неудавшихся запусков; служебные каталоги обратимо переименованы. Во втором каталоге предварительно подтверждён единственный нулевой `engine.sock`. Резервные копии сохранены в `%LOCALAPPDATA%`: `Docker/run.local-tools-backup-20260909`, `Docker/run.local-tools-backup-20260909-attempt2`, `docker-secrets-engine.local-tools-backup-20260909`. WSL-диск и прежние данные не сбрасывались. Похожий последовательный сбой описан в [трекере Docker](https://github.com/docker/desktop-feedback/issues/460); фактическая диагностика этого прохода основана на локальных логах.
+
+| Проверка | Результат |
+|---|---|
+| Docker daemon / isolation | PASS: Engine `29.7.2`, `linux/amd64`; отдельный Compose project `wcl-local-tools-20260909`, image `wcl-local-tools-20260909-app:local`, новый том `wcl-local-tools-20260909-postgres`, loopback HTTP `35549` / PostgreSQL `55489`. Использован существующий `quality/compose.override.yaml`; исходный `.env` не загружался |
+| Compose config | PASS: основной файл и изолированная merged model; проверены уникальные image/volume names и свободные порты |
+| Clean container | PASS: `compose build --no-cache app` с локальным `APP_VERSION=0.1.0-local-tools`, затем `up --no-build --wait --wait-timeout 180`; app/DB healthy, initial migrate/seed exit `0` |
+| Повторный bootstrap / runtime | PASS: repeat migrate/history `0001`–`0003`, repeat seed и `node dist/verify-database.js`; UID `65532:65532`, read-only root, `cap_drop=ALL`, `no-new-privileges:true` |
+| HTTP / assets | PASS: `/`, `/health/live`, `/health/ready`, JS и CSS — `200`, правильные MIME; оба health payload ровно `{"status":"ok"}` |
+| Gitleaks | PASS: существующий `pnpm security:secrets`, pinned `v8.30.1`, `--all` history (`44` commits) и current-source snapshot; оба JSON содержат `0` findings. Сеть scanner-контейнеров отключена, mounts исходников read-only, redaction `100%`; прежние узкие history ignores не расширялись |
+| Trivy exact image | PASS: pinned `0.74.0`, свежая загруженная CVE DB, `--scanners vuln --parallel 1 --severity HIGH,CRITICAL --exit-code 1`, без `--ignore-unfixed`; Debian `13.6`, `14` OS и `100` Node packages, findings `0` |
+| Google Cloud CLI | PASS: официальная подписанная установка только для текущего пользователя, SDK `583.0.0`, bundled Python `3.14.7`, user PATH, сохранённое `disable_usage_reporting=True`; обычный PowerShell launcher и настоящий `gcloud.cmd` через preflight wrapper работают |
+| Foundation preparation | PASS только локальной части: `9/9` preflight fixtures и повторно прочитанные GitHub IDs `1303711056` / `294865028`. Сохранённых/активных Google accounts `0`, ADC file отсутствует; настоящий GCP preflight не запускался |
+
+Docker containerd store возвращает локальный image ID `sha256:a6ffe1f46f255ceaf774e6d471c2d2c86f6f018888d37d6ad3835c0e996f1bc3`. Он совпал у построенного image и запущенного app. Отдельно из `docker save` проверены tag, bytes/config SHA-256 `sha256:1a0907963c8d2c02e8ac6ed540a0a30e7e2100636f2ecaa050d2d43d67637655`, `linux/amd64`, UID и OCI revision; `Trivy.Metadata.ImageID` совпал именно с config digest. Это локальный QA image, без registry publication и release manifest. Дополнительный локальный валидатор отчёта первоначально ожидал тип `npm`; он исправлен на наблюдаемый `lang-pkgs/node-pkg`, тот же успешный отчёт проверен повторно без повторной сборки или сканирования.
+
+После проверки удалены только собственные тестовые контейнеры, сеть и том. Исходные четыре остановленных контейнера и два тома сохранились; их inventory сравнен до/после. Сверка SHA-256 исходных `240` файлов нашла изменения только в трёх документах этого прохода, остальные `237` файлов сохранены, staged diff пуст. Прежние ignored Gitleaks reports также сохранены.
+
+Несекретные команды и результаты сохранены в ignored `.quality-results/local-tools-2026-09-09/`: `container-gates.ps1`, `toolchain-summary.json`, `docker-before.json`/`docker-after.json`, build/start/verify/scan/cleanup logs, `runtime-verification.json`, `runtime-image.tar`, `image-vulnerabilities.json`, `scan-summary.json`, Gitleaks reports, `gcloud-verification.json` и `preservation.json`. Code/browser/performance/offline Terraform gates от 2026-09-08 остаются отдельными историческими результатами; они не объявляются повторно выполненными сегодня.
+
+Установка разрешена пользователем в этом проходе. Google OAuth/ADC login, Billing Overview, реальные billing/IAM/API/backend проверки, remote Terraform initialization, cloud writes, image publication, GitHub settings и commit/push не выполнялись. Текущий Free Trial status неизвестен. Исторический следующий read-only foundation preflight был подготовлен в [Terraform README](../../infra/terraform/README.md): нужны выбранный principal/ADC, реальные billing account, organization/folder, три project IDs и существующий защищённый state bucket. Этап 10 остаётся `4/7` до hosted qualification.
+
+## Локальная готовность при Pending Free Trial — 2026-09-08
+
+Проверяется текущее незакоммиченное рабочее дерево ветки `codex/stage-10-task-5-foundation-plan`. При старте уже были 18 изменённых tracked files в границах задачи (включая корневой `ci.yml`) и четыре untracked foundation/backend/preflight files внутри WorkCard-Lifecycle; staged diff был пуст. Существующие изменения сохранены, соседний `WorkCard-Project-Dashboard-Site` и social preview не изменялись. Этот проход добавляет локальные исправления safety/preflight и [[deployment|чек-лист развёртывания, бюджетов и семи суток]], но не повышает этап 10 выше 4/7.
+
+Системный Node в PATH — `24.18.0`, ниже package engines. Использован уже существующий bundled Node `24.19.0` (разрешён `>=24.19.0 <25`) и pnpm `11.19.0`; глобальный PATH, `.node-version` (`24.20.0` для CI), lockfile и зависимости не менялись. Terraform `1.16.1`, cached provider `7.45.0`, actionlint `1.7.12`, PostgreSQL `18.6` и Chromium найдены локально. Установок и скачивания toolchain не было.
+
+| Проверка | Текущий результат |
+|---|---|
+| `pnpm check` | PASS: format, ESLint, strict types, `158` frontend + `24` обычных API tests, `58` release tests, production build. Шесть DB integration tests в этом gate закономерно skipped без integration URL; они отдельно выполнены ниже |
+| `pnpm security:dependencies` | PASS: `No known vulnerabilities found`, все dependency scopes; это не скан runtime image |
+| Database bootstrap | PASS на отдельном PostgreSQL `18.6`: initial и repeat migrate/history checks, seed дважды, runtime verification/grants; существующая application DB не использовалась |
+| API integration / `pnpm test:quality` | PASS: `6/6` integration и `11/11` PostgreSQL regression tests, включая transactions/migrations/security/budgets |
+| `pnpm test:browser` | PASS: `4/4` compact lifecycle/recovery на desktop и mobile, около 1,2 минуты |
+| `pnpm test:browser:canonical` | PASS: `2/2`, полный процесс 250 карточек с финальной приёмкой/audit/payroll и recovery, около 8,6 минуты; исходный timeout сохранён |
+| `pnpm test:performance` | PASS: 40 партий, 120 комплектов, 10 000 карточек, 12 800 событий; 40 samples основных операций. Локальный p95: release 250 — 99,13 мс, detail на 10 000 карточках — 23,18 мс; это не hosted SLA |
+| Workflow syntax | PASS: существующий actionlint `1.7.12` для корневых `ci.yml`, `release.yml`, `deploy.yml`; удалённый CI не запускался |
+| Offline Terraform | PASS: isolated `init -backend=false -input=false -lockfile=readonly`, recursive `fmt -check`, `validate`; с одним contact full `167 create / 0 change / 0 destroy`, foundation `136 / 0 / 0`. Дополнительные реальные offline plans с двумя contacts: full `170 / 0 / 0`, foundation `139 / 0 / 0`, strict assertions PASS |
+| Negative Terraform inputs | PASS: все восемь недопустимых случаев завершились exit 1 — нет parent, общие secrets двух окружений, jobs без SHA/image, service без origin, более 7 суток без extension, более 30 суток с extension, production без обязательного PITR, staging без smoke identity |
+| Plan safety regression | PASS: `test-plan-safety.mjs` на реальном JSON каждого плана — `27/27` full и `27/27` foundation; positive baseline и negatives проверяют WIF, чужую workload identity, checks, budgets, secrets, teardown/actions, phase substitution и согласованность дополнительных alert contacts |
+| Read-only preflight fixtures | PASS: `9/9` тестов без SDK/GCP, включая raw GCS metadata, отказ при плохих inputs/CLI errors и реальное выполнение temporary `gcloud.cmd` с точными аргументами в Windows |
+| Final focused code check | PASS: явный Prettier для новых/изменённых IaC scripts, focused ESLint и общий финальный Node run release/preflight — `67/67`, `0` skipped; CI diff просмотрен |
+| Documentation audit | Strict PASS после исправлений: `57` документов, `0` errors / `0` warnings; semantic review исправил origin-by-phase, состав teardown по state, approval после подготовки plan и reset только для запущенного production |
+
+Первый конкурентный `pnpm check` получил два timeout по 5 секунд при создании Fastify app. Sequential диагностика API/web прошла с исходными assertions/timeouts, затем обычный неизменённый `pnpm check` без тяжёлых соседних процессов завершился exit 0. Приложение, таймауты и gate ради результата не менялись; оба лога сохранены. `pg_ctl start` в sandbox не смог создать restricted token Windows (error 87); прямой запуск `postgres.exe` на новом scratch cluster позволил пройти DB suite без изменения прав/служб. Собственный cluster остановлен, его data dir удалён после проверки пути.
+
+PostgreSQL quality suite выполнялась последовательно с `--maxWorkers=1 --no-file-parallelism`; проверки и данные не упрощались. Browser/performance использовали отдельный новый cluster и существующий Chromium. После завершения собственных data directories и password files осталось 0; прежние три browser/performance JSON восстановлены, SHA-256 совпали с исходными. Финальные tracked application/quality source diffs пусты. При отдельном focused check локальный `pnpm exec prettier` не разрешил shim; прямой запуск уже установленного CLI через Node выполнил проверку успешно, установка не потребовалась.
+
+Terraform review выполнялся в новой ignored копии только конфигурации/example inputs, без исходных backend/state/реальных tfvars и credentials, с filesystem-mirror-only provider installation, отключённым checkpoint, loopback proxy и искусственными ephemeral review markers. Рецепт — [Terraform README](../../infra/terraform/README.md#review-commands). Он подтверждает структуру и запреты, но не GCP APIs, IAM/quota, существование projects или backend write/lock capability. Computed service URI и actAs target `.name` сверяются дополнительно по фактическим outputs/hosted metadata; неизвестные apply-time значения не объявляются наблюдёнными.
+
+Независимый IaC review воспроизвёл ложный PASS старого checker для missing parent, повторно использованных staging/production secrets и WIF condition с `|| true`. Root/module safety checks переведены в блокирующие input validations; JSON guard отклоняет failed/missing/unexpected-unknown checks, требует точное AND-only WIF condition и workload member. Budget credit treatment теперь явно `EXCLUDE_ALL_CREDITS`, чтобы promotional/free-tier credits не скрывали usage от alerts. Regression tests включены в `release_iac`. Изменения не создают spending cap или автоматический teardown.
+
+Локальные несекретные логи находятся в ignored `.quality-results/local-readiness-2026-09-08/` (`code-summary.json`, code/dependencies, `db-native/`, `runtime/evidence/`, `final-release-preflight.log`, `prior-evidence-restored.json`) и `.quality-results/iac-review-20260908/` (offline plans/negative controls). Это воспроизводимые local QA результаты, не release manifest/evidence и не hosted qualification.
+
+### Зафиксированные ограничения на 2026-09-08
+
+Таблица сохраняет состояние прежней ограниченной оболочки. Docker впоследствии найден и восстановлен, Google Cloud CLI установлен; актуальные результаты — в разделе 2026-09-09 выше. Облачные prerequisites по-прежнему требуют отдельного подтверждения.
+
+| Блокер | Что пока не подтверждено | Минимальный следующий способ |
+|---|---|---|
+| Docker отсутствует | Compose model, clean container startup, Gitleaks history/current-source и Trivy exact image scan текущего дерева | Отдельно разрешить установку/запуск Docker и выполнить существующие gates; либо после отдельного commit/push approval получить все соответствующие CI jobs именно нового SHA. Исторические JSON не заменяют свежий gate |
+| Google Cloud CLI отсутствует; ADC не настроены | Настоящий read-only foundation preflight | Отдельно разрешить Google Cloud CLI, настроить short-lived account/ADC и выполнить `check-foundation-prerequisites.mjs` с реальными несекретными inputs; fixtures не являются GCP PASS |
+| Free Trial Pending, реальные inputs/approvals отсутствуют | Billing eligibility/currency, organization/folder, project IDs, contacts, approved cost/lifetime, IAM/quotas и защищённый существующий GCS backend | После активации подтвердить Billing Overview, заполнить и рассмотреть inputs по [[deployment]]; отсутствие organization/folder или state bucket требует отдельного решения, а не выдуманного ID |
+| Нет provisioned WIF/registry/workloads и exact release image | GitHub settings, publication, hosted staging, production promotion/rollback, proxy/log/socket/reset observations | Последовательно выполнить отдельно разрешённые foundation, release-image, staging и production фазы по [[deployment-gcp-history]] с фактическими digest/revision/job evidence |
+
+Python не в PATH, но strict docs audit работает через существующий `C:/Users/artem/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe`. Для локального `pnpm check` достаточно в отдельной PowerShell-сессии временно добавить `C:/Users/artem/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin` в начало PATH; системную версию менять не требуется. Terraform доступен по `C:/Users/artem/AppData/Local/Temp/workcard-terraform-1.16.1/terraform.exe`; наличие temporary binary следует перепроверять перед новым проходом.
+
+Google Cloud и GitHub settings не изменялись; `terraform apply/destroy`, remote backend initialization, release/deploy workflows, публикация image и commit/push не выполнялись. Следующий шаг после Pending — read-only подтверждение Free trial account, currency, credits и даты окончания в Billing Overview; это не разрешение на provisioning.
+
+## Foundation-plan этапа 10 — 2026-09-06
+
+Ветка `codex/stage-10-task-5-foundation-plan` создана от перечитанного `origin/main` merge-коммита `551f5b8dc966abda4e93219b4887f297aad61354`. Проверка намеренно остановлена до cloud mutation:
+
+| Проверка | Результат |
+|---|---|
+| Terraform toolchain | PASS: официальный Terraform `1.16.1` запущен из временного каталога; SHA256 архива совпал с опубликованным HashiCorp `5c6c6d8fedf56ce29c55f0c1fc91de3c259f42c2d220a28e827b5b60fd47bfa1`; provider lock остаётся `google 7.45.0` |
+| Format/validation | PASS: `terraform fmt -check -recursive`, `terraform validate`, Node syntax обоих safety/preflight scripts |
+| Foundation graph | PASS: offline `-refresh=false` plan ровно `136 create / 0 change / 0 destroy`, оба окружения `jobs=false`/`service=false`; exact type/action, IAM/WIF, deletion, no-workload и no-secret assertions приняты |
+| Full regression graph | PASS: прежний full contract остаётся `167 create / 0 change / 0 destroy` |
+| Negative controls | PASS: plan fail-closed отклоняет jobs/service без SHA/digest/origin и lifetime 8 суток без extension approval; safety checker отклоняет foundation-граф в full-режиме |
+| Repository checks | PASS: release contracts `58/58`, Prettier, focused ESLint и high-confidence pattern scan `0` findings в `20` изменённых files. Контейнерный Gitleaks не стартовал без Docker и остаётся обязательным удалённым gate, а не локальным PASS |
+| Read-only prerequisites | PASS только для публичных GitHub IDs: repository `1303711056`, owner `294865028`. `gcloud`, ADC и Google credential env отсутствуют; реальные hierarchy/billing/project/backend inputs не предоставлены, поэтому GCP/IAM/quota/backend checks — BLOCKED |
+| GitHub settings boundary | Read-only API вернул `0` environments; состояние repository variables недоступно текущей авторизации. Environment/variables/settings не создавались и не изменялись |
+| Governed docs | PASS: `project-docs-auditor` проверил `57` документов, `0` errors / `0` warnings; semantic pass сохраняет этап 10 на `4/7` и отделяет structural plan от apply-ready/hosted evidence |
+
+Plan использовал только example placeholders, ephemeral review markers и локальный provider graph; временные plan и process inputs удалены. `terraform apply`, remote backend initialization/refresh, `release.yml`, `deploy.yml`, GitHub settings mutations и любые cloud writes не выполнялись. Этот результат проверяет форму первого foundation-plan, но не является apply-ready plan.
+
+## Интеграционный gate — историческая последовательность
+
+Ниже сохранены команды прежнего Compose contract до ADR-0009. Они **не предназначены для исполнения в текущем checkout**: services `migrate`/`seed` заменены owner `bootstrap`, а verification требует owner boundary. Актуальная последовательность, включая отдельный `run readiness` после `up --wait`, находится в [[local-development#Чистый запуск|Local development]]. Исторический список:
 
 ```powershell
 docker compose config --quiet
@@ -151,9 +295,9 @@ Frontend coverage включает типизированные ответы и 
 
 При проверке реализации различались прежние 5 integration tests, новые PostgreSQL и browser suites, compact и canonical, локальные результаты и последующий CI implementation SHA. Негативная приёмка, переделка, переназначение, deployment и этапы 10–12 не добавлены. Соседние пользовательские dashboard/Home/Obsidian/site изменения не входили в implementation commit этапа 9. Семантических противоречий в затронутых канонических документах не найдено; структурный audit учитывается отдельно.
 
-## Локальные проверки PR #2 этапа 10 — 2026-09-06
+## Базовые проверки release orchestration этапа 10 — 2026-09-06
 
-Текущие незакоммиченные изменения в ветке `codex/stage-10-release-orchestration` сохраняют прогресс этапа 10 ровно `4/7`. Пятая задача начата как локально проверенная release-orchestration implementation, но не закрыта без provisioning и hosted qualification. Выполнились следующие локальные gates:
+Эти результаты относятся к release-orchestration implementation, позже вошедшей в merge-base `origin/main` `551f5b8`. Они сохраняют прогресс этапа 10 ровно `4/7`: пятая задача начата как локально проверенная реализация, но не закрыта без provisioning и hosted qualification. Тогда выполнились следующие локальные gates:
 
 | Проверка | Результат текущего checkout |
 |---|---|

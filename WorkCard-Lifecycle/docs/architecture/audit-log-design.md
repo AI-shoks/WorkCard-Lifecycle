@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.audit-log
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # Audit Log Design
@@ -88,7 +88,7 @@ Defense in depth:
 4. API не публикует mutation endpoint для истории.
 5. Migration/owner role отделена от runtime role и используется только в контролируемом migration job.
 
-В local/test audit живёт вместе с соответствующей demo-БД. В общем public production он является изменяемыми synthetic demo-данными и удаляется owner-only reset не реже одного раза в 24 часа вместе с aggregate/receipt/result rows. Reset идёт только после закрытия public access и drain, транзакционно проверяет пустые mutable tables и не удаляет reference fixtures. Backup/PITR может содержать прежнее состояние до 7 дней. Audit не является release evidence: manifests, IAM snapshots и hosted execution records хранятся отдельно и reset их не затрагивает. Tenant/archive/export architecture вне MVP по [[0008-bounded-public-demo-operations|ADR-0008]].
+В local/test audit живёт вместе с disposable DB. В public demo audit является synthetic visitor data и удаляется owner reset вместе с aggregate/receipt/result rows. Обычно reset выполняется ежедневно; через 26 часов API закрывается, но это не обещание удаления rows в точно заданный момент. Reset идёт под DB exclusive barrier после закрытия persistent gate и завершения допущенных runtime operations, проверяет пустые mutable tables и сохраняет reference fixtures. Recovery допускает потерю всей истории посетителей; достаточно migrations + initial seed + verify. Короткое Neon restore window не является архивом audit. Release manifests/scan/deployment evidence хранятся отдельно на весь lifecycle/rollback и reset их не затрагивает. Текущий контракт — [[0009-render-free-neon-free-release|ADR-0009]].
 
 ## История aggregate
 

@@ -1,23 +1,20 @@
+import { isIP } from 'node:net';
+
 import { Client } from 'pg';
 
 import { defaultDemoCapacity } from './demo-maintenance.js';
 
 const appEnvironments = ['development', 'test', 'staging', 'production'] as const;
 const logLevels = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
-const proxyTrustModes = ['none', 'cloud-run'] as const;
-const cloudSqlSocketPattern =
-  /^\/cloudsql\/[a-z][a-z0-9-]{4,28}[a-z0-9]:[a-z]+(?:-[a-z0-9]+)+:[a-z](?:[a-z0-9-]{0,96}[a-z0-9])?$/;
-const postgresSocketFile = '/.s.PGSQL.5432';
+const proxyTrustModes = ['none', 'render', 'observe'] as const;
+const directNeonHost = /^ep-[a-z0-9-]+\.[a-z0-9.-]+\.neon\.tech$/;
+const localHosts = new Set(['localhost', '127.0.0.1', '[::1]', 'database', 'postgres']);
 
 type AppEnvironment = (typeof appEnvironments)[number];
 type LogLevel = (typeof logLevels)[number];
 export type ProxyTrustMode = (typeof proxyTrustModes)[number];
 
-export type DatabaseTarget = {
-  host: string;
-  transport: 'cloud-sql-unix' | 'tcp';
-};
-
+export type DatabaseTarget = { host: string; database: string; transport: 'tcp' };
 export type AppConfig = {
   allowedOrigin: string;
   appEnvironment: AppEnvironment;
@@ -30,45 +27,24 @@ export type AppConfig = {
   logLevel: LogLevel;
   port: number;
   proxyTrustMode: ProxyTrustMode;
+  proxyTrustedCidrs: string[];
   revision: string;
   serviceName: string;
   sessionSigningSecret: string;
   webDistPath?: string;
 };
-
 export type MigrationConfig = {
   appDatabasePassword: string;
   appDatabaseUser: string;
   migrationDatabaseUrl: string;
 };
-
-export type MaintenanceConfig = {
-  migrationDatabaseUrl: string;
-};
-
-export type VerificationConfig = {
-  appDatabaseUser: string;
-  databaseUrl: string;
-};
+export type MaintenanceConfig = { migrationDatabaseUrl: string };
+export type VerificationConfig = MaintenanceConfig & { appDatabaseUser: string };
 
 function requireValue(environment: NodeJS.ProcessEnv, name: string): string {
   const value = environment[name]?.trim();
-
-  if (!value) {
-    throw new Error(`Обязательная переменная окружения ${name} не задана.`);
-  }
-
+  if (!value) throw new Error(`Обязательная переменная окружения ${name} не задана.`);
   return value;
-}
-
-function parsePort(raw: string): number {
-  const port = Number(raw);
-
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error('PORT должен быть целым числом от 1 до 65535.');
-  }
-
-  return port;
 }
 
 function parsePositiveInteger(raw: string, name: string, maximum: number): number {
@@ -84,10 +60,7 @@ function parseEnum<const T extends readonly string[]>(
   values: T,
   name: string,
 ): T[number] {
-  if (!values.includes(raw)) {
-    throw new Error(`${name} содержит неподдерживаемое значение.`);
-  }
-
+  if (!values.includes(raw)) throw new Error(`${name} содержит неподдерживаемое значение.`);
   return raw as T[number];
 }
 
@@ -99,104 +72,119 @@ function safeMetadata(environment: NodeJS.ProcessEnv, name: string, fallback: st
   return value;
 }
 
-function rawQueryValues(databaseUrl: string, name: string): Map<string, string[]> {
-  const queryStart = databaseUrl.indexOf('?');
-  if (queryStart === -1 || databaseUrl.includes('#')) {
-    throw new Error(`${name} должен содержать корректные query parameters.`);
-  }
-
-  const values = new Map<string, string[]>();
-  try {
-    for (const pair of databaseUrl.slice(queryStart + 1).split('&')) {
-      const separator = pair.indexOf('=');
-      const rawKey = separator === -1 ? pair : pair.slice(0, separator);
-      const rawValue = separator === -1 ? '' : pair.slice(separator + 1);
-      const key = decodeURIComponent(rawKey.replaceAll('+', ' '));
-      values.set(key, [...(values.get(key) ?? []), rawValue]);
-    }
-  } catch {
-    throw new Error(`${name} содержит некорректное percent-encoding.`);
-  }
-  return values;
-}
-
+// pg query parameters override authority, TLS and startup options. Validate
+// before the driver parses the URL; accept exactly one supported TLS parameter.
 export function inspectDatabaseUrlForPg(
   databaseUrl: string,
   name = 'DATABASE_URL',
 ): DatabaseTarget {
+  let url: URL;
+  let database: string;
   let client: Client;
   try {
+    url = new URL(databaseUrl);
+    database = decodeURIComponent(url.pathname.slice(1));
+    if (
+      !['postgres:', 'postgresql:'].includes(url.protocol) ||
+      url.hash ||
+      /[\s\\]/.test(databaseUrl) ||
+      !url.hostname ||
+      !url.username ||
+      !url.password ||
+      !database ||
+      database.includes('/') ||
+      !/^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,62}$/.test(database) ||
+      (url.port && (!/^\d+$/.test(url.port) || Number(url.port) < 1 || Number(url.port) > 65535))
+    ) {
+      throw new Error('Invalid URL');
+    }
+    decodeURIComponent(url.username);
+    decodeURIComponent(url.password);
+    const keys = [...url.searchParams.keys()];
+    if (
+      keys.some((key) => key !== 'sslmode') ||
+      keys.length > 1 ||
+      (keys.length === 1 && !['disable', 'verify-full'].includes(url.searchParams.get('sslmode')!))
+    ) {
+      throw new Error('Ambiguous TLS or connection override');
+    }
     client = new Client({ connectionString: databaseUrl });
+    const host = url.hostname.replace(/^\[|\]$/g, '');
+    if (
+      client.host !== host ||
+      client.database !== database ||
+      client.user !== decodeURIComponent(url.username) ||
+      client.password !== decodeURIComponent(url.password) ||
+      client.port !== Number(url.port || 5432)
+    ) {
+      throw new Error('Driver URL mismatch');
+    }
+    const ssl: unknown = client.ssl;
+    if (
+      url.searchParams.get('sslmode') === 'verify-full' &&
+      (!ssl ||
+        (typeof ssl === 'object' &&
+          (('rejectUnauthorized' in ssl && ssl.rejectUnauthorized === false) ||
+            'checkServerIdentity' in ssl)))
+    ) {
+      throw new Error('Driver TLS downgrade');
+    }
   } catch {
-    throw new Error(`${name} должен быть корректным PostgreSQL connection URL.`);
-  }
-
-  if (
-    !client.host ||
-    !client.user ||
-    !client.password ||
-    !client.database ||
-    !client.port ||
-    client.port < 1 ||
-    client.port > 65_535
-  ) {
-    throw new Error(`${name} должен задавать user, password, database, host и допустимый порт.`);
-  }
-
-  if (!client.host.startsWith('/cloudsql/')) {
-    return { host: client.host, transport: 'tcp' };
-  }
-
-  if (!cloudSqlSocketPattern.test(client.host)) {
+    // Do not expose URLs, credentials, query values or parser errors.
     throw new Error(
-      `${name} должен указывать Unix socket /cloudsql/<project>:<region>:<instance>.`,
+      `${name} должен задавать однозначный PostgreSQL TCP URL; разрешён только sslmode=verify-full (или disable локально).`,
     );
   }
-  if (client.port !== 5432) {
-    throw new Error(`${name} для Cloud SQL должен использовать порт PostgreSQL 5432.`);
-  }
-  if (Buffer.byteLength(`${client.host}${postgresSocketFile}`, 'utf8') >= 108) {
-    throw new Error(`${name} задаёт слишком длинный путь Unix socket.`);
-  }
+  return { host: url.hostname, database, transport: 'tcp' };
+}
 
-  const query = rawQueryValues(databaseUrl, name);
-  const allowedQueryKeys = new Set(['host', 'sslmode']);
-  if ([...query.keys()].some((key) => !allowedQueryKeys.has(key))) {
-    throw new Error(`${name} для Cloud SQL содержит неподдерживаемые query parameters.`);
-  }
-  const rawHosts = query.get('host') ?? [];
-  const sslModes = query.get('sslmode') ?? [];
-  const expectedEncodedHost = encodeURIComponent(client.host).toUpperCase();
+function rejectConnectionOverrides(environment: NodeJS.ProcessEnv) {
+  const overrides = Object.keys(environment).filter(
+    (key) =>
+      /^PG(?:HOST|HOSTADDR|PORT|DATABASE|USER|PASSWORD|PASSFILE|SERVICE|SERVICEFILE|SSLMODE|SSLROOTCERT|SSLCERT|SSLKEY|OPTIONS|APPNAME|CONNECT_TIMEOUT|CHANNELBINDING|REQUIRESSL|TARGETSESSIONATTRS)$/i.test(
+        key,
+      ) && environment[key] !== undefined,
+  );
+  if (overrides.length > 0)
+    throw new Error('PG* connection overrides запрещены: используйте единственный явный URL.');
   if (
-    rawHosts.length !== 1 ||
-    rawHosts[0]?.toUpperCase() !== expectedEncodedHost ||
-    sslModes.length !== 1 ||
-    sslModes[0] !== 'disable' ||
-    client.ssl !== false
+    environment['NODE_TLS_REJECT_UNAUTHORIZED'] !== undefined &&
+    environment['NODE_TLS_REJECT_UNAUTHORIZED'] !== '1'
   ) {
-    throw new Error(`${name} должен задавать percent-encoded host Unix socket и sslmode=disable.`);
+    throw new Error('NODE_TLS_REJECT_UNAUTHORIZED не должен отключать проверку TLS.');
   }
-
-  const schemeEnd = databaseUrl.indexOf('://');
-  const pathStart = databaseUrl.indexOf('/', schemeEnd + 3);
-  const authority = pathStart === -1 ? '' : databaseUrl.slice(schemeEnd + 3, pathStart);
-  const networkAuthority = authority.slice(authority.lastIndexOf('@') + 1);
-  if (!/^postgres(?:ql)?:\/\//.test(databaseUrl) || networkAuthority !== '') {
-    throw new Error(`${name} для Cloud SQL не должен содержать TCP host в authority.`);
-  }
-
-  return { host: client.host, transport: 'cloud-sql-unix' };
 }
 
 function requireDatabaseUrl(
   environment: NodeJS.ProcessEnv,
   name: 'DATABASE_URL' | 'MIGRATION_DATABASE_URL',
-  requireCloudSqlSocket: boolean,
 ): string {
+  rejectConnectionOverrides(environment);
   const databaseUrl = requireValue(environment, name);
   const target = inspectDatabaseUrlForPg(databaseUrl, name);
-  if (requireCloudSqlSocket && target.transport !== 'cloud-sql-unix') {
-    throw new Error(`${name} в hosted environment должен использовать Cloud SQL Unix socket.`);
+  const url = new URL(databaseUrl);
+  const appEnvironment = loadAppEnvironment(environment);
+  const hosted =
+    ['staging', 'production'].includes(appEnvironment) || environment['RENDER'] === 'true';
+  if (hosted) {
+    const expectedHost = requireValue(environment, 'NEON_DATABASE_HOST');
+    const expectedDatabase = requireValue(environment, 'NEON_DATABASE_NAME');
+    if (
+      !directNeonHost.test(target.host) ||
+      target.host.split('.')[0]!.includes('-pooler') ||
+      target.host !== expectedHost ||
+      target.database !== expectedDatabase ||
+      url.search !== '?sslmode=verify-full' ||
+      (url.port && url.port !== '5432')
+    ) {
+      throw new Error(
+        `${name} должен указывать ожидаемые direct Neon host/database, порт 5432 и sslmode=verify-full.`,
+      );
+    }
+  } else if (!localHosts.has(target.host)) {
+    throw new Error(
+      `${name} для development/test разрешён только с локальным disposable PostgreSQL.`,
+    );
   }
   return databaseUrl;
 }
@@ -205,54 +193,100 @@ function loadAppEnvironment(environment: NodeJS.ProcessEnv): AppEnvironment {
   return parseEnum(environment['APP_ENV']?.trim() || 'development', appEnvironments, 'APP_ENV');
 }
 
+function trustedCidrs(environment: NodeJS.ProcessEnv, mode: ProxyTrustMode): string[] {
+  const raw = environment['PROXY_TRUSTED_CIDRS']?.trim();
+  if (mode !== 'render') {
+    if (raw) throw new Error('PROXY_TRUSTED_CIDRS требует PROXY_TRUST_MODE=render.');
+    return [];
+  }
+  const values = requireValue(environment, 'PROXY_TRUSTED_CIDRS')
+    .split(',')
+    .map((value) => value.trim());
+  if (
+    values.length > 16 ||
+    new Set(values).size !== values.length ||
+    values.some((value) => {
+      const [address, prefix, extra] = value.split('/');
+      const family = isIP(address ?? '');
+      return (
+        !family ||
+        extra !== undefined ||
+        address === '0.0.0.0' ||
+        address === '::' ||
+        (prefix !== undefined &&
+          (!/^\d+$/.test(prefix) ||
+            Number(prefix) < (family === 4 ? 8 : 32) ||
+            Number(prefix) > (family === 4 ? 32 : 128)))
+      );
+    })
+  )
+    throw new Error(
+      'PROXY_TRUSTED_CIDRS должен содержать проверенный ограниченный список IP/CIDR proxy.',
+    );
+  return values;
+}
+
 export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const webDistPath = environment['WEB_DIST_PATH']?.trim();
   const appEnvironment = loadAppEnvironment(environment);
-  const port = parsePort(environment['PORT']?.trim() || '3000');
+  const port = parsePositiveInteger(environment['PORT']?.trim() || '3000', 'PORT', 65_535);
   const sessionSigningSecret =
     environment['SESSION_SIGNING_SECRET']?.trim() ||
     (appEnvironment === 'development' || appEnvironment === 'test'
       ? 'local-development-session-secret-change-me'
       : '');
-
-  if (sessionSigningSecret.length < 32) {
+  if (sessionSigningSecret.length < 32)
     throw new Error('SESSION_SIGNING_SECRET должен содержать не менее 32 символов.');
-  }
-
   const allowedOrigin =
     environment['APP_ORIGIN']?.trim() ||
     (appEnvironment === 'development' ? 'http://localhost:5173' : `http://localhost:${port}`);
   const parsedOrigin = new URL(allowedOrigin);
-  if (parsedOrigin.origin !== allowedOrigin || parsedOrigin.pathname !== '/') {
-    throw new Error('APP_ORIGIN должен содержать только точный origin без path.');
+  if (
+    parsedOrigin.origin !== allowedOrigin ||
+    parsedOrigin.pathname !== '/' ||
+    !['http:', 'https:'].includes(parsedOrigin.protocol)
+  ) {
+    throw new Error('APP_ORIGIN должен содержать только точный HTTP(S) origin без path.');
   }
-
-  const cloudRunService = environment['K_SERVICE']?.trim();
+  if (appEnvironment === 'production' && parsedOrigin.protocol !== 'https:') {
+    throw new Error('Production APP_ORIGIN должен использовать HTTPS.');
+  }
+  if (
+    appEnvironment === 'staging' &&
+    parsedOrigin.protocol !== 'https:' &&
+    !['localhost', '127.0.0.1', '[::1]'].includes(parsedOrigin.hostname)
+  ) {
+    throw new Error('HTTP staging APP_ORIGIN разрешён только для локального Docker runner.');
+  }
+  const render = environment['RENDER'] === 'true';
   const proxyTrustMode = parseEnum(
-    environment['PROXY_TRUST_MODE']?.trim() || (cloudRunService ? 'cloud-run' : 'none'),
+    environment['PROXY_TRUST_MODE']?.trim() || 'none',
     proxyTrustModes,
     'PROXY_TRUST_MODE',
   );
   if (
-    proxyTrustMode === 'cloud-run' &&
-    (appEnvironment === 'development' || appEnvironment === 'test' || !cloudRunService)
+    render &&
+    (!['staging', 'production'].includes(appEnvironment) ||
+      !['render', 'observe'].includes(proxyTrustMode) ||
+      parsedOrigin.protocol !== 'https:' ||
+      !environment['RENDER_SERVICE_ID'])
   ) {
     throw new Error(
-      'PROXY_TRUST_MODE=cloud-run разрешён только для staging/production внутри Cloud Run.',
+      'Render требует hosted APP_ENV, HTTPS APP_ORIGIN, RENDER_SERVICE_ID и PROXY_TRUST_MODE=render|observe.',
     );
   }
-  if (cloudRunService && proxyTrustMode !== 'cloud-run') {
-    throw new Error('Cloud Run service должен использовать PROXY_TRUST_MODE=cloud-run.');
+  if (proxyTrustMode !== 'none' && !render) {
+    throw new Error('PROXY_TRUST_MODE=render|observe разрешён только внутри Render.');
   }
-
+  if (environment['MIGRATION_DATABASE_URL'] || environment['APP_DATABASE_PASSWORD']) {
+    throw new Error('Owner credentials запрещены в runtime environment.');
+  }
   return {
     allowedOrigin,
     appEnvironment,
     appVersion: safeMetadata(environment, 'APP_VERSION', '0.1.0-dev'),
     cookieSecure: parsedOrigin.protocol === 'https:',
-    databaseUrl: requireDatabaseUrl(environment, 'DATABASE_URL', Boolean(cloudRunService)),
-    host: environment['HOST']?.trim() || '127.0.0.1',
-    logLevel: parseEnum(environment['LOG_LEVEL']?.trim() || 'info', logLevels, 'LOG_LEVEL'),
+    databaseUrl: requireDatabaseUrl(environment, 'DATABASE_URL'),
     maximumDemoBatches: parsePositiveInteger(
       environment['DEMO_MAX_BATCHES']?.trim() || String(defaultDemoCapacity.maximumBatches),
       'DEMO_MAX_BATCHES',
@@ -263,65 +297,39 @@ export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): App
       'DEMO_MAX_SESSIONS',
       10_000,
     ),
+    host: environment['HOST']?.trim() || '127.0.0.1',
+    logLevel: parseEnum(environment['LOG_LEVEL']?.trim() || 'info', logLevels, 'LOG_LEVEL'),
     port,
     proxyTrustMode,
-    revision: safeMetadata(environment, 'K_REVISION', 'local'),
-    serviceName: safeMetadata(environment, 'K_SERVICE', 'work-card-api'),
+    proxyTrustedCidrs: trustedCidrs(environment, proxyTrustMode),
+    revision: safeMetadata(environment, 'RENDER_INSTANCE_ID', 'local'),
+    serviceName: safeMetadata(environment, 'RENDER_SERVICE_ID', 'work-card-api'),
     sessionSigningSecret,
     ...(webDistPath ? { webDistPath } : {}),
   };
 }
 
-export function loadMigrationConfig(environment: NodeJS.ProcessEnv = process.env): MigrationConfig {
-  const appEnvironment = loadAppEnvironment(environment);
-  const cloudRunJob = environment['CLOUD_RUN_JOB']?.trim();
-  if (cloudRunJob && (appEnvironment === 'development' || appEnvironment === 'test')) {
-    throw new Error('Cloud Run Job должен использовать APP_ENV=staging|production.');
-  }
-  const appDatabaseUser = requireValue(environment, 'APP_DATABASE_USER');
-
-  if (!/^[a-z_][a-z0-9_]*$/.test(appDatabaseUser)) {
+function runtimeRole(environment: NodeJS.ProcessEnv): string {
+  const user = requireValue(environment, 'APP_DATABASE_USER');
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(user))
     throw new Error('APP_DATABASE_USER должен быть безопасным PostgreSQL identifier.');
-  }
-
-  return {
-    appDatabasePassword: requireValue(environment, 'APP_DATABASE_PASSWORD'),
-    appDatabaseUser,
-    migrationDatabaseUrl: requireDatabaseUrl(
-      environment,
-      'MIGRATION_DATABASE_URL',
-      Boolean(cloudRunJob),
-    ),
-  };
+  return user;
 }
 
+export function loadMigrationConfig(environment: NodeJS.ProcessEnv = process.env): MigrationConfig {
+  return {
+    appDatabasePassword: requireValue(environment, 'APP_DATABASE_PASSWORD'),
+    appDatabaseUser: runtimeRole(environment),
+    migrationDatabaseUrl: requireDatabaseUrl(environment, 'MIGRATION_DATABASE_URL'),
+  };
+}
 export function loadMaintenanceConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): MaintenanceConfig {
-  const appEnvironment = loadAppEnvironment(environment);
-  const cloudRunJob = environment['CLOUD_RUN_JOB']?.trim();
-  if (cloudRunJob && (appEnvironment === 'development' || appEnvironment === 'test')) {
-    throw new Error('Cloud Run Job должен использовать APP_ENV=staging|production.');
-  }
-  return {
-    migrationDatabaseUrl: requireDatabaseUrl(
-      environment,
-      'MIGRATION_DATABASE_URL',
-      Boolean(cloudRunJob),
-    ),
-  };
+  return { migrationDatabaseUrl: requireDatabaseUrl(environment, 'MIGRATION_DATABASE_URL') };
 }
-
 export function loadVerificationConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): VerificationConfig {
-  const appEnvironment = loadAppEnvironment(environment);
-  const cloudRunJob = environment['CLOUD_RUN_JOB']?.trim();
-  if (cloudRunJob && (appEnvironment === 'development' || appEnvironment === 'test')) {
-    throw new Error('Cloud Run Job должен использовать APP_ENV=staging|production.');
-  }
-  return {
-    appDatabaseUser: requireValue(environment, 'APP_DATABASE_USER'),
-    databaseUrl: requireDatabaseUrl(environment, 'DATABASE_URL', Boolean(cloudRunJob)),
-  };
+  return { ...loadMaintenanceConfig(environment), appDatabaseUser: runtimeRole(environment) };
 }

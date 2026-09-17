@@ -1,16 +1,16 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 33
+version: 37
 owner: project
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # Backlog
 
 Оперативные задачи проекта следуют каноническому [[project-plan|roadmap]]. Требования к поведению системы хранятся в `docs/requirements/`, а принятые решения — в [[decision-log]] и [[adr-index|ADR]].
 
-**На 2026-09-06 этапы 1–9 закрыты; этап 10 «Релиз» остаётся в работе на 4/7. Код `deploy.yml` и hosted smoke runner для пятой задачи подготовлен локально, но это ещё не provisioning, deployment или hosted qualification.**
+**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]; read-only preflight начат. Локальная реализация не заменяет ещё не завершённые hosted qualification и release evidence.**
 
 ## Выполнено — этапы 1–4
 
@@ -96,15 +96,15 @@ Desktop/mobile UI, все 14 шагов прототипа и `window.runUxCopyA
 
 ## В работе — этап 10 «Релиз»
 
-- [x] Выбрать Cloud Run/Artifact Registry и отдельные Cloud SQL PostgreSQL 18; зафиксировать в [[0007-cloud-run-and-cloud-sql-release|ADR-0007]], [[0008-bounded-public-demo-operations|ADR-0008]] и [[deployment]] build-once image, owner-only DB jobs, bounded shared demo, secrets/`APP_ORIGIN`, health/logging, staging smoke, promotion, rollback и lifetime.
-- [x] Реализовать [reviewable Terraform IaC](../../infra/terraform/README.md) для раздельных release/staging/production projects, IAM, Cloud SQL, Secret Manager, Cloud Run service/jobs, probes, logs, alerts, backups/PITR и budget controls; hardening добавляет reset identity/job, custom production service IAM role, отдельные deployment-WIF bindings для deployer/smoke identities и deletion guards. `fmt`, `validate` и strict review plan `167/0/0` проходят без `apply`.
-- [x] Реализовать ручной `main`-only release workflow с short-lived Workload Identity, full-SHA immutable Artifact Registry tag, registry digest capture/recheck, pull/semantic Trivy scan exact опубликованного digest и schema-validated генерацией несекретного `docs/release/manifests/<SHA>.json`; будущие deployment/smoke/promotion/rollback факты пишутся отдельными append-only hash-chained records без placeholders. Обязательная `Release and IaC contract` CI job проверяет actionlint всех трёх workflows, manifest/schema/release tests и secret/WIF-safe Terraform plan; release preflight требует её успеха. Workflow и удалённая job для текущих изменений не запускались, image/manifest/hosted evidence ещё не существуют.
-- [x] Закрыть pre-deploy gaps из [[deployment]] на уровне кода/config: public health публикует только status; Pino пишет allowlisted Cloud Logging context; proxy/socket boundaries проверяются; общий demo ограничен 20 партиями/500 sessions, очищает expired sessions и имеет owner-only transactional reset. Фактические IAM close/restore, reset cadence, Cloud Logging ingestion, proxy chain/client IP и socket connection остаются обязательным hosted evidence, а не результатом этой задачи.
-- [ ] Завершить hosted qualification для одного exact digest: `deploy.yml`, smoke/log/evidence runners, negative tests и отдельный smoke WIF binding уже реализованы и локально проверены без DB/owner credentials; checkbox остаётся открытым до отдельно разрешённых provisioning и реального clean staging `migrate → seed → verify → deploy → smoke` без test retry.
-- [ ] После отдельного разрешения продвинуть тот же digest в production, подтвердить узкий IAM close/restore, daily reset/fail-closed policy, backup/PITR, bounded smoke, traffic rollback и lifetime/teardown evidence.
-- [ ] Обновить evidence/ограничения, выполнить strict documentation audit и semantic review; закрыть этап только по фактическим hosted результатам.
+- [x] Принять текущий $0 release design в [[0009-render-free-neon-free-release|ADR-0009]]; заменить ADR-0007/0008 с сохранением истории, bounded public demo и clean synthetic recovery.
+- [x] Описать один Render Free image-backed service и отдельные Neon Free projects; прежний GCP Terraform/foundation/backend contract сохранить неактивным историческим вариантом.
+- [x] Адаптировать manual main-only build-once workflow к public GHCR, exact digest/scan/migration checksums, versioned release evidence и lifetime retention; заменить GCP-only IaC gate deployment-contract checks без удаления других gates.
+- [x] Реализовать runtime/owner pre-deploy contract: direct Neon verify-full target validation, SQL runtime-role boundary, persistent maintenance/generation, shared/exclusive barrier и 26h fail-closed, liveness без DB и безопасный Render proxy/logging contract.
+- [ ] Завершить фактическую hosted qualification того же digest: temporary staging Docker + отдельный Neon project, non-superuser owner/repeat, TLS, роль, races/cancellation, browser compact/canonical, proxy/logging/cold start и clean recovery. Локальные fixtures не закрывают пункт.
+- [ ] Выполнить разрешённое production promotion в Render; подтвердить persistent reference/resolved digest, daily/manual reset и совместимый rollback, quotas/$0 settings, secret boundaries и retention release records. При отсутствии предыдущего совместимого image явно сохранить rollback как непроверенный.
+- [ ] Сохранить фактическое hosted evidence, strict documentation audit и semantic review; закрыть этап только по этим результатам.
 
-**Прогресс этапа 10 — ровно 4/7:** завершены release design, reviewable IaC, неисполненный release-image workflow и runtime pre-deploy controls; реализация orchestration/runner является незавершённой частью пятой задачи, а не новым закрытым пунктом. Результат подтверждён только code tests/config/plan/docs audit; `terraform apply` и `workflow_dispatch` не выполнялись, поэтому cloud resources, реальные secrets, registry image, фактический source SHA/digest manifest, staging/production revisions, IAM/reset/Cloud Run/Cloud SQL qualification и smoke evidence не создавались. Этап остаётся в работе.
+**Прогресс этапа 10 — 4/7:** локально реализованные design/config/workflows/runtime controls не являются удалённым запуском. Результаты проверок текущего дерева — [[quality-gates]]. Историческая GCP foundation preparation `136/0/0`, full `167/0/0`, GCS templates и preflight сохранены в [[deployment-gcp-history]] и [Terraform README](../../infra/terraform/README.md); они не активный next step, а незакоммиченные Terraform HCL/scripts/templates не входят в текущую публикацию. Scoped commit/push, PR/merge после gates, GHCR publication и Render/Neon operations разрешены; следующий результат — фактический hosted deployment с evidence по [[deployment]], который ещё не подтверждён.
 
 ## Maintenance
 

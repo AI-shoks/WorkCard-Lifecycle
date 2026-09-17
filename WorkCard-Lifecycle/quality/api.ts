@@ -11,7 +11,7 @@ export async function testApi(db: TestDatabase, demoCapacity?: BuildAppOptions['
     appVersion: 'quality',
     ...(demoCapacity ? { demoCapacity } : {}),
     pool: db.runtime,
-    readiness: { check: async () => ({ database: 'up', migrationVersion: 3 }) },
+    readiness: { check: async () => ({ database: 'up', migrationVersion: 4 }) },
     security: { allowedOrigin: origin, cookieSecure: false, signingSecret: randomUUID() },
   });
   const sessions = new Map<string, { cookie: string; csrfToken: string }>();

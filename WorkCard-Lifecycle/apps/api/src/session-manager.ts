@@ -3,6 +3,12 @@ import { createHash, createHmac, timingSafeEqual, randomUUID } from 'node:crypto
 import type { CommandName, DemoSessionResponse, DemoUser, Role } from '@work-card/contracts';
 import type { Pool } from 'pg';
 
+import {
+  assertCurrentSession,
+  createRuntimeReader,
+  withRuntimeTransaction,
+} from './database-gate.js';
+
 import { demoMaintenanceLockKey } from './demo-maintenance.js';
 import {
   actionForbidden,
@@ -36,6 +42,8 @@ const rolePermissions: Record<Role, readonly CommandName[]> = {
 };
 
 export type ActorContext = {
+  generation: string;
+  sessionId: string;
   id: string;
   displayName: string;
   role: Role;
@@ -62,6 +70,7 @@ type UserRow = {
 type SessionRow = UserRow & {
   csrf_token_hash: Buffer;
   session_id: string;
+  generation: string;
 };
 
 function isRole(value: string): value is Role {
@@ -103,6 +112,7 @@ export function createSessionManager(
   options: SessionManagerOptions,
   maximumSessions: number,
 ) {
+  const reads = createRuntimeReader(pool);
   const signatureFor = (sessionId: string): string =>
     createHmac('sha256', options.signingSecret).update(`session:${sessionId}`).digest('base64url');
 
@@ -155,42 +165,50 @@ export function createSessionManager(
       const sessionId = parseSignedSessionId(cookieHeader);
       if (!sessionId) throw authenticationRequired();
 
-      const result = await pool.query<SessionRow>(
-        `UPDATE demo_sessions AS session
-         SET last_seen_at = CURRENT_TIMESTAMP,
-             idle_expires_at = LEAST(session.expires_at, CURRENT_TIMESTAMP + interval '${idleSessionMinutes} minutes')
-         FROM demo_users AS demo_user
-         WHERE session.id = $1
-           AND session.demo_user_id = demo_user.id
-           AND demo_user.enabled
-           AND session.expires_at > CURRENT_TIMESTAMP
-           AND session.idle_expires_at > CURRENT_TIMESTAMP
-         RETURNING session.id AS session_id, session.csrf_token_hash,
-                   demo_user.id, demo_user.display_name, demo_user.role_code`,
-        [sessionId],
-      );
-      const row = result.rows[0];
-      if (!row || !isRole(row.role_code)) {
-        await pool.query(
-          `DELETE FROM demo_sessions AS session
-           WHERE session.id = $1
-             AND (
-               session.expires_at <= CURRENT_TIMESTAMP
-               OR session.idle_expires_at <= CURRENT_TIMESTAMP
-               OR NOT EXISTS (
-                 SELECT 1 FROM demo_users AS demo_user
-                 WHERE demo_user.id = session.demo_user_id AND demo_user.enabled
-               )
-             )`,
-          [sessionId],
+      const authenticated = await withRuntimeTransaction(pool, async (client, admission) => {
+        const result = await client.query<SessionRow>(
+          `UPDATE demo_sessions AS session
+           SET last_seen_at = clock_timestamp(),
+               idle_expires_at = LEAST(session.expires_at, clock_timestamp() + interval '${idleSessionMinutes} minutes')
+           FROM demo_users AS demo_user
+           WHERE session.id = $1 AND session.generation = $2::bigint
+             AND session.demo_user_id = demo_user.id AND demo_user.enabled
+             AND session.expires_at > clock_timestamp()
+             AND session.idle_expires_at > clock_timestamp()
+           RETURNING session.id AS session_id, session.csrf_token_hash, session.generation::text,
+                     demo_user.id, demo_user.display_name, demo_user.role_code`,
+          [sessionId, admission.generation],
         );
-        throw authenticationRequired();
-      }
-      return {
-        id: row.session_id,
-        csrfTokenHash: row.csrf_token_hash,
-        actor: { id: row.id, displayName: row.display_name, role: row.role_code },
-      };
+        const row = result.rows[0];
+        if (!row || !isRole(row.role_code)) {
+          await client.query(
+            `DELETE FROM demo_sessions AS session
+             WHERE session.id = $1 AND (
+               session.generation <> $2::bigint
+               OR session.expires_at <= clock_timestamp()
+               OR session.idle_expires_at <= clock_timestamp()
+               OR NOT EXISTS (SELECT 1 FROM demo_users AS demo_user
+                 WHERE demo_user.id = session.demo_user_id AND demo_user.enabled)
+             )`,
+            [sessionId, admission.generation],
+          );
+          return null;
+        }
+        return {
+          id: row.session_id,
+          csrfTokenHash: row.csrf_token_hash,
+          actor: {
+            id: row.id,
+            displayName: row.display_name,
+            role: row.role_code,
+            sessionId: row.session_id,
+            generation: row.generation,
+          },
+        };
+      });
+      // Expired-row cleanup commits before the authentication error is returned.
+      if (!authenticated) throw authenticationRequired();
+      return authenticated;
     },
 
     clearSessionCookie,
@@ -199,33 +217,28 @@ export function createSessionManager(
       demoUserId: string,
       previousCookieHeader: string | undefined,
     ): Promise<{ body: DemoSessionResponse; cookie: string }> {
-      const userResult = await pool.query<UserRow>(
-        `SELECT id, display_name, role_code
-         FROM demo_users
-         WHERE id = $1 AND enabled`,
-        [demoUserId],
-      );
-      const userRow = userResult.rows[0];
-      if (!userRow) {
-        throw invalidBusinessInput(
-          'INVALID_DEMO_USER',
-          'Выберите доступную демонстрационную роль.',
-        );
-      }
-      const user = toDemoUser(userRow);
       const sessionId = randomUUID();
       const csrfToken = csrfTokenFor(sessionId);
       const previousSessionId = parseSignedSessionId(previousCookieHeader);
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
+      const user = await withRuntimeTransaction(pool, async (client, admission) => {
+        const userResult = await client.query<UserRow>(
+          'SELECT id, display_name, role_code FROM demo_users WHERE id = $1 AND enabled',
+          [demoUserId],
+        );
+        const userRow = userResult.rows[0];
+        if (!userRow)
+          throw invalidBusinessInput(
+            'INVALID_DEMO_USER',
+            'Выберите доступную демонстрационную роль.',
+          );
         await client.query('SELECT pg_advisory_xact_lock($1::bigint)', [demoMaintenanceLockKey]);
         if (previousSessionId) {
           await client.query('DELETE FROM demo_sessions WHERE id = $1', [previousSessionId]);
         }
         await client.query(
-          `DELETE FROM demo_sessions
-           WHERE expires_at <= CURRENT_TIMESTAMP OR idle_expires_at <= CURRENT_TIMESTAMP`,
+          `DELETE FROM demo_sessions WHERE generation <> $1::bigint
+             OR expires_at <= clock_timestamp() OR idle_expires_at <= clock_timestamp()`,
+          [admission.generation],
         );
         const capacity = await client.query<{ count: number }>(
           'SELECT COUNT(*)::integer AS count FROM demo_sessions',
@@ -237,24 +250,14 @@ export function createSessionManager(
         }
         await client.query(
           `INSERT INTO demo_sessions(
-             id, demo_user_id, csrf_token_hash, created_at, expires_at, idle_expires_at,
-             last_seen_at
-           ) VALUES (
-             $1, $2, $3, CURRENT_TIMESTAMP,
-             CURRENT_TIMESTAMP + interval '${absoluteSessionHours} hours',
-             CURRENT_TIMESTAMP + interval '${idleSessionMinutes} minutes',
-             CURRENT_TIMESTAMP
-           )`,
-          [sessionId, demoUserId, hashCsrf(csrfToken)],
+             id, demo_user_id, csrf_token_hash, generation, created_at, expires_at, idle_expires_at, last_seen_at
+           ) VALUES ($1, $2, $3, $4::bigint, clock_timestamp(),
+             clock_timestamp() + interval '${absoluteSessionHours} hours',
+             clock_timestamp() + interval '${idleSessionMinutes} minutes', clock_timestamp())`,
+          [sessionId, demoUserId, hashCsrf(csrfToken), admission.generation],
         );
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
-      }
-
+        return toDemoUser(userRow);
+      });
       return {
         body: { actor: user, csrfToken, permissions: permissionsFor(user.role) },
         cookie: sessionCookie(sessionId),
@@ -262,12 +265,20 @@ export function createSessionManager(
     },
 
     async deleteSession(session: AuthenticatedSession): Promise<void> {
-      await pool.query('DELETE FROM demo_sessions WHERE id = $1', [session.id]);
+      await withRuntimeTransaction(pool, async (client, admission) => {
+        await assertCurrentSession(client, session.actor, admission);
+        await client.query('DELETE FROM demo_sessions WHERE id = $1', [session.id]);
+      });
     },
 
     async getSessionResponse(session: AuthenticatedSession): Promise<DemoSessionResponse> {
+      await withRuntimeTransaction(pool, (client, admission) =>
+        assertCurrentSession(client, session.actor, admission),
+      );
       const actor: DemoUser = {
-        ...session.actor,
+        id: session.actor.id,
+        displayName: session.actor.displayName,
+        role: session.actor.role,
         roleLabel: roleLabels[session.actor.role],
       };
       return {
@@ -278,7 +289,7 @@ export function createSessionManager(
     },
 
     async listUsers(): Promise<DemoUser[]> {
-      const result = await pool.query<UserRow>(
+      const result = await reads.query<UserRow>(
         `SELECT id, display_name, role_code
          FROM demo_users
          WHERE enabled

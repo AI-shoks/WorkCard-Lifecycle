@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.security-baseline
 status: accepted
-version: 8
+version: 10
 owner: architecture
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # Security Baseline
@@ -39,7 +39,7 @@ updated: 2026-09-06
 - Same-origin deployment; development использует Vite proxy.
 - Mutation требует session cookie, `X-CSRF-Token`, совпадающий с hash текущей session, и допустимый `Origin`.
 - CORS middleware не подключён: поддерживаются same-origin deployment и development через Vite proxy. Separate-origin deployment требует отдельной явной политики на этапе 10.
-- GET/HEAD не меняют состояние.
+- GET/HEAD не выполняют предметные mutations; допустимый session touch/expired cleanup также проходит DB maintenance barrier.
 - Frontend при bootstrap перечитывает actor, permissions и новый CSRF token через session endpoint, хранит token только в памяти и не использует `localStorage`/`sessionStorage` для session state. До подтверждения server session защищённый экран не монтируется; смена пользователя очищает command state и permission-sensitive cache.
 
 ## Authorization
@@ -50,7 +50,7 @@ updated: 2026-09-06
 2. route-level role permission;
 3. mutation `Origin` и CSRF;
 4. schema и не зависящие от состояния проверки command input;
-5. authorized resource visibility, resource-dependent business rules, state/purpose/gate/version;
+5. shared maintenance barrier, отдельный SQL state check, повторная session/generation проверка до receipt, затем authorized resource visibility и state/purpose/gate/version;
 6. атомарный transaction commit состояния, receipt и audit events.
 
 Fastify выполняет первые три шага в `preValidation`, поэтому schema-invalid запрос без session получает `401`, запрещённая роль — `403`, а закрытые params/resources не проверяются до authorization. Транзакция открывается до блокировки строк, но ни receipt, ни state, ни audit event не фиксируются при ошибке.
@@ -77,21 +77,26 @@ Rate limiting, JSON parsing и body-size rejection технически пред
 - hosted app ограничивает live state значениями `DEMO_MAX_BATCHES=20` и `DEMO_MAX_SESSIONS=500`; capacity rejection даёт `409` до предметного side effect. Это ограничение накопления общей demo, а не tenant quota;
 - body limit `1 MiB`, graceful shutdown, connection timeout `10 s`, request timeout `15 s`, handler timeout `20 s`, keep-alive `5 s`;
 - runtime PostgreSQL pool: максимум 10 соединений, connection timeout `3 s`, idle pool timeout `10 s`, statement timeout `10 s`, lock timeout `3 s`, idle-in-transaction и transaction timeout `15 s`. Это ресурсные ограничения, не бизнес-SLA; DB timeout даёт безопасный `503`, UI использует существующее контрольное чтение;
-- API/DB timestamps server-side. `PROXY_TRUST_MODE=none` игнорирует `X-Forwarded-For` локально и в test; `cloud-run` разрешён только для `staging|production` при platform marker `K_SERVICE` и доверяет ровно непосредственному socket peer. Поэтому `request.ip`/rate-limit key берут правый platform-added address, а более левые подложенные значения не получают доверия. Terraform явно фиксирует этот режим только для Cloud Run service; добавление внешнего load balancer потребует нового анализа цепочки.
+- API/DB timestamps server-side. `PROXY_TRUST_MODE=none` игнорирует forwarded headers локально/на Actions; `render` требует platform metadata и явный `PROXY_TRUSTED_CIDRS` peers. Initial Render `observe` не доверяет forwarded headers, запрещает CIDRs и принудительно закрывает `/api*`/readiness до DB; доступны liveness/SPA и peer logs. Нет безусловного `trustProxy=true`. Проверка CIDR-цепочки и spoof/rate-limit tests не заменяют hosted observation реальной Render chain/client IP; неизвестная цепочка блокирует public qualification.
+- Idle pool errors логируются безопасно и не завершают процесс; budgets сохраняются. Пробуждение Neon/Render может не уложиться в budget и дать `503`, это не причина бесконечных retries или keepalive.
+
+Production `APP_ORIGIN` требует HTTPS независимо от Render marker; HTTP в hosted staging допускается только для loopback Docker.
 
 ## Secrets и конфигурация
 
-- `.env` игнорируется Git; репозиторий содержит только `.env.example` с безопасными placeholder/local values;
-- hosted secrets должны приходить из численно закреплённых Secret Manager versions по [[environments]] и [[deployment]], а не из Docker image, Compose file, frontend variables или logs; Terraform описывает этот binding через ephemeral/write-only values, но он ещё не применён и не проверен в hosted runtime;
-- отдельные `DATABASE_URL` для migration owner и runtime app role;
-- runtime DB role не владеет schema и не может update/delete audit/final/payroll rows;
-- session signing secret валидируется как строка минимум из 32 символов; release contract требует минимум 32 CSPRNG bytes, раздельные значения контуров и versioned rotation, которая инвалидирует demo sessions;
-- startup требует явно переданный secret вне `development/test` и минимум 32 символа; он не определяет криптографическую стойкость произвольного значения. Локальные Compose placeholders не предназначены для hosted окружения.
-- release deployer не получает прямой `secretAccessor`, но имеет `iam.serviceAccountUser` на конкретные workload identities и deploy permissions. Он может косвенно запустить код с полномочиями присоединённой identity, поэтому его WIF/workflow нельзя считать неспособным получить payload; неожиданный deploy/job/secret access является incident.
+- `.env` игнорируется Git; examples содержат только local/placeholder values.
+- Owner `MIGRATION_DATABASE_URL` разрешён только одноразовому owner CLI; runtime получает `DATABASE_URL` SQL-created role и `SESSION_SIGNING_SECRET`, browser — только HTTP.
+- Runtime role не имеет elevated flags/memberships (включая `neon_superuser`), ownership или возможности изменить maintenance state; immutable audit/final/payroll mutation запрещена grants/triggers. Privileged existing role вызывает отказ bootstrap, а не молчаливое исправление.
+- Hosted `APP_ENV=staging|production` требует direct Neon TCP/TLS `verify-full`, exact ожидаемые host/database и запрещает pooler/downgrade/неоднозначные overrides независимо от наличия Cloud Run `K_*`.
+- Session secret требует минимум 32 CSPRNG bytes, отдельные значения контуров и явную rotation, которая инвалидирует sessions. Startup проверяет длину, а не доказывает случайность.
+- GitHub/Render secrets изменяемые; несекретный rotation identifier в evidence не выдаётся за enforced secret version. App rollback не восстанавливает прежний payload автоматически.
+- Publisher, Render adapter, owner и runtime jobs разделены; browser не наследует DB/owner/PG/cloud variables. GitHub workflow с owner environment остаётся привилегированной границей, даже при step-scoped secrets.
+
+Точные имена и bindings — [[environments]]. Public GHCR image не содержит credentials и не требует registry secret в Render.
 
 ## Logging и audit privacy
 
-Production Pino logger пишет однострочный JSON с ISO `time`, полем `severity` из набора Cloud Logging и безопасными `service`, `revision`, `appVersion`. Завершение запроса содержит сгенерированный server-side request ID, method, шаблон route, status и duration, но не фактический URL/query, IP, body или headers. Поля credentials удаляются redaction; error serializer не пишет driver message/stack, которые могут содержать SQL или DB URL. Jobs тем же logger фиксируют execution ID, command, phase/outcome и migration filename/version без SQL. `runtime-protection.test.ts` подаёт маркеры в cookie, authorization, CSRF, query, body, DB URL, SQL и driver error и проверяет отсутствие их в logs; startup errors также не печатают исходное исключение. Цена этой политики — ограниченная диагностика по внутренним сообщениям; request ID и безопасная readiness-диагностика остаются доступны. Audit payload формируется отдельно и не копирует HTTP body целиком.
+Production Pino logger пишет однострочный JSON с ISO `time`, безопасными полями уровня, platform service, `appVersion`. Завершение запроса содержит сгенерированный server-side request ID, method, шаблон route, status и duration, а также `remoteAddress`, `remoteIp` и `protocol` для proxy qualification; фактический URL/query, body и headers исключены. Эти сетевые адреса являются техническими metadata запросов, не полями synthetic production data. Raw visitor logs не публикуются как release evidence; qualified observation summary описывает только запросы runner. Поля credentials удаляются redaction; error serializer не пишет driver message/stack, которые могут содержать SQL или DB URL. Owner CLI тем же logger фиксирует command, phase/outcome и migration filename/version без SQL. `runtime-protection.test.ts` подаёт маркеры в cookie, authorization, CSRF, query, body, DB URL, SQL и driver error и проверяет отсутствие их в logs; startup errors также не печатают исходное исключение. Цена этой политики — ограниченная диагностика по внутренним сообщениям; request ID и безопасная readiness-диагностика остаются доступны. Audit payload формируется отдельно и не копирует HTTP body целиком.
 
 Синтетические display names можно показывать в demo; email, телефон и реальные табельные номера не моделируются.
 
@@ -108,13 +113,14 @@ Production Pino logger пишет однострочный JSON с ISO `time`, �
 
 ## Database protection
 
-- constraints дублируют критическую положительность/уникальность;
-- транзакции и row locks описаны в [[transactions-concurrency]];
-- audit/acceptance/payroll append-only защищены grants + trigger;
-- hosted config при platform marker требует percent-encoded `/cloudsql/<project>:<region>:<instance>` в `host`, `sslmode=disable`, однозначный URL и допустимую длину socket; parser test закреплённого `pg` подтверждает ожидаемый `Client.host`. `apply`, наличие mount и фактическое Cloud SQL connection всё ещё обязательны как hosted evidence;
-- backups/PITR, log retention и deployment identities определены в [[deployment]] и reviewable Terraform, но до фактического IAM/restore/smoke evidence нельзя заявлять production readiness.
-- owner-only `reset` транзакционно удаляет mutable demo tables и sessions, проверяет пустые счётчики и сохранность reference fixtures. В production он разрешён только после снятия public invoker и drain; failure оставляет demo закрытым. Live retention — до 24 часов, backup/PITR может содержать прежнее synthetic состояние до 7 дней.
-- project budget alerts не являются hard spending cap. Предварительно записанный lifetime и двухфазный teardown с защищённым по умолчанию `teardown_mode=false` обязательны независимо от уведомлений.
+- Constraints дублируют критическую положительность/уникальность; транзакции и row locks описаны в [[transactions-concurrency]].
+- Все runtime DB operations проходят shared advisory barrier и отдельный SQL state check после lock в `READ COMMITTED`, включая reads и session touch/delete/cleanup. Runtime только читает persistent maintenance/requested/generation/timestamp; оба maintenance flags должны быть false для admission.
+- Command executor повторно проверяет session/generation до создания/replay receipt, закрывая race `auth → reset → command`.
+- Owner session mutex сериализует orchestration; сначала коммитится `maintenance_requested=true`, затем exclusive barrier дожидается допущенных transactions и фиксирует `maintenance=true`/generation. Новые admissions закрыты уже при requested; timeout/cancel ожидания сохраняет fail-closed state. Capacity locks используют другие ключи. Workflow concurrency — дополнительная защита, не замена DB mutex.
+- Reset транзакционно удаляет mutable synthetic demo и sessions, сохраняет reference fixtures, не запускает seed; verify доступен с закрытым gate. Только успешные initial bootstrap + verify либо reset + verify обновляют timestamp. Через 26 часов API fail-closed.
+- Ошибка/cancellation после persisted request или close сохраняет закрытое состояние; только verified success очищает оба флага, unconditional reopen запрещён. Suspend/HTTP 202 Render не считаются доказательством завершения SQL.
+- Direct Neon TLS/hostname, реальные owner capabilities и runtime grants проверяются отдельно в hosted qualification. Локальный PostgreSQL non-superuser test доказывает SQL behavior без обращения к Neon.
+- История посетителей не требует backup/recovery. При восстановлении достаточно чистых migrations + seed + verify; ограниченное Neon restore window и невозможность гарантировать $0 uptime описаны в [[0009-render-free-neon-free-release|ADR-0009]].
 
 ## Проверки baseline
 
@@ -127,9 +133,10 @@ Production Pino logger пишет однострочный JSON с ISO `time`, �
 | SQL/XSS payload | validation/escaping, нет исполнения |
 | oversize body/list | PostgreSQL security test: body `413`, list из 251 ID `400`, бизнес-состояние неизменно |
 | public health | exact response contract: только status и `200/503`, version/database/migration details отсутствуют |
-| logs | unit test: Cloud Logging severity/request fields присутствуют; cookie/token/query/body/DB URL/SQL/raw driver error отсутствуют |
-| proxy/IP | local XFF игнорируется; one-hop Cloud Run simulation игнорирует spoofed prefix и разделяет rate-limit key реальных client IP |
-| Cloud SQL URL | config tests отклоняют hosted TCP/raw/ambiguous URL и проверяют resolved socket через `pg@8.23.0` |
+| logs | unit test: безопасные JSON level/request fields присутствуют; cookie/token/query/body/DB URL/SQL/raw driver error отсутствуют |
+| proxy/IP | local XFF игнорируется; Render peer/CIDR-chain simulation игнорирует spoofed prefix и разделяет rate-limit key реальных client IP |
+| Neon URL | config tests отклоняют pooler/downgrade/неоднозначные параметры и неверные expected host/database; TLS использует проверку сертификата/hostname |
+| Maintenance | reads/session/commands закрываются под gate; owner fail/cancel не открывает; auth-reset race не создаёт receipt |
 | runtime DB role | update/delete immutable tables запрещены |
 | image | отдельный clean-container и Trivy gate; текущие результаты в [[quality-gates]] |
 
@@ -141,4 +148,4 @@ Production Pino logger пишет однострочный JSON с ISO `time`, �
 
 ## Явные ограничения
 
-MVP baseline не включает production IAM пользователей, password reset, MFA, tenant isolation, реальные персональные данные, formal penetration test, SIEM или compliance certification. Локальные tests и plan assertions доказывают только code/config contracts, но не hosted TLS, IAM propagation/restore, reset cadence, secret rotation, network policy, фактическую Cloud Run header chain/Cloud Logging ingestion или Cloud SQL socket connection. Эти наблюдения остаются staging/production evidence по [[deployment]]. Подтверждённые CI gates этапа 9 относятся только к прежнему implementation SHA из [[quality-gates]]; текущие изменения удалённо не проверялись.
+MVP baseline не включает production IAM пользователей, password reset, MFA, tenant isolation, реальные персональные данные, formal penetration test, SIEM или compliance certification. Локальные tests и plan assertions доказывают только code/config contracts, но не hosted Neon TLS/roles, Render resolved digest/proxy chain/log ingestion, reset cadence/cancellation, secret rotation, cold start или recovery. Эти наблюдения остаются staging/production evidence по [[deployment]]. Подтверждённые CI gates этапа 9 относятся только к прежнему implementation SHA из [[quality-gates]]; текущие изменения удалённо не проверялись.

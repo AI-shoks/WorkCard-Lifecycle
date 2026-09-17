@@ -1,3 +1,5 @@
+> **Исторический неактивный GCP вариант с 2026-09-17.** Текущий контракт — [ADR-0009](../../docs/architecture/adr/0009-render-free-neon-free-release.md), [Render configuration](../render/README.md) и [Deployment](../../docs/release/deployment.md). Опубликованный GCP baseline сохранён; ранее подготовленные незакоммиченные foundation/backend изменения остаются только в локальном рабочем дереве. Каталог не используется активным deployment gate и не должен запускаться для нового Render/Neon демо. Никакого `apply`/`destroy` или удаления GCP в текущей задаче нет. Все приведённые ниже account/CLI checks, цены, next steps и результаты относятся к историческим датам, не доказывают текущее состояние внешних аккаунтов и не являются разрешением на действия.
+
 # Terraform release infrastructure
 
 Reviewable IaC для этапа 10. Конфигурация описывает три отдельных GCP project, общий immutable Artifact Registry, IAM, две строго ограниченные GitHub Workload Identity границы с отдельными deployer/smoke targets, Cloud SQL PostgreSQL 18, Secret Manager, Cloud Run service и отдельные `migrate`/`reset`/`seed`/`verify` jobs, probes, logging/alerts, production PITR, project-level budgets и teardown guards. Она не является разрешением на `apply` и не доказывает hosted readiness.
@@ -11,7 +13,7 @@ Reviewable IaC для этапа 10. Конфигурация описывает
 - App не имеет owner secret; `migrate`/`seed` получают owner URL и app password, `reset` — только owner URL, `verify` — только runtime URL. У release deployer нет прямого `secretAccessor`, но его `roles/iam.serviceAccountUser` вместе с deploy правами может косвенно выполнять код от workload identities. Поэтому нельзя без оговорки утверждать, что deployer не способен получить secret payload; deployer WIF/workflow — привилегированная граница.
 - `roles/run.developer` не используется как разрешение на изменение IAM. На единственный production service deployer получает custom role ровно с `run.services.getIamPolicy` и `run.services.setIamPolicy`; `roles/run.admin` отсутствует. Jobs используют resource-level `roles/run.jobsExecutor`.
 - Projects, registry, service accounts, WIF, SQL/database, services, jobs и secret containers защищены от Terraform deletion при `teardown_mode=false`. Default VPC не создаётся; Cloud SQL разрешает только Cloud SQL connectors и не имеет authorized networks.
-- Project budget notifications не являются hard spending cap и не останавливают ресурсы. Финансовая граница — заранее записанный `destroyBy` и двухфазный teardown по [deployment runbook](../../docs/release/deployment.md).
+- Project budget notifications не являются hard spending cap и не останавливают ресурсы. Финансовая граница — заранее записанный `destroyBy` и двухфазный teardown по [deployment runbook](../../docs/release/deployment-gcp-history.md).
 - Backend намеренно не назначен на review-only шаге. До первого разрешённого apply нужен отдельный encrypted/versioned remote backend и проверка IAM к нему.
 
 ## Review commands
@@ -80,13 +82,13 @@ Service использует startup `/health/ready` (`5s/3s/24`) и liveness `/
 | `GCP_STAGING_ORIGIN`                        | `runtime.staging.service_uri`, точно совпадающий с reviewed `app_origins.staging`                            |
 | `GCP_STAGING_SECRET_VERSIONS`               | JSON из `runtime.staging.pinned_secret_versions`; только пять numeric generation/version values, без payload |
 
-`deploy.yml` и его smoke runner локально проверены, но outputs нигде не назначены и WIF authentication не проверялась в GCP. Exact workflow contract и bootstrap prerequisite описаны в [deployment](../../docs/release/deployment.md#staging-orchestration-без-выполненного-deployment).
+`deploy.yml` и его smoke runner локально проверены, но outputs нигде не назначены и WIF authentication не проверялась в GCP. Exact workflow contract и bootstrap prerequisite описаны в [deployment](../../docs/release/deployment-gcp-history.md#staging-orchestration-без-выполненного-deployment).
 
 ## Общий mutable demo
 
 Production остаётся публичным interactive demo с общей synthetic DB и без tenant isolation. Application отклоняет создание 21-й live партии и 501-й active session; session живёт максимум 8 часов/30 минут idle и очищается opportunistically. `work-card-reset` транзакционно удаляет все mutable rows/sessions, сохраняет reference users/passport/operations и откатывается, если post-check не прошёл.
 
-Reset не имеет scheduler resource. До отдельной разрешённой orchestration оператор обязан запускать его не реже раза в 24 часа через public-IAM maintenance runbook: снять только production `allUsers roles/run.invoker`, подтвердить внешний `403`, drain, выполнить `reset` и `verify`, затем эквивалентно восстановить policy. После 26 часов без успешного reset, capacity stop или failed verification public access остаётся закрытым. Полный контракт и предупреждение о backup/PITR retention находятся в [ADR-0008](../../docs/architecture/adr/0008-bounded-public-demo-operations.md) и [deployment](../../docs/release/deployment.md).
+Reset не имеет scheduler resource. До отдельной разрешённой orchestration оператор обязан запускать его не реже раза в 24 часа через public-IAM maintenance runbook: снять только production `allUsers roles/run.invoker`, подтвердить внешний `403`, drain, выполнить `reset` и `verify`, затем эквивалентно восстановить policy. После 26 часов без успешного reset, capacity stop или failed verification public access остаётся закрытым. Полный контракт и предупреждение о backup/PITR retention находятся в [ADR-0008](../../docs/architecture/adr/0008-bounded-public-demo-operations.md) и [deployment](../../docs/release/deployment-gcp-history.md).
 
 ## Будущий apply — только после отдельного разрешения
 
@@ -98,7 +100,7 @@ Initial provisioning нельзя выполнять одним нераздел
 
 Перед каждой фазой обязательны обычный plan review, актуальная cost estimate/billing eligibility, remote state, подтверждённые email channels и числовые secret generation counters. Terraform principal также нужен `serviceusage.services.use` в release project: aliased billing provider использует его как quota project для Billing Budgets API. Изменение пароля или производного DB URL требует увеличить соответствующий counter; прежняя Secret Manager version остаётся disabled-on-destroy для rollback window.
 
-До provisioning также обязательны UTC `provisionedAt`/`destroyBy`: default window 7 дней, абсолютный максимум после одного явного продления — 30 дней. Budget alerts не ограничивают расходы. При deadline сначала public access остаётся закрытым, затем отдельный phase-A plan/apply с `teardown_mode=true` снимает только guards. После нового `plan -destroy` и второго разрешения phase B удаляет весь stack без `-target`. При обычном `teardown_mode=false` strict review отклоняет снятые guards, а `deletion_policy=PREVENT`/`deletion_protection` должны остановить случайное удаление. Точные stop conditions и проверки удаления — в [deployment](../../docs/release/deployment.md#lifetime-и-двухфазный-teardown).
+До provisioning также обязательны UTC `provisionedAt`/`destroyBy`: default window 7 дней, абсолютный максимум после одного явного продления — 30 дней. Budget alerts не ограничивают расходы. При deadline сначала public access остаётся закрытым, затем отдельный phase-A plan/apply с `teardown_mode=true` снимает только guards. После нового `plan -destroy` и второго разрешения phase B удаляет весь stack без `-target`. При обычном `teardown_mode=false` strict review отклоняет снятые guards, а `deletion_policy=PREVENT`/`deletion_protection` должны остановить случайное удаление. Точные stop conditions и проверки удаления — в [deployment](../../docs/release/deployment-gcp-history.md#lifetime-и-двухфазный-teardown).
 
 ## Намеренно вне реализованной границы
 

@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 8
+version: 10
 owner: engineering
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # Repository Structure
@@ -14,7 +14,7 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 ```text
 .
-├── .github/workflows/               CI и ручные release/deploy workflows
+├── .github/workflows/               CI, manual release/deploy/rollback и daily/manual reset workflows
 ├── .github/actions/setup-workspace/ общее закреплённое CI-окружение
 └── WorkCard-Lifecycle/
     ├── apps/
@@ -24,7 +24,8 @@ Git checkout содержит каталог приложения `WorkCard-Life
     │   └── web/                     React SPA и frontend-тесты
     ├── packages/
     │   └── contracts/               общие TypeBox-схемы и TypeScript-типы
-    ├── infra/terraform/             reviewable GCP IaC и GitHub WIF без backend/apply
+    ├── infra/render/                текущий Render Free deployment contract
+    ├── infra/terraform/             исторический неактивный GCP IaC
     ├── docs/                        управляемые артефакты и release/evidence schemas
     ├── scripts/                     UX audit, release validator/generator/evidence appender
     ├── quality/                     isolated DB, browser, failure/security/performance tests
@@ -34,11 +35,13 @@ Git checkout содержит каталог приложения `WorkCard-Life
     └── package.json                 корневые команды quality gate
 ```
 
-`node_modules`, `dist`, coverage, локальные `.env` и кэши являются производными данными и не входят в Git. `pnpm-lock.yaml`, SQL-миграции и `.env.example` входят в Git как воспроизводимая спецификация.
+`node_modules`, `dist`, coverage, локальные `.env` и кэши являются производными данными и не входят в Git. `pnpm-lock.yaml`, SQL-миграции, `.env.example` и `.env.owner.example` входят в Git как воспроизводимая спецификация.
 
-`infra/terraform` содержит root module, переиспользуемый runtime module, provider lockfile, placeholder inputs, ограниченный GitHub OIDC/WIF trust и plan-safety checker. `.terraform/`, state и plan files игнорируются; remote backend до provisioning ещё не настроен.
+`infra/render` задаёт один Free image-backed service и локальные contract checks. `infra/terraform` сохраняет неактивные исторические root/runtime modules, provider lock, GitHub WIF и plan-safety checker. Более ранние незакоммиченные foundation/backend templates и дополнительные safety tests сохранены только в локальном рабочем дереве и не включены в Render/Neon commit. Незакоммиченные Terraform HCL/scripts/templates остаются локальной историей и не входят в текущую публикацию Render/Neon. Активный release gate не применяет GCP Terraform; `.terraform/`, state и plans остаются ignored. Причина перехода — [[0009-render-free-neon-free-release|ADR-0009]].
 
-`scripts/release/create-release-manifest.mjs` после успешной публикации и semantic scan validation создаёт только новый `docs/release/manifests/<SHA>.json` по `docs/release/release-manifest.schema.json`; перезапись существующего build record запрещена. `validate-release-manifest.mjs` проверяет schema, cross-field bindings и исходный Trivy JSON. Последующие реальные lifecycle-факты создаёт `append-release-evidence.mjs` как новые последовательные hash-chained файлы по `docs/release/release-evidence.schema.json`, не меняя initial manifest. Фактических manifest/evidence-файлов до разрешённых hosted runs нет.
+`scripts/release/create-release-manifest.mjs` после успешной публикации и semantic scan validation создаёт только новый `docs/release/manifests/<SHA>.json` по `docs/release/release-manifest.v2.schema.json`; перезапись существующего build record запрещена. `validate-release-manifest.mjs` проверяет schema, cross-field bindings и исходный Trivy JSON. Последующие реальные lifecycle-факты создаёт `append-release-evidence.mjs` как новые последовательные hash-chained файлы по `docs/release/release-evidence.v2.schema.json`, не меняя initial manifest. Фактические manifest/evidence возникают только по результатам publication/hosted operations; локальные fixtures их не заменяют. Эти scoped операции разрешены владельцем по [[deployment]].
+
+`.env.owner` отделяет local owner credentials от runtime `.env`; оба ignored.
 
 `.quality-results`, `playwright-report` и `test-results` также игнорируются Git; CI прикладывает выбранные JSON/HTML/traces как временные artifacts. `quality/` — инженерные проверки, не новый workspace или production service. Runtime-образ содержит API/SPA и production dependencies без npm/shell; build stage остаётся отдельно.
 
@@ -60,4 +63,4 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 ## Критерий принятия
 
-Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender и hosted smoke/evidence validators покрыты позитивными и негативными tests; `ci.yml`, `release.yml` и `deploy.yml` проходят `actionlint`. Terraform-каталог дополнительно прошёл `fmt`, `validate` и secret-safe review plan без `apply`. Удалённый запуск новой обязательной `release_iac` job и ручных release/deploy workflows пока отсутствует.
+Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender и hosted smoke/evidence validators покрыты позитивными и негативными tests; `ci.yml`, `release.yml`, `deploy.yml`, `reset.yml` и `rollback.yml` требуют `actionlint`. GCP Terraform results являются историческими; активный `release_iac` проверяет новый deployment contract. Фактические текущие проверки — [[quality-gates]]; полный удалённый CI текущего `main` SHA и hosted qualification ещё должны быть подтверждены отдельно.

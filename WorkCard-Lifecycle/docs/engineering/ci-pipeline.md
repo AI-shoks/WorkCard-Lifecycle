@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.ci-pipeline
 status: accepted
-version: 13
+version: 16
 owner: engineering
-updated: 2026-09-06
+updated: 2026-09-17
 ---
 
 # CI Pipeline
@@ -21,9 +21,9 @@ GitHub Actions workflows находятся в `.github/workflows/` относи
 1. поднимает чистую PostgreSQL 18.6 service;
 2. устанавливает зависимости с pnpm cache;
 3. выполняет `pnpm check`;
-4. применяет миграцию;
-5. выполняет seed дважды;
-6. запускает runtime DB verification;
+4. выполняет owner bootstrap с migrations + initial seed + verify;
+5. повторяет bootstrap/seed checks без обновления reset timestamp;
+6. проверяет owner catalog assertions и реальные runtime role boundaries;
 7. запускает backend integration suite с runtime и owner URL;
 8. валидирует Compose model;
 9. запускает `pnpm test:quality`: новые rollback/migration/security/budget tests в отдельных случайных БД и runtime-ролях через `QUALITY_OWNER_URL`.
@@ -36,7 +36,7 @@ Owner и runtime credentials существуют только в job environmen
 
 ## Job `container`
 
-Job зависит от `quality`, строит multi-stage образ с `--no-cache`, выполняет `docker compose up --no-build --wait`, проверяет liveness, readiness и SPA. Runtime — закреплённый distroless Node 24 / Debian 13 без npm/shell; build stage отделён. Этот же runtime image экспортируется и сканируется закреплённым Trivy: OS/application vulnerabilities, HIGH/CRITICAL, `--exit-code 1`, без `--ignore-unfixed` и общего allowlist. `--parallel 1` ограничивает расход памяти без изменения правил. Ошибка сканера также блокирует job. При ошибке печатаются container logs; cleanup ephemeral volumes выполняется всегда.
+Job зависит от `quality`, строит multi-stage образ с `--no-cache`, выполняет `docker compose up --no-build --wait`, затем отдельно `docker compose run --rm --no-deps readiness` и проверяет liveness/SPA. Одноразовая readiness probe находится в профиле `checks`, а bootstrap — dependency приложения с `service_completed_successfully`; завершённая probe не входит в обычное ожидание running/healthy. Runtime — закреплённый distroless Node 24 / Debian 13 без npm/shell; build stage отделён. Этот же runtime image экспортируется и сканируется закреплённым Trivy: OS/application vulnerabilities, HIGH/CRITICAL, `--exit-code 1`, без `--ignore-unfixed` и общего allowlist. `--parallel 1` ограничивает расход памяти без изменения правил. Ошибка сканера также блокирует job. При ошибке печатаются container logs; cleanup ephemeral volumes выполняется всегда.
 
 ## Job `browser`, matrix `compact` / `canonical`
 
@@ -48,43 +48,49 @@ Job зависит от `quality`, строит multi-stage образ с `--no-
 
 ## Job `release_iac`
 
-`Release and IaC contract` — седьмая обязательная job основного CI и новый preflight gate для ручного release. Она устанавливает actionlint `1.7.12` и Terraform `1.16.1` из фиксированных release URL с проверкой точных SHA-256, а все GitHub Actions остаются закреплены по commit SHA.
+Название job сохранено для совместимости preflight с семью обязательными CI checks. Вместо активного GCP Terraform plan job проверяет Render/Neon deployment contract: один Free image-backed service, health/liveness, no preview/disk/paid jobs, strict target/secret boundaries, immutable GHCR digest и отсутствие rebuild при promotion. GCP Terraform остаётся историческим неактивным вариантом; его прежние локальные результаты сохранены в [[quality-gates]] и [Terraform README](../../infra/terraform/README.md).
 
-Job запускает actionlint для `ci.yml`, `release.yml` и `deploy.yml`, весь `pnpm test:release`, компиляцию JSON Schema и негативные manifest/Trivy/append-only/deployment/smoke tests. Затем выполняются `terraform init -backend=false -lockfile=readonly`, recursive `fmt -check`, `validate` и review-only `plan -refresh=false` с синтетическими secret markers. Plan и tfvars находятся только в `$RUNNER_TEMP`; JSON checker требует точные deployer/actAs/job/secret IAM matrices, единственный production `allUsers`, custom role из двух permissions, отдельные publisher/deployment WIF providers, точные deployer/smoke impersonation targets, reset identity/secret, demo limits и deletion guards при `teardown_mode=false`. Одновременно запрещены широкие admin/token-creator roles, materialized secrets, credential URLs и service-account keys. Job не имеет `id-token: write`, не аутентифицируется в GCP и ничего не применяет.
+Actionlint проверяет `ci.yml`, `release.yml`, `deploy.yml`, `reset.yml`, `rollback.yml`; `pnpm test:release` сохраняет schema compilation и negative manifest/scan/evidence/deployment/smoke tests. Versioned schemas и cross-field validation адаптированы к Render/Neon, а не удалены. CI не имеет hosted secrets, не использует Neon, не создаёт resources и ничего не публикует. Остальные шесть quality jobs сохраняются.
 
-Конфигурация этой job проверена локально, но для текущих незакоммиченных изменений удалённого CI run ещё нет. Поэтому она является обязательным будущим gate, а не hosted evidence.
+## Ручной `release.yml`
 
-## Ручной workflow `release.yml`
+Только `workflow_dispatch` с `main`; preflight требует успешный полный push-CI того же SHA. Одна `linux/amd64` сборка получает full-SHA tag/OCI revision/`APP_VERSION`; существующий tag не перезаписывается. Publisher получает job-scoped `GITHUB_TOKEN` с `packages: write`, без Neon/Render credentials и без GCP WIF/gcloud.
 
-Release-image workflow имеет только `workflow_dispatch`, принимает кандидатом `github.sha` выбранной `main` и не содержит push/schedule trigger. Preflight с `actions: read` требует clean checkout и один полный успешный push-run `ci.yml` того же SHA с семью ожидаемыми jobs, включая `Release and IaC contract`. Publish job отдельно получает лишь `contents: read` и `id-token: write`; service-account key или GitHub secret с cloud credential не используется.
+Опубликованный exact GHCR digest pull-ится и сравнивается с локальной сборкой/config/platform, сканируется Trivy HIGH/CRITICAL. Public visibility проверяется anonymous pull; перед первым продвижением package отдельно переводится в public в рамках разрешённой публикации. После первого private push manual `resume_run_id` восстанавливает проверенный digest из отдельного single-file artifact `published-identity-<SHA>-<originalRunAttempt>` исходного run того же SHA; успешные build/push steps проверяются, image повторно не собирается. Этот artifact записывается до anonymous pull, хранится 30d и содержит `published-identity.json` без зависимости от общего upload root. Manifest содержит только проверенные build/scan факты, раздельные source-build/build-scan run bindings, source/CI и migration checksums по [versioned schema](../release/release-manifest.v2.schema.json).
 
-После локальной единственной `linux/amd64` сборки workflow получает short-lived credential через Workload Identity Federation. Terraform trust дополнительно ограничен неизменяемыми GitHub repository/owner IDs, `refs/heads/main`, событием `workflow_dispatch` и точным `workflow_ref`. Перед push существующий full-SHA tag приводит к отказу; публикуются только `work-card:<40-char SHA>`, OCI revision label и `APP_VERSION` равны этому SHA.
+GitHub Release assets сохраняют manifest/scan и последующие [evidence records](../release/release-evidence.v2.schema.json) на весь срок эксплуатации/rollback. Actions artifacts остаются временной диагностикой, а не единственным release archive. Release workflow не выполняет owner DB tasks или Render deployment.
 
-Deployment/reset orchestration использует другой WIF pool/provider и service account `work-card-deployer`, ограниченный точным `deploy.yml`; publisher credential для этого непригоден. Тот же узко привязанный provider разрешает hosted job impersonate отдельный `work-card-smoke`, который имеет только invocation на private staging service и не получает deploy/log/DB roles. Причина и привилегированная `iam.serviceAccountUser` граница deployer описаны в [[deployment]].
+## Ручной `deploy.yml`
 
-Digest сначала читается из Artifact Registry по tag. Затем образ pull-ится по `image@sha256:…`; его config ID сравнивается с единственным локальным build, а label, environment version и `linux/amd64` перепроверяются. Trivy сканирует tar, сохранённый именно из этого pulled digest, с блокировкой HIGH/CRITICAL. После сканирования WIF credential обновляется, tag и exact reference повторно разрешаются через registry; только при равенстве digest генератор создаёт `docs/release/manifests/<SHA>.json` и вместе с scan JSON загружает его как 30-дневный workflow artifact.
+Только manual `main` release, связанный с ранее успешным release run и тем же SHA/digest. Workflow повторно проверяет manifest, Trivy binding и migration checksums, не строит image и не принимает mutable tags.
 
-Manifest соответствует [JSON Schema](../release/release-manifest.schema.json) и до записи проходит межполевую и семантическую проверку Trivy report. Он содержит только неизменяемые build/scan факты: source/CI/build-scan URLs, tag, registry/config digests, exact reference, OCI label, platform, scan checksum/summary и checksum SQL migrations. Deployment placeholders отсутствуют. Реальные staging/production/smoke/promotion/rollback события позже добавляются отдельными hash-chained append-only records по [release evidence schema](../release/release-evidence.schema.json); build workflow не создаёт ни каталога evidence, ни пустых записей и не коммитит manifest. `release.yml` не запускает Terraform, Cloud Run jobs, deploy, promotion или rollback. Сам manual run и предварительное создание Artifact Registry/WIF требуют отдельного разрешения.
+Staging owner job выполняет initial `bootstrap` либо, при обычном release, `node dist/migrate.js`; затем всегда отдельный fixed `reset` на staging Neon target. Migrate оставляет gate закрытым, reset проверяет schema/fixtures и открывает чистое demo с новым verified timestamp. Просроченный предыдущий staging reset не подменяется повторным bootstrap. Runtime запускается из того же image временным Docker на runner с runtime-only environment; readiness и browser/security checks выполняются отдельно от owner process. Browser не получает DB/PG/owner/deployment credentials; local-only DB helper guards не ослаблены.
 
-## Ручной workflow `deploy.yml` — реализован, не исполнялся
+Production owner migration идёт отдельной границей. Render adapter проверяет service contract и совпадение текущих persistent/live digests. До PATCH он сохраняет staging evidence и `production-attempt` с previous image в GitHub Release, затем обновляет постоянный image reference, записывает deploy ID, ждёт конечный status и сверяет resolved digest. Live record сохраняется до browser smoke; ошибка/отмена smoke сохраняет доступный rollback record. Несекретные факты добавляются schema-validated append-only evidence. Реальная chain/proxy/TLS/logging/cold-start qualification остаётся отдельным hosted requirement; fixture PASS его не создаёт.
 
-Единственный trigger — `workflow_dispatch` из `refs/heads/main` с точной фразой `DEPLOY EXACT DIGEST TO STAGING`; job использует GitHub Environment `staging`. Preflight находит успешный `release.yml` run того же SHA, скачивает artifact именно этого run и заново проверяет manifest, Trivy binding и `buildScanRunUrl`. Workflow не собирает image, не принимает mutable tag и не выполняет Terraform.
+## Ручной `rollback.yml`
 
-Deployment job через `work-card-deployer` сверяет registry digest, а затем до каждого запуска проверяет metadata существующих `migrate`, `seed`, `verify`: единственный exact-digest container, отдельная service account, `taskCount=parallelism=1`, `maxRetries=0`, фиксированные command/args/env, numeric secret versions и Cloud SQL mount. Jobs исполняются без overrides в порядке `migrate → seed → verify` и затем повторно для idempotence/history. Кандидат создаётся без traffic; отдельный validator до переключения требует Ready revision, exact manifest image, `source-sha`/`APP_VERSION`, runtime-only numeric secret refs, canonical origin, app identity и staging Cloud SQL mount. Имя прежней 100%-revision фиксируется заранее; любая последующая ошибка включает отдельный rollback job.
+Manual main-only workflow принимает exact current/previous SHA и sequence retained deployment record, требует `ROLLBACK PREVIOUS COMPATIBLE DIGEST` и использует общую owner/deployment concurrency group. Проверяются оба release records, доступность public target image, текущий persistent/live digest и одинаковые migration checksums. Deploy ID выбранного live/triggered evidence должен совпасть с фактическим current live deployment; prepared intent либо старый record того же digest не принимаются. DB credentials и destructive down migrations отсутствуют.
 
-Hosted job использует только `work-card-smoke`: родительский runner обновляет короткоживущий audience-bound Cloud Run ID token через GitHub WIF, проверяет issuer/audience/email/lifetime и передаёт browser только режимный temporary token file. Browser process не наследует GitHub/Google, deployer, DB или owner credentials; trace отключён, внешние origin блокируются, а IAM header вставляется только в one-hop requests точному staging origin. Runner проверяет IAM denial без token, sanitized health, SPA/assets MIME и headers, authentication/Origin/CSRF/role negatives без side effect, proxy spoof/rate-limit key и полный Playwright lifecycle `112 → 3 → 250`; browser запускается до rate-limit exhaustion, retries отсутствуют, safety timeout равен 25 минутам.
+До PATCH durable archive получает rollback decision/attempt и compatibility binding; после запуска записываются deploy ID и live status/resolved digest до browser smoke. Отдельный browser job не получает provider/DB secrets. Log-verification/evidence job завершает rollback только после full security/canonical/proxy smoke и сохраняет `rollback-decision: completed`; потеря/ошибка smoke не стирает фактический deployment. Подробный операторский порядок — [[deployment]].
 
-Отдельная post-smoke job возвращается к deployer только для `roles/logging.viewer`: по server-generated request IDs и Cloud Trace она связывает application completion с Cloud Run request log, сверяет status/client IP/severity и отвергает query/header/body/DB markers. Успешные job execution IDs, revision/digest, numeric versions и hashes smoke/observation reports записываются в два schema-validated append-only records и публикуются только как workflow artifacts. Ни token, ни DB URL, ни Playwright trace туда не входят.
+## `reset.yml`
 
-Workflow требует уже provisioned staging jobs/service, действующие outputs/repository variables и предыдущую 100%-revision для автоматического rollback. В текущем checkout выполнены только локальные static/unit/plan проверки: `terraform apply`, `release.yml`, `deploy.yml`, image publication и hosted запросы не запускались.
+Daily schedule 02:17 UTC и manual trigger с `RESET SYNTHETIC PRODUCTION DEMO` запускают только фиксированный production `reset` текущего проверенного digest. Присутствуют timeout, проверка expected Neon target и main branch, owner-only secrets и общая concurrency group `work-card-owner-and-release` с deployment. Arbitrary commands/SQL, seed и unconditional reopen отсутствуют. DB advisory mutex сериализует owner orchestration также при локальном запуске вне Actions.
 
-## Кэширование и артефакты
+Scheduled Actions могут опаздывать, пропускаться или отключаться в неактивном public repository. Без successful reset + verify в течение 26 часов API закрывается DB gate независимо от состояния workflow; `/health/live` продолжает работать. Оператор контролирует last-success и выполняет manual recovery по [[deployment]].
 
-Кэшируется pnpm store по lockfile. `node_modules`, runtime tar, БД и connection credentials не публикуются. CI upload ограничен browser HTML/JSON/screenshots/failure trace, performance JSON и redacted secret/image reports; retention 7 дней. Staging orchestration при фактическом успешном запуске хранит 30 дней только manifest, numeric metadata, append-only evidence, smoke JSON, observation summary и trace-free HTML/screenshots. Failure trace обычного CI может содержать временные cookie/CSRF тестовой demo-session: соответствующая изолированная БД удаляется при завершении suite, все данные синтетические. Эти artifacts не предназначены для настоящих пользовательских сессий. Container build не использует host `node_modules` благодаря `.dockerignore`.
+## Кэширование, secrets и артефакты
+
+Кэшируется pnpm store по lockfile. `node_modules`, DB, credentials и owner environment не публикуются. CI browser reports могут содержать только временные synthetic sessions локальной disposable DB; hosted browser trace выключен, sensitive raw logs не входят в evidence. Security scan отчёты redacted.
+
+GitHub environments разделяют `staging-owner`, `staging-runtime`, `production-owner` и `production` (Render adapter). Secrets задаются только в нужных steps/containers. Полная матрица имён — [[environments]]. Current/previous GHCR image и GitHub Release assets не удаляются автоматической retention policy весь срок эксплуатации/rollback; workflow artifacts не заменяют этот архив.
+
+Владелец разрешил scoped commit/push, PR/merge после обязательных gates, полный CI и ручные release/deploy/reset/rollback workflows для установленных ресурсов проекта. Успешные удалённые runs текущей реализации и hosted qualification ещё должны быть привязаны к фактическому `main` SHA/digest; прежние runs этого не доказывают. Фактические результаты перечислены в [[quality-gates]] и release records по [[deployment]].
 
 ## Критерий принятия
 
-Закрытие этапа 9 требует зелёных `quality`, `container` (включая image scan), `security`, обеих `browser` matrix entries и `performance` для одного implementation SHA. Локальные проверки и успешные runs прежнего SHA не подменяют этот gate. Commit/push требуют отдельного прямого разрешения. Workflow не меняет branch protection через API; здесь зафиксирован критерий приёмки проекта.
+Закрытие этапа 9 требует зелёных `quality`, `container` (включая image scan), `security`, обеих `browser` matrix entries и `performance` для одного implementation SHA. Локальные проверки и успешные runs прежнего SHA не подменяют этот gate. Scoped commit/push и PR/merge разрешены владельцем для текущей задачи после обязательных проверок; gate полного CI того же `main` SHA перед release сохраняется. Workflow не меняет branch protection через API; здесь зафиксирован критерий приёмки проекта.
 
 Workflow обнаруживается GitHub из корневой `.github/workflows/`, а shell steps выполняются в `WorkCard-Lifecycle/`. Implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) подтверждён полностью зелёными [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041): в обоих запусках jobs `Code and database quality` и `Clean container startup` завершены успешно. Это закрывает удалённый acceptance gate этапа 7. Неблокирующее предупреждение GitHub о переводе runtime используемых actions с Node.js 20 на 24 учтено как maintenance item в [[backlog]].
 
@@ -96,4 +102,4 @@ SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf` подтверждён успеш
 
 ## Закрытие этапа 9
 
-Этап 9 закрыт 2026-09-05: implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): все 6 обязательных jobs имеют `completed/success` для того же SHA в каждом запуске, включая image scan в `container`. Полная матрица и локальные результаты — [[quality-gates]]. Этапы 1–9 закрыты; этап 10 в работе: release design, reviewable Terraform, manual release-image workflow и локальный код staging orchestration/runner приняты к review, но `apply`/workflow не запускались и ничего не развёрнуто.
+Этап 9 закрыт 2026-09-05: implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): все 6 обязательных jobs имеют `completed/success` для того же SHA в каждом запуске, включая image scan в `container`. Полная матрица и локальные результаты — [[quality-gates]]. Это историческое закрытие этапа 9; текущий Render/Neon этап 10 и его локальные проверки описаны выше и в [[quality-gates]], без утверждения о hosted deployment.
