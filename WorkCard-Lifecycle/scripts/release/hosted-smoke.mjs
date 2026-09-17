@@ -531,7 +531,7 @@ function sessionFromResponse(result, origin) {
     .split(';')
     .map((value) => value.trim());
   assert(
-    cookie?.startsWith('work_card_demo=') && cookie.length > 'work_card_demo='.length,
+    cookie?.startsWith('wcl_session=') && cookie.length > 'wcl_session='.length,
     'Hosted demo session did not return the expected cookie.',
   );
   const normalized = attributes.map((value) => value.toLowerCase());

@@ -86,6 +86,7 @@ function unsignedToken(payload) {
 function hostedFetch({
   platform = 'cloud-run',
   cookieAttributes = '; Path=/; HttpOnly; SameSite=Lax; Secure',
+  sessionCookie = (number) => `wcl_session=session-${number}`,
 } = {}) {
   let rateAttempts = 0;
   let sessionNumber = 0;
@@ -163,7 +164,7 @@ function hostedFetch({
       }
       sessionNumber += 1;
       return jsonResponse({ csrfToken: `csrf-token-${sessionNumber}-${'x'.repeat(32)}` }, 201, {
-        'set-cookie': `work_card_demo=session-${sessionNumber}${cookieAttributes}`,
+        'set-cookie': `${sessionCookie(sessionNumber)}${cookieAttributes}`,
       });
     }
     throw new Error(`Unexpected hosted request: ${method} ${url.pathname}`);
@@ -363,6 +364,58 @@ test('public Render smoke requires secure host-only session cookies', async () =
         fetchImplementation: hostedFetch({ platform: 'render', cookieAttributes }),
       }),
       /Hosted session cookie/,
+    );
+  }
+});
+
+test('public smoke reuses the issued API session cookie for reads, replacement and cleanup', async () => {
+  const original = hostedFetch({ platform: 'render' });
+  const issuedCookies = new Set();
+  const authenticatedRequests = [];
+  await probeHostedSurface({
+    origin: 'https://work-card-demo.onrender.com',
+    platform: 'render',
+    runBrowser: false,
+    fetchImplementation: async (input, init = {}) => {
+      const cookie = new globalThis.Headers(init.headers).get('cookie');
+      const path = new globalThis.URL(input).pathname;
+      const method = init.method ?? 'GET';
+      if (cookie !== null) {
+        assert(issuedCookies.has(cookie), 'Smoke must send only an issued cookie without attributes.');
+        authenticatedRequests.push({ path, method, cookie });
+      }
+      const response = await original(input, init);
+      if (path === '/api/v1/demo-session' && method === 'POST' && response.status === 201) {
+        const issuedCookie = response.headers.get('set-cookie').split(';')[0];
+        assert.match(issuedCookie, /^wcl_session=.+$/);
+        issuedCookies.add(issuedCookie);
+      }
+      return response;
+    },
+  });
+  assert(
+    authenticatedRequests.some(
+      ({ path, method }) => path === '/api/v1/production-passports' && method === 'GET',
+    ),
+  );
+  assert(
+    authenticatedRequests.some(
+      ({ path, method }) => path === '/api/v1/demo-session' && method === 'POST',
+    ),
+  );
+  assert.equal(authenticatedRequests.filter(({ method }) => method === 'DELETE').length, 3);
+});
+
+test('public smoke rejects missing, empty and unexpected session cookie names', async () => {
+  for (const cookie of ['', 'wcl_session=', 'work_card_demo=session', 'wcl_session_extra=session']) {
+    await assert.rejects(
+      probeHostedSurface({
+        origin: 'https://work-card-demo.onrender.com',
+        platform: 'render',
+        runBrowser: false,
+        fetchImplementation: hostedFetch({ platform: 'render', sessionCookie: () => cookie }),
+      }),
+      /Hosted demo session did not return the expected cookie/,
     );
   }
 });
