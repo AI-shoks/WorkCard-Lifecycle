@@ -12,6 +12,10 @@ const resume = await read('./resume-publication.mjs');
 const ci = await read('../../../.github/workflows/ci.yml');
 const fetchRelease = await read('./fetch-release.mjs');
 const browser = await read('../../quality/browser/lifecycle.spec.ts');
+const browserTransport = await read('../../quality/browser/hosted-route.ts');
+const browserTransportTests = await read('../../quality/hosted-route.test.ts');
+const proxyProbe = await read('./proxy-probe.mjs');
+const publicSmoke = await read('./public-smoke.mjs');
 function section(text, start, end) {
   const first = text.indexOf(start);
   const last = end ? text.indexOf(end, first + start.length) : text.length;
@@ -125,7 +129,69 @@ test('owner, runtime, Render adapter and browser have separate secret boundaries
   assert.match(workflow, /origin: \$\{\{ steps\.deployment\.outputs\.origin \}\}/);
   assert.match(smoke, /public-smoke\.mjs/);
   assert.match(browser, /context\.route\('\*\*\/\*'/);
-  assert.match(browser, /maxRedirects: 0/);
+  assert.match(browser, /forwardHostedRoute\(route, hostedOrigin\)/);
+  assert.doesNotMatch(browser, /\broute\.fetch\s*\(/);
+});
+
+test('hosted browser forwarding enforces origin, redirects, normal TLS and fixed failure errors', () => {
+  const boundary = section(
+    browserTransport,
+    'const target = new URL(request.url());',
+    'const headers = await request.allHeaders();',
+  );
+  assert.match(boundary, /target\.origin !== origin/);
+  assert.match(boundary, /!\['http:', 'https:'\]\.includes\(target\.protocol\)/);
+  assert.match(boundary, /target\.username \|\|\s*target\.password/);
+  assert.match(boundary, /throw new HostedRouteFailure\('origin'\)/);
+  assert.match(browserTransport, /headers\['host'\] = target\.host/);
+
+  // Native HTTP(S) never follows redirects. A redirect response must still
+  // fail explicitly rather than being fulfilled into a browser navigation.
+  assert.match(browserTransport, /import \{ request as requestHttp \} from 'node:http'/);
+  assert.match(browserTransport, /import \{ request as requestHttps \} from 'node:https'/);
+  assert.match(
+    browserTransport,
+    /if \(\[301, 302, 303, 307, 308\]\.includes\(status\)\) \{\s*fail\('redirect'\);\s*incoming\.destroy\(\);\s*forwarded\.destroy\(\);\s*return;/,
+  );
+  assert.doesNotMatch(browserTransport, /\bfetch\s*\(/);
+  assert.match(
+    browserTransport,
+    /transport\(target, \{ method: request\.method\(\), headers \},/,
+  );
+  assert.doesNotMatch(
+    browserTransport,
+    /rejectUnauthorized|checkServerIdentity|secureContext|NODE_TLS_REJECT_UNAUTHORIZED|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|\b(?:ca|cert|key|agent|lookup|servername|secureOptions)\s*:/,
+  );
+
+  assert.match(browserTransport, /super\(`Hosted browser request failed \(\$\{kind\}\)\.`\)/);
+  const failure = section(browserTransport, '  } catch (error) {');
+  assert.match(failure, /error instanceof HostedRouteFailure \? error\.kind : 'transport'/);
+  assert.match(failure, /await route\.abort\('failed'\)/);
+  assert.match(failure, /throw new HostedRouteFailure\(kind\)/);
+  assert.doesNotMatch(failure, /throw error|error\.(?:message|stack|cause)|\bcause\s*:|console\./);
+
+  // These loopback fixtures execute the real helper in the existing quality
+  // gate, proving that both redirect classes make exactly one HTTP request.
+  assert.match(ci, /run: pnpm test:quality/);
+  assert.match(browserTransportTests, /it\.each\(\['\/next', 'http:\/\/127\.0\.0\.1:1\/forbidden'\]\)/);
+  assert.match(browserTransportTests, /await expect\(forwardHostedRoute\(fixture\.route, origin\)\)\.rejects/);
+  assert.match(browserTransportTests, /expect\(requests\)\.toBe\(1\)/);
+  assert.match(browserTransportTests, /expect\(fixture\.fulfill\)\.not\.toHaveBeenCalled\(\)/);
+});
+
+test('public egress probes use the DNS hostname with default TLS, no redirects and a finite budget', () => {
+  for (const probe of [proxyProbe, publicSmoke]) {
+    assert.match(
+      probe,
+      /globalThis\.fetch\('https:\/\/www\.cloudflare\.com\/cdn-cgi\/trace', \{\s*redirect: 'error',\s*signal: globalThis\.AbortSignal\.timeout\(20_000\),?\s*\}\)/,
+    );
+    assert.match(probe, /assert\.equal\((?:trace|response)\.status, 200/);
+    assert.match(probe, /assert\(isIP\(expectedClientIp \?\? ''\)/);
+    assert.doesNotMatch(
+      probe,
+      /https:\/\/1\.1\.1\.1\/cdn-cgi\/trace|rejectUnauthorized|checkServerIdentity|NODE_TLS_REJECT_UNAUTHORIZED|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR/,
+    );
+  }
 });
 
 test('reset runs a fixed current-image command with only owner URL and expected target', () => {

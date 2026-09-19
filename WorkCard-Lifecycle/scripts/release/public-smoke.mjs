@@ -76,7 +76,8 @@ async function main() {
   // establish the runner's egress address; never infer a real client from XFF.
   let expectedClientIp;
   if (platform === 'render') {
-    const response = await globalThis.fetch('https://1.1.1.1/cdn-cgi/trace', {
+    // The documented hostname supplies normal TLS SNI without trust overrides.
+    const response = await globalThis.fetch('https://www.cloudflare.com/cdn-cgi/trace', {
       redirect: 'error',
       signal: globalThis.AbortSignal.timeout(20_000),
     });

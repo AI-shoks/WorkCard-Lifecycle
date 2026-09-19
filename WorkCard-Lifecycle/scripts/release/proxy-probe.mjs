@@ -28,7 +28,8 @@ const markers = {
   query: `QUERY_${randomUUID()}`,
   spoofedIps: ['192.0.2.11', '192.0.2.12', '192.0.2.13'],
 };
-const trace = await globalThis.fetch('https://1.1.1.1/cdn-cgi/trace', {
+// Use Cloudflare's documented hostname so HTTPS includes its normal TLS SNI.
+const trace = await globalThis.fetch('https://www.cloudflare.com/cdn-cgi/trace', {
   redirect: 'error',
   signal: globalThis.AbortSignal.timeout(20_000),
 });
