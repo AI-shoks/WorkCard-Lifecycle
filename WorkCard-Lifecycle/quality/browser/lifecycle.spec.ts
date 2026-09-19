@@ -153,6 +153,40 @@ async function finishCard(page: Page, path: string) {
     page.getByText('Завершение работы зафиксировано мастером', { exact: true }),
   ).toBeVisible();
 }
+
+export async function runCardGroups(
+  page: Page,
+  groups: readonly (readonly string[])[],
+  operation: (worker: Page, path: string) => Promise<void>,
+  observePage: (worker: Page) => void,
+) {
+  const workers: Page[] = [];
+  let failed = false;
+  // Each of the three sets owns one page. Keep its cards sequential because
+  // start/quality commands lock the set row; only independent sets overlap.
+  const results = await Promise.allSettled(
+    groups.map(async (paths) => {
+      try {
+        const worker = await page.context().newPage();
+        workers.push(worker);
+        observePage(worker);
+        for (const path of paths) {
+          if (failed) break;
+          await operation(worker, path);
+        }
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }),
+  );
+  // Drain every in-flight operation and close our pages before the caller can
+  // change the shared session's role. Never retry a card after a failure.
+  const cleanup = await Promise.allSettled(workers.map((worker) => worker.close()));
+  for (const result of [...results, ...cleanup])
+    if (result.status === 'rejected') throw result.reason;
+}
+
 async function checkVisibleUi(page: Page) {
   expect(await page.locator('html').getAttribute('lang')).toBe('ru');
   expect(await page.locator('body').innerText()).not.toMatch(
@@ -168,11 +202,14 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
 }, testInfo) => {
   const errors: string[] = [];
   const mutations: { url: string; commandId: string }[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  page.on('request', (request) => {
-    if (request.method() === 'POST' && !request.url().endsWith('/demo-session'))
-      mutations.push({ url: request.url(), commandId: request.postDataJSON().commandId });
-  });
+  const observePage = (observedPage: Page) => {
+    observedPage.on('pageerror', (error) => errors.push(error.message));
+    observedPage.on('request', (request) => {
+      if (request.method() === 'POST' && !request.url().endsWith('/demo-session'))
+        mutations.push({ url: request.url(), commandId: request.postDataJSON().commandId });
+    });
+  };
+  observePage(page);
   await documentNavigation(page, '/batches/new');
   await role(page, 'planner');
   await expect(page.getByLabel('Количество изделий в партии')).toHaveValue('112');
@@ -240,12 +277,14 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   }
 
   const serialCards: string[] = [];
+  const serialGroups: string[][] = [];
   await role(page, 'master');
   for (const [index, set] of sets.entries()) {
     await documentNavigation(page, `/card-sets/${set.id}`);
     const links = await allCardLinks(page);
     const serial = links.filter((path) => path !== firstCards[index]);
     serialCards.push(...serial);
+    serialGroups.push(serial);
     const groups = set.plannedCardCount === 112 ? [59, 52] : [set.plannedCardCount - 1];
     for (const [groupIndex, count] of groups.entries()) {
       await page.getByLabel('Количество из загруженных свободных карточек').fill(String(count));
@@ -270,18 +309,25 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
         '1 + 59 + 52 = 112 карточек',
       );
     await checkVisibleUi(page);
-    for (const path of serial) await finishCard(page, path);
   }
   expect(serialCards).toHaveLength(total - 3);
+  await runCardGroups(page, serialGroups, finishCard, observePage);
   await role(page, 'quality');
-  for (const path of serialCards) {
-    await documentNavigation(page, path);
-    await page
-      .getByRole('button', { name: 'Подтвердить качество и закрыть карточку', exact: true })
-      .click();
-    await uiCommand(page, `${path}/quality-confirmation`, 'Положительно подтвердить качество');
-    await expect(page.getByText('Качество карточки подтверждено', { exact: true })).toBeVisible();
-  }
+  await runCardGroups(
+    page,
+    serialGroups,
+    async (worker, path) => {
+      await documentNavigation(worker, path);
+      await worker
+        .getByRole('button', { name: 'Подтвердить качество и закрыть карточку', exact: true })
+        .click();
+      await uiCommand(worker, `${path}/quality-confirmation`, 'Положительно подтвердить качество');
+      await expect(
+        worker.getByText('Качество карточки подтверждено', { exact: true }),
+      ).toBeVisible();
+    },
+    observePage,
+  );
 
   await documentNavigation(page, `/batches/${batchId}`);
   const allClosed = await get(page, `/production-batches/${batchId}`);
