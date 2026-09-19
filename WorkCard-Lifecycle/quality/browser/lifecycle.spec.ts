@@ -312,6 +312,9 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   }
   expect(serialCards).toHaveLength(total - 3);
   await runCardGroups(page, serialGroups, finishCard, observePage);
+  // Leave the coordinator's assignment form before changing its session role,
+  // as the original single-page flow did when it opened the last finished card.
+  await documentNavigation(page, serialCards.at(-1)!);
   await role(page, 'quality');
   await runCardGroups(
     page,
