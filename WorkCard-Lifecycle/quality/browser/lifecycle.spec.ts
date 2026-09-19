@@ -57,17 +57,42 @@ export async function assertHostedBootstrapNavigation(
   await Promise.all([...responses, Promise.resolve().then(navigation)]);
 }
 
-async function documentNavigation(page: Page, path?: string) {
-  const navigation = () => (path === undefined ? page.reload() : page.goto(path));
-  if (!hosted) {
-    await navigation();
+export async function navigateHostedPage(page: Page, origin: string, path?: string) {
+  const current = new URL(page.url());
+  if (
+    path !== undefined &&
+    /^\/work-cards\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path) &&
+    current.origin === origin &&
+    current.pathname !== path
+  ) {
+    // Use the SPA's existing popstate router for card links already read from
+    // the UI. Wait for the new screen's own read before touching its controls.
+    const response = page.waitForResponse(
+      (value) => value.url() === `${origin}/api/v1${path}` && value.request().method() === 'GET',
+      { timeout: hostedRequestTimeoutMs },
+    );
+    const [result] = await Promise.all([
+      response,
+      page.evaluate((target) => {
+        window.history.pushState(null, '', target);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, path),
+    ]);
+    if (result.status() !== 200)
+      throw new Error(`Hosted card GET returned HTTP ${result.status()}.`);
     return;
   }
-  await assertHostedBootstrapNavigation(
-    page,
-    new URL(process.env['QUALITY_BASE_URL']!).origin,
-    navigation,
+  await assertHostedBootstrapNavigation(page, origin, () =>
+    path === undefined ? page.reload() : page.goto(path),
   );
+}
+
+async function documentNavigation(page: Page, path?: string) {
+  if (!hosted) {
+    await (path === undefined ? page.reload() : page.goto(path));
+    return;
+  }
+  await navigateHostedPage(page, new URL(process.env['QUALITY_BASE_URL']!).origin, path);
 }
 
 async function role(page: Page, name: keyof typeof roleIds) {
