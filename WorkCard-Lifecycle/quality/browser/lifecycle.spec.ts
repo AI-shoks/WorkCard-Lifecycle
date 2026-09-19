@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { Pool } from 'pg';
 
+import { forwardHostedRoute, hostedRequestTimeoutMs } from './hosted-route.js';
+
 const canonical = process.env['QUALITY_CANONICAL'] === '1';
 const hosted = process.env['QUALITY_HOSTED'] === '1';
 const counts = canonical ? [112, 112, 26] : [2, 2, 2];
@@ -28,21 +30,45 @@ test.beforeEach(async ({ context }) => {
       throw new Error('Browser runner must not receive runtime, owner or deploy credentials.');
   }
   const hostedOrigin = new URL(baseUrl).origin;
-  await context.route('**/*', async (route) => {
-    const request = route.request();
-    if (new URL(request.url()).origin !== hostedOrigin) {
-      await route.abort('blockedbyclient');
-      return;
-    }
-
-    // Probe the public service without platform credentials. Fetch one hop so
-    // redirects remain subject to the same-origin browser boundary.
-    const response = await route.fetch({
-      maxRedirects: 0,
-    });
-    await route.fulfill({ response });
-  });
+  await context.route('**/*', (route) => forwardHostedRoute(route, hostedOrigin));
 });
+
+export async function assertHostedBootstrapNavigation(
+  page: Page,
+  origin: string,
+  navigation: () => Promise<unknown>,
+) {
+  // Observe requests the SPA already makes; never create a session, retry a
+  // failed bootstrap, or include its token-bearing response body in an error.
+  const checks = [
+    { path: '/api/v1/demo-users', statuses: [200] },
+    { path: '/api/v1/demo-session', statuses: [200, 401] },
+    { path: '/health/ready', statuses: [200] },
+  ];
+  const responses = checks.map(async ({ path, statuses }) => {
+    const response = await page.waitForResponse(
+      (value) => value.url() === `${origin}${path}` && value.request().method() === 'GET',
+      { timeout: hostedRequestTimeoutMs },
+    );
+    const status = response.status();
+    if (!statuses.includes(status))
+      throw new Error(`Hosted bootstrap GET ${path} returned HTTP ${status}.`);
+  });
+  await Promise.all([...responses, Promise.resolve().then(navigation)]);
+}
+
+async function documentNavigation(page: Page, path?: string) {
+  const navigation = () => (path === undefined ? page.reload() : page.goto(path));
+  if (!hosted) {
+    await navigation();
+    return;
+  }
+  await assertHostedBootstrapNavigation(
+    page,
+    new URL(process.env['QUALITY_BASE_URL']!).origin,
+    navigation,
+  );
+}
 
 async function role(page: Page, name: keyof typeof roleIds) {
   await page
@@ -56,6 +82,7 @@ async function uiCommand(page: Page, path: string, button: string, expected = 20
   const [result] = await Promise.all([
     page.waitForResponse(
       (value) => value.url().endsWith(`/api/v1${path}`) && value.request().method() === 'POST',
+      hosted ? { timeout: hostedRequestTimeoutMs } : {},
     ),
     target.getByRole('button', { name: button, exact: true }).click(),
   ]);
@@ -81,6 +108,7 @@ async function allCardLinks(page: Page) {
     const next = page.waitForResponse(
       (response) =>
         response.url().includes('/work-cards?') && response.request().method() === 'GET',
+      hosted ? { timeout: hostedRequestTimeoutMs } : {},
     );
     await page.getByRole('button', { name: 'Загрузить ещё', exact: true }).click();
     expect((await next).status()).toBe(200);
@@ -93,7 +121,7 @@ async function allCardLinks(page: Page) {
     .evaluateAll((links) => links.map((link) => link.getAttribute('href')!));
 }
 async function finishCard(page: Page, path: string) {
-  await page.goto(path);
+  await documentNavigation(page, path);
   await uiCommand(page, `${path}/start`, 'Зафиксировать начало');
   await uiCommand(page, `${path}/complete`, 'Зафиксировать завершение');
   await expect(
@@ -120,7 +148,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
     if (request.method() === 'POST' && !request.url().endsWith('/demo-session'))
       mutations.push({ url: request.url(), commandId: request.postDataJSON().commandId });
   });
-  await page.goto('/batches/new');
+  await documentNavigation(page, '/batches/new');
   await role(page, 'planner');
   await expect(page.getByLabel('Количество изделий в партии')).toHaveValue('112');
   const created = await uiCommand(page, '/production-batches', 'Создать партию', 201);
@@ -149,7 +177,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   const firstCards: string[] = [];
   await role(page, 'master');
   for (const set of sets) {
-    await page.goto(`/card-sets/${set.id}`);
+    await documentNavigation(page, `/card-sets/${set.id}`);
     const first = page.locator('.entity-row--card').first();
     await first.getByRole('radio').check();
     const path = (await first.locator('a').getAttribute('href'))!;
@@ -169,7 +197,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   }
   await role(page, 'quality');
   for (const [index, path] of firstCards.entries()) {
-    await page.goto(path);
+    await documentNavigation(page, path);
     await page
       .getByRole('button', {
         name: 'Принять первую деталь и открыть обработку партии',
@@ -189,7 +217,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   const serialCards: string[] = [];
   await role(page, 'master');
   for (const [index, set] of sets.entries()) {
-    await page.goto(`/card-sets/${set.id}`);
+    await documentNavigation(page, `/card-sets/${set.id}`);
     const links = await allCardLinks(page);
     const serial = links.filter((path) => path !== firstCards[index]);
     serialCards.push(...serial);
@@ -222,7 +250,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   expect(serialCards).toHaveLength(total - 3);
   await role(page, 'quality');
   for (const path of serialCards) {
-    await page.goto(path);
+    await documentNavigation(page, path);
     await page
       .getByRole('button', { name: 'Подтвердить качество и закрыть карточку', exact: true })
       .click();
@@ -230,7 +258,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
     await expect(page.getByText('Качество карточки подтверждено', { exact: true })).toBeVisible();
   }
 
-  await page.goto(`/batches/${batchId}`);
+  await documentNavigation(page, `/batches/${batchId}`);
   const allClosed = await get(page, `/production-batches/${batchId}`);
   expect(allClosed.counts.closedCardCount).toBe(total);
   expect(allClosed.finalAcceptance).toBeNull();
@@ -246,7 +274,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   ).toBeVisible();
   const finalRead = await get(page, `/production-batches/${batchId}`);
   expect(finalRead.finalAcceptance).toEqual(accepted.acceptance);
-  await page.reload();
+  await documentNavigation(page);
   await expect(
     page.getByText('Идентификатор записи сверён обязательным контрольным чтением'),
   ).toBeVisible();
@@ -254,7 +282,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   await page.screenshot({ path: testInfo.outputPath('final-acceptance.png'), fullPage: true });
 
   await role(page, 'auditor');
-  await page.goto(`${serialCards[0]}/audit`);
+  await documentNavigation(page, `${serialCards[0]}/audit`);
   await page
     .getByRole('button', { name: 'Проверить полный связанный набор', exact: true })
     .first()
@@ -265,7 +293,7 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
       `Сервер ожидал ${total + 4}, насчитал ${total + 4}, клиент получил все ${total + 4} уникальных событий.`,
     ),
   ).toBeVisible();
-  await page.goto(`${serialCards[0]}/payroll`);
+  await documentNavigation(page, `${serialCards[0]}/payroll`);
   await page
     .getByRole('button', { name: 'Создать тестовую запись нормо-часов', exact: true })
     .click();
@@ -276,16 +304,16 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
     201,
   );
   await expect(page.getByRole('region', { name: 'Тестовая запись нормо-часов' })).toBeVisible();
-  await page.reload();
+  await documentNavigation(page);
   await expect(page.getByRole('region', { name: 'Тестовая запись нормо-часов' })).toBeVisible();
   expect(await get(page, `${serialCards[0]}/payroll-record`)).toEqual(payroll.payrollRecord);
   expect(mutations.filter((entry) => entry.url.endsWith('/payroll-export'))).toHaveLength(1);
   await role(page, 'worker');
-  await page.goto(serialCards[0]!);
+  await documentNavigation(page, serialCards[0]!);
   await expect(
     page.getByRole('button', { name: /Зафиксировать|Подтвердить качество/ }),
   ).toHaveCount(0);
-  await page.goto(`${serialCards[0]}/audit`);
+  await documentNavigation(page, `${serialCards[0]}/audit`);
   await expect(page.getByRole('heading', { name: 'Доступ ограничен', exact: true })).toBeVisible();
 
   if (!hosted) {
