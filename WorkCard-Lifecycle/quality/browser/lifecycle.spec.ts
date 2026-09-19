@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { Pool } from 'pg';
 
+import { forwardHostedRoute, hostedRequestTimeoutMs } from './hosted-route.js';
+
 const canonical = process.env['QUALITY_CANONICAL'] === '1';
 const hosted = process.env['QUALITY_HOSTED'] === '1';
 const counts = canonical ? [112, 112, 26] : [2, 2, 2];
@@ -28,20 +30,7 @@ test.beforeEach(async ({ context }) => {
       throw new Error('Browser runner must not receive runtime, owner or deploy credentials.');
   }
   const hostedOrigin = new URL(baseUrl).origin;
-  await context.route('**/*', async (route) => {
-    const request = route.request();
-    if (new URL(request.url()).origin !== hostedOrigin) {
-      await route.abort('blockedbyclient');
-      return;
-    }
-
-    // Probe the public service without platform credentials. Fetch one hop so
-    // redirects remain subject to the same-origin browser boundary.
-    const response = await route.fetch({
-      maxRedirects: 0,
-    });
-    await route.fulfill({ response });
-  });
+  await context.route('**/*', (route) => forwardHostedRoute(route, hostedOrigin));
 });
 
 async function role(page: Page, name: keyof typeof roleIds) {
@@ -56,6 +45,7 @@ async function uiCommand(page: Page, path: string, button: string, expected = 20
   const [result] = await Promise.all([
     page.waitForResponse(
       (value) => value.url().endsWith(`/api/v1${path}`) && value.request().method() === 'POST',
+      hosted ? { timeout: hostedRequestTimeoutMs } : {},
     ),
     target.getByRole('button', { name: button, exact: true }).click(),
   ]);
@@ -81,6 +71,7 @@ async function allCardLinks(page: Page) {
     const next = page.waitForResponse(
       (response) =>
         response.url().includes('/work-cards?') && response.request().method() === 'GET',
+      hosted ? { timeout: hostedRequestTimeoutMs } : {},
     );
     await page.getByRole('button', { name: 'Загрузить ещё', exact: true }).click();
     expect((await next).status()).toBe(200);
