@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.database-bootstrap
 status: accepted
-version: 4
+version: 5
 owner: engineering
-updated: 2026-09-17
+updated: 2026-09-19
 ---
 
 # Database Bootstrap
@@ -15,10 +15,13 @@ Bootstrap отделяет полномочия изменения схемы о
 ```text
 PostgreSQL healthy
   → migrate: advisory lock → history preflight → runtime role → SQL migrations → atomic grants
+  → Neon prerequisite: separate owner role/database defaults → fresh runtime budget inspection
   → seed: owner-only transaction → insert-if-absent → exact fixture comparison
   → owner verify: schema + roles + fixtures → initial verified timestamp → open gate
   → app: shared barrier → maintenance/freshness check → runtime role → readiness
 ```
+
+Строка Neon — отдельная подготовка окружения, не новая команда или стадия внутри owner CLI. Перед первым hosted bootstrap `node dist/migrate.js` из выбранного immutable image создаёт schema/runtime role и оставляет gate закрытым. Затем выполняются описанные ниже owner-only настройки и свежее runtime-наблюдение; fixed `bootstrap` безопасно повторяет migrate перед seed + verify.
 
 Мигратор:
 
@@ -82,6 +85,53 @@ Seed требует только `MIGRATION_DATABASE_URL` (в hosted также 
 Все hosted команды требуют `APP_ENV`, `NEON_DATABASE_HOST`, `NEON_DATABASE_NAME` и direct URL с `sslmode=verify-full`; точные env names — [[environments]]. Runtime/browser owner secrets не получают. Обычный reset не вызывает seed. Bootstrap на уже инициализированной БД не должен обновлять `last_reset_verified_at` и маскировать просроченный reset.
 
 Non-superuser owner получает только необходимые schema/role administration privileges. SQL `CREATE ROLE` использует безопасные defaults; на `ALTER ROLE` не переносятся superuser-only `NOSUPERUSER`/`NOREPLICATION`. До изменения проверяются flags, memberships (включая `neon_superuser`) и ownership любых объектов через `pg_shdepend`, а не только известных application tables. Ограничения non-superuser `ALTER ROLE` — [PostgreSQL 18](https://www.postgresql.org/docs/18/sql-alterrole.html). Найденная повышенная роль требует отдельного решения оператора, запуск прекращается. Hosted qualification отдельно проверяет реальные возможности Neon owner; локальный non-superuser fixture не доказывает provider-specific grants.
+
+## Neon: настройки timeout для runtime-роли в выбранной БД
+
+Hosted staging-наблюдение 2026-09-19 обнаружило фактические значения transaction/statement/lock/idle `15000/0/0/300000` мс при неизменённых exports image `15000/10000/3000/15000`. Это расхождение эффективных настроек, а не представление секунд вместо миллисекунд. В исследованном [исходнике Neon proxy](https://github.com/neondatabase/neon/blob/fa504217c61bbcaf5c512d75830564541f917f8f/proxy/src/compute/mod.rs#L196-L225) отдельные startup parameters отбрасываются при `arbitrary_params=false`, а `options` передаются отдельно; [TCP path](https://github.com/neondatabase/neon/blob/fa504217c61bbcaf5c512d75830564541f917f8f/proxy/src/proxy/mod.rs#L83-L85) выбирает этот режим без compatibility option. Это объяснение, согласующееся с наблюдением, не утверждение о SHA развёрнутого provider proxy. Значения каждого target проверяются через реальное подключение.
+
+Минимальная настройка сохраняет budgets приложения: только `statement_timeout=10000`, `lock_timeout=3000`, `idle_in_transaction_session_timeout=15000` мс для `workcard_app` **IN DATABASE** точной разрешённой БД. `transaction_timeout=15000` уже передаётся image через `options: '-c transaction_timeout=15000'`; его role default не менять и не сбрасывать. Не менять application, migrations, exported budgets или image. Direct URL по-прежнему содержит единственный query `?sslmode=verify-full`; `PGOPTIONS`, URL `options` и TLS overrides запрещены.
+
+Перед отдельной owner-only операцией обязательны:
+
+1. Live binding разрешённых organization/project и distinct staging/production endpoints; совпадение `APP_ENV`, exact direct host, database, PostgreSQL 18, `current_user=session_user=workcard_owner`. Одно имя `workcard` не определяет target. Произвольные target/role/SQL inputs не допускаются.
+2. Завершённые same-image migrations, зарегистрированная `workcard_app` и успешный runtime role boundary check. Owner владеет выбранной БД, имеет `CREATEROLE` и прямой `ADMIN OPTION` на эту обычную роль. При недостаточных полномочиях остановиться; не выдавать privileges/membership автоматически.
+3. Deployed owner mutex и отсутствие иных owner operations/connections. До изменения сохранить sanitized intent и исходное состояние: relevant defaults, unrelated settings, role attributes и maintenance state. Более строгий положительный timeout или неизвестное значение требуют разбора; не увеличивать его до указанного budget.
+
+После этих проверок для `workcard` в одном установленном approved project выполнить ровно три изменения в одной транзакции:
+
+```sql
+BEGIN;
+ALTER ROLE workcard_app IN DATABASE workcard SET statement_timeout TO '10000ms';
+ALTER ROLE workcard_app IN DATABASE workcard SET lock_timeout TO '3000ms';
+ALTER ROLE workcard_app IN DATABASE workcard SET idle_in_transaction_session_timeout TO '15000ms';
+COMMIT;
+```
+
+Это отдельный reviewed SQL runbook: fixed `migrate`/`bootstrap`/`reset`/`verify` не выполняют эти три SET. Пароль, privileges/membership, global role defaults, схема, данные, gate/generation и reset timestamp не изменяются. До commit и отдельным read-only readback после него проверить три defaults и сохранность остального, включая существующий transaction default. При timeout/неизвестном исходе сохранить intent и сначала read-only reconciliation; не повторять mutation вслепую.
+
+Затем новый runtime-only процесс того же image с неизменённым `databaseBudgets` открывает новое соединение как `workcard_app`, подтверждает exact host/database, PostgreSQL 18, actual TLS CA/hostname и role boundary. Owner URL и реальный signing secret этому диагностическому процессу не нужны; owner credentials запрещены runtime/browser. В `BEGIN READ ONLY` получить только:
+
+```sql
+SELECT name, setting, unit
+FROM pg_catalog.pg_settings
+WHERE name IN ('transaction_timeout', 'statement_timeout',
+               'lock_timeout', 'idle_in_transaction_session_timeout')
+ORDER BY name;
+```
+
+Завершить `ROLLBACK`. Требуются ровно четыре уникальные строки, `unit=ms` и числовое равенство:
+
+| Setting | Значение, мс |
+|---|---:|
+| `transaction_timeout` | `15000` |
+| `statement_timeout` | `10000` |
+| `lock_timeout` | `3000` |
+| `idle_in_transaction_session_timeout` | `15000` |
+
+`pg_settings.setting` содержит текст текущего значения, `unit` — его единицу; строки `15s`/`15000` нельзя сравнивать как свидетельство разных budgets без проверки единиц. Role/database defaults применяются при новом login: старый pool, owner session и `SET ROLE` не заменяют fresh runtime proof. См. [pg_settings](https://www.postgresql.org/docs/18/view-pg-settings.html) и [ALTER ROLE](https://www.postgresql.org/docs/18/sql-alterrole.html).
+
+Настройку завершить после создания runtime-роли и до app/cancellation/deployment qualification. Same-image повторный migrate меняет существующей роли только пароль и grants; `reset`/`verify` не сбрасывают эти defaults. После bootstrap/reset + verify подтвердить их сохранность новым runtime-наблюдением. Для новой recovery БД в уже разрешённом staging project повторить exact database configuration после migrations: `IN DATABASE workcard` не распространяется на другое имя. Recovery database identifier фиксируется оператором для конкретного разрешённого drill, не принимается как произвольный SQL input. Пересоздание роли/БД тоже требует повторной настройки и проверки.
 
 ## Постоянный maintenance state и барьер
 
