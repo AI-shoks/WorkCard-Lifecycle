@@ -1,9 +1,9 @@
 ---
 artifact_id: project.case-study-positioning
 status: accepted
-version: 11
+version: 12
 owner: project
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Case Study Positioning
@@ -17,7 +17,7 @@ updated: 2026-09-17
 - данные, партия, нормы, пользователи и payroll являются синтетическими;
 - implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) демонстрирует product analysis, AS-IS/TO-BE analysis, domain modeling, requirements engineering, UX design, traceability, принятую техническую архитектуру, воспроизводимый инженерный фундамент и проверенный backend vertical slice;
 - отдельная цифровая `FinalBatchAcceptance` является синтетическим TO-BE-решением уровня партии, а не утверждением о существующей заводской ИС;
-- связанный frontend flow закрыт на этапе 8 SHA [`b00ff294a7b7ce1e09379c088969d9a02bd033bf`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf), полный quality-этап — на этапе 9 SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc); этап 10 в работе на 4/7: Render Free/Neon Free design по [[0009-render-free-neon-free-release|ADR-0009]], GHCR workflows и runtime/owner controls подготовлены локально, а provisioning и hosted evidence ещё нет;
+- связанный frontend flow закрыт на этапе 8 SHA [b00ff294a7b7ce1e09379c088969d9a02bd033bf](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf), quality-этап — на этапе 9 SHA [3ee65709966f5775928de87783fd2946d085e2bc](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc); этап 10 в работе на 5/7: публичное Render/Neon демо и production smoke подтверждены [[deployment]], а clean recovery и окончательная квалификация остаются открытыми;
 - ограничения и допущения документируются явно.
 
 ## Чего не утверждаем
@@ -27,7 +27,7 @@ updated: 2026-09-17
 - что метрики получены от реального предприятия;
 - что mock payroll рассчитывает настоящую зарплату;
 - что система соответствует всем требованиям промышленной MES;
-- что уже выполнены deployment, staging/production qualification или фактический hosted runtime.
+- что завершены все hosted recovery gates, 26-часовое elapsed наблюдение или rollback drill.
 
 ## Публичная доказательность
 
