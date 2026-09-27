@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { URL } from 'node:url';
 
 import { recoveryDatabase, recoveryTarget } from './recovery-target.mjs';
 

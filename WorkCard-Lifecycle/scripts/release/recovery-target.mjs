@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
+import process from 'node:process';
+import { URL, pathToFileURL } from 'node:url';
 
 export const recoveryDatabase = 'workcard_recovery_20260917';
 

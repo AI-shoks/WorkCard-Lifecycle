@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import process from 'node:process';
+import { URL } from 'node:url';
 import { Client } from 'pg';
 
 import { recoveryDatabase } from './recovery-target.mjs';
