@@ -6,7 +6,7 @@ tags:
   - case-study
   - workcard
 status: active
-version: 23
+version: 24
 owner: navigation
 updated: 2026-09-27
 ---
@@ -17,7 +17,7 @@ updated: 2026-09-27
 
 ## Сейчас
 
-**На 27 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» в работе на 5/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging и production smoke прошли; полный clean recovery и 26-часовое elapsed наблюдение остаются открытыми.** Подробности — [[deployment]] и [[backlog]].
+**На 27 сентября 2026 года этапы 1–10 закрыты; этап 10 «Релиз» выполнен на 7/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging/production и canonical/compact browser на ранее чисто восстановленной recovery-БД прошли; после 192,58 часа без reset recovery API отказал закрытым gate и восстановился после owner reset.** Rollback drill не проверен: предыдущего совместимого образа нет. Подробности — [[deployment]] и [[backlog]].
 
 ### Подтверждения предыдущих этапов
 

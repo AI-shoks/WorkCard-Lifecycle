@@ -1,7 +1,7 @@
 ---
 artifact_id: project.plan
 status: active
-version: 30
+version: 31
 owner: project
 updated: 2026-09-27
 ---
@@ -19,7 +19,7 @@ updated: 2026-09-27
 
 ## Прогресс
 
-**На 27 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» в работе на 5/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging и production smoke прошли; полный clean recovery и 26-часовое elapsed наблюдение остаются открытыми.**
+**На 27 сентября 2026 года этапы 1–10 закрыты; этап 10 «Релиз» выполнен на 7/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging, production и recovery canonical/compact browser прошли, а реально просроченный recovery gate закрыл API до owner reset.** Rollback drill остаётся непроверенным без предыдущего совместимого образа.
 
 | № | Этап | Статус | Результат |
 |---:|---|---|---|
@@ -33,7 +33,7 @@ updated: 2026-09-27
 | 7 | Backend vertical slice | `[x]` выполнено | Код, DB integration, local clean-container и CI implementation SHA подтверждены |
 | 8 | Frontend vertical slice | `[x]` выполнено | Полный браузерный процесс, clean-container и CI подтверждены для `b00ff294…` |
 | 9 | Качество | `[x]` выполнено | SHA `3ee65709966f5775928de87783fd2946d085e2bc`: все 6 обязательных jobs успешны в push и PR; ссылки ниже |
-| 10 | Релиз | [-] в работе, 5/7 | Public GHCR digest, Render promotion, staging/production smoke и reset подтверждены; полная clean recovery и итоговое закрытие открыты |
+| 10 | Релиз | `[x]` выполнено, 7/7 | Exact digest, Render/Neon Free, staging/production/recovery canonical и compact smoke, elapsed fail-closed подтверждены; rollback drill ограничен отсутствием прежнего совместимого image |
 | 11 | Упаковка портфолио | `[ ]` не начато | Ценность и глубина проекта понятны работодателю |
 | 12 | Финальный аудит | `[ ]` не начато | Результат готов к честной демонстрации |
 
@@ -93,11 +93,11 @@ updated: 2026-09-27
 
 **Этап 9 закрыт, 2026-09-05:** implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` — все 6/6 в каждом запуске. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review также пройдены; результаты этапа 9 и ссылки на каждую job сохранены отдельно от этапов 7–8 в [[quality-gates]]. Воспроизводимые проверки описаны в [[test-strategy]].
 
-**Этап 10 «Релиз»: [-] в работе, 5/7.** Публичный сервис https://work-card-demo.onrender.com использует опубликованный digest source SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) и [release records](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждают staging, persistent/live Render reference и canonical production smoke. Manual и scheduled reset проходили; 26 сентября resolver завершился сетевым ECONNRESET до owner job, 27 сентября reset снова успешен. Два Neon проекта находятся на Free. Полная clean recovery, 26-часовое elapsed наблюдение и заключительный audit остаются открытыми; совместимого предыдущего image для rollback drill нет.
+**Этап 10 «Релиз»: [x] закрыт, 7/7.** Публичный сервис https://work-card-demo.onrender.com использует опубликованный digest source SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) и [release records](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждают staging, persistent/live Render reference и canonical production smoke. [Recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) подтвердил 192,58 часа elapsed, fail-closed API, owner reset и полный 250-card browser на отдельной ранее чисто восстановленной БД; [recovery compact](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) прошёл 6-card browser и удалил временный synthetic паспорт. Manual и scheduled reset проходили; сетевой сбой resolver 26 сентября не запускал owner job, 27 сентября reset снова успешен. Два Neon проекта находятся на Free. Rollback drill не заявляется: предыдущего совместимого образа нет.
 
 - **Frontend vertical slice — выполнено:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
 - **Качество — выполнено:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
-- **Релиз — в работе, 5/7:** опубликованный digest развернут на Render, staging/production smoke и reset подтверждены. Clean recovery и финальное закрытие документации ещё предстоят; см. [[deployment]].
+- **Релиз — выполнен, 7/7:** exact digest развернут на Render, staging/production/recovery smoke и elapsed fail-closed подтверждены; evidence и ограничения — [[deployment]].
 - **Упаковка портфолио — не начато:** README, диаграммы, demo script, скриншоты, ограничения и ретроспектива.
 - **Финальный аудит — не начато:** сверка scope, критериев готовности, документации и воспроизводимости.
 
