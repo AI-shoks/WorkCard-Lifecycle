@@ -1,16 +1,16 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 37
+version: 38
 owner: project
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Backlog
 
 Оперативные задачи проекта следуют каноническому [[project-plan|roadmap]]. Требования к поведению системы хранятся в `docs/requirements/`, а принятые решения — в [[decision-log]] и [[adr-index|ADR]].
 
-**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]; read-only preflight начат. Локальная реализация не заменяет ещё не завершённые hosted qualification и release evidence.**
+**На 27 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» в работе на 5/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging и production smoke прошли; полный clean recovery и 26-часовое elapsed наблюдение остаются открытыми.**
 
 ## Выполнено — этапы 1–4
 
@@ -101,10 +101,10 @@ Desktop/mobile UI, все 14 шагов прототипа и `window.runUxCopyA
 - [x] Адаптировать manual main-only build-once workflow к public GHCR, exact digest/scan/migration checksums, versioned release evidence и lifetime retention; заменить GCP-only IaC gate deployment-contract checks без удаления других gates.
 - [x] Реализовать runtime/owner pre-deploy contract: direct Neon verify-full target validation, SQL runtime-role boundary, persistent maintenance/generation, shared/exclusive barrier и 26h fail-closed, liveness без DB и безопасный Render proxy/logging contract.
 - [ ] Завершить фактическую hosted qualification того же digest: temporary staging Docker + отдельный Neon project, non-superuser owner/repeat, TLS, роль, races/cancellation, browser compact/canonical, proxy/logging/cold start и clean recovery. Локальные fixtures не закрывают пункт.
-- [ ] Выполнить разрешённое production promotion в Render; подтвердить persistent reference/resolved digest, daily/manual reset и совместимый rollback, quotas/$0 settings, secret boundaries и retention release records. При отсутствии предыдущего совместимого image явно сохранить rollback как непроверенный.
+- [x] Выполнить production promotion: release record подтверждает persistent и resolved digest; manual reset 19 сентября и scheduled reset 27 сентября прошли. Render API и Neon UI 27 сентября показывают Free; release records сохранены, owner/runtime secrets разделены по jobs. Предыдущего совместимого digest для rollback нет, поэтому rollback drill остаётся непроверенным. Сбой scheduled reset 26 сентября произошёл на сетевом чтении образа до owner job.
 - [ ] Сохранить фактическое hosted evidence, strict documentation audit и semantic review; закрыть этап только по этим результатам.
 
-**Прогресс этапа 10 — 4/7:** локально реализованные design/config/workflows/runtime controls не являются удалённым запуском. Результаты проверок текущего дерева — [[quality-gates]]. Историческая GCP foundation preparation `136/0/0`, full `167/0/0`, GCS templates и preflight сохранены в [[deployment-gcp-history]] и [Terraform README](../../infra/terraform/README.md); они не активный next step, а незакоммиченные Terraform HCL/scripts/templates не входят в текущую публикацию. Scoped commit/push, PR/merge после gates, GHCR publication и Render/Neon operations разрешены; следующий результат — фактический hosted deployment с evidence по [[deployment]], который ещё не подтверждён.
+**Прогресс этапа 10 — 5/7:** [release evidence](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждает staging, live Render digest и production smoke. Чистая recovery БД прошла empty → migrate → bootstrap и TLS/role checks, но её canonical browser завершился HTTP 500 при подготовке сессии. 26-часовой elapsed fail-closed и rollback drill не подтверждены. Следующий шаг — безопасный повтор recovery HTTP/browser на существующей БД, затем итоговый audit. Исторический GCP Terraform остаётся вне релиза.
 
 ## Maintenance
 

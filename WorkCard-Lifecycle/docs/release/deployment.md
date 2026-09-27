@@ -1,16 +1,24 @@
 ---
 artifact_id: release.deployment
 status: accepted
-version: 15
+version: 16
 owner: release
-updated: 2026-09-19
+updated: 2026-09-27
 ---
 
 # Deployment
 
-Текущий локально реализованный контракт — [[0009-render-free-neon-free-release|ADR-0009]]: один Render Free service из публичного GHCR image, отдельные Neon Free PostgreSQL 18 projects для production/staging. Действия посетителей не сохраняются при recovery; чистое synthetic demo из migrations + seed является достаточным восстановлением. Владелец разрешил scoped commit/push, PR и merge после обязательных проверок, создание этих трёх ресурсов, настройку environments/secrets, публикацию GHCR, workflows и owner operations на созданных для демо БД. Эти разрешения действуют только для однозначно установленных аккаунтов/ресурсов проекта и не требуют повторного подтверждения. Платные планы/add-ons/overage, добавление payment method, GCP apply/destroy и изменение посторонних ресурсов запрещены. Фактический deployment и hosted qualification ещё должны быть подтверждены release records.
+Контракт [[0009-render-free-neon-free-release|ADR-0009]] реализован для одного Render Free service и двух отдельных Neon Free PostgreSQL 18 projects. Владелец разрешил scoped Git/cloud/DB действия только для этих ресурсов. Платные планы, add-ons, overage, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены. Ниже отделены фактические результаты от ещё открытых recovery и qualification gates.
 
 Репозиторий — источник текущей реализации. Workflows находятся в `.github/workflows/` родительского Git root; shell steps работают в `WorkCard-Lifecycle/`. GCP Terraform неактивен. Полный прежний runbook, включая foundation/backend work, сохранён в [[deployment-gcp-history]]; его исторические сведения об аккаунтах не являются новой внешней проверкой.
+
+## Фактическое состояние на 27 сентября 2026 года
+
+Опубликованный [release record](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) для source SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7 сохраняет пять связанных evidence records и отчёты staging, Render deployment, public smoke и proxy observations. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) завершил все семь jobs успешно: staging canonical 112 → 3 → 250, persistent/live digest sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057 и production smoke. Публичный https://work-card-demo.onrender.com 27 сентября ответил HTTP 200 на /health/live, /health/ready и /.
+
+[Manual reset](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35454127224) и [scheduled reset 27 сентября](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36305239932) успешны. [Scheduled run 26 сентября](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36227442468) остановился на сетевом ECONNRESET при read-only image resolution; owner job не запускался. Текущий Render API подтвердил Free service, отключённый auto-deploy и постоянную ссылку на тот же digest; Neon UI — Free organization с ровно двумя проектами. Предыдущего совместимого digest нет: rollback drill непроверен.
+
+Отдельная staging recovery БД прошла empty → migrate → bootstrap → verify, owner/runtime TLS и role checks. Её canonical browser завершился HTTP 500 при подготовке demo-session; успешный полный recovery smoke не зафиксирован. Опубликованный supplemental receipt прямо ограничивает общий qualification claim и не доказывает 26 часов elapsed fail-closed либо rollback. Подробные локальные отчёты сохранены в ignored .quality-results; их выборочная публичная сводка не заменяет повторный успешный проход. Полная hosted qualification и закрытие этапа остаются открытыми.
 
 ## Deployment contract
 
@@ -121,4 +129,4 @@ Preflight 2026-09-17 подтвердил публичный repository `AI-shok
 
 После scoped PR/merge и полного CI main SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` image опубликован один раз: [release record](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7), exact digest `sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057`. Anonymous pull и опубликованный scan прошли; resume не потребовался. Смена Render аккаунта не меняет этот release: при следующем manual deploy явно выбирать этот `release_sha`, не собирать повторно.
 
-Этот runbook задаёт контракт deployment и эксплуатации. Фактические provider state, account/resource bindings и billing перед изменениями проверяются заново через актуальные UI/API. Приведённые выше preflight facts относятся к своим историческим датам и не заменяют такую проверку. Статус публичного deployment и пройденные hosted проверки подтверждаются durable release evidence для точных source SHA, immutable digest и фактического окружения. Сам документ не является подтверждением готовности deployment или успешного hosted qualification.
+Этот runbook задаёт контракт и фиксирует проверенное состояние на указанную дату. Перед новым изменением provider bindings, billing и quotas проверяются заново; исторический preflight не подменяет актуальную проверку. Полная hosted qualification и закрытие этапа 10 пока не подтверждены.

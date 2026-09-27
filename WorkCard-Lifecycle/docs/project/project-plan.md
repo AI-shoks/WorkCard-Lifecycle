@@ -1,9 +1,9 @@
 ---
 artifact_id: project.plan
 status: active
-version: 29
+version: 30
 owner: project
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Project Plan
@@ -19,7 +19,7 @@ updated: 2026-09-17
 
 ## Прогресс
 
-**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]. Один image и постоянный release record опубликованы; отдельный Render аккаунт с пустым Hobby workspace без payment method проверен, owner binding и защищённый API key настроены. Neon, создание сервиса и hosted qualification ещё не подтверждены.**
+**На 27 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» в работе на 5/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging и production smoke прошли; полный clean recovery и 26-часовое elapsed наблюдение остаются открытыми.**
 
 | № | Этап | Статус | Результат |
 |---:|---|---|---|
@@ -33,7 +33,7 @@ updated: 2026-09-17
 | 7 | Backend vertical slice | `[x]` выполнено | Код, DB integration, local clean-container и CI implementation SHA подтверждены |
 | 8 | Frontend vertical slice | `[x]` выполнено | Полный браузерный процесс, clean-container и CI подтверждены для `b00ff294…` |
 | 9 | Качество | `[x]` выполнено | SHA `3ee65709966f5775928de87783fd2946d085e2bc`: все 6 обязательных jobs успешны в push и PR; ссылки ниже |
-| 10 | Релиз | `[-]` в работе, 4/7 | Render/Neon design/config, release-image workflow и runtime controls приняты; actual hosted qualification ещё не выполнена |
+| 10 | Релиз | [-] в работе, 5/7 | Public GHCR digest, Render promotion, staging/production smoke и reset подтверждены; полная clean recovery и итоговое закрытие открыты |
 | 11 | Упаковка портфолио | `[ ]` не начато | Ценность и глубина проекта понятны работодателю |
 | 12 | Финальный аудит | `[ ]` не начато | Результат готов к честной демонстрации |
 
@@ -93,11 +93,11 @@ updated: 2026-09-17
 
 **Этап 9 закрыт, 2026-09-05:** implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` — все 6/6 в каждом запуске. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review также пройдены; результаты этапа 9 и ссылки на каждую job сохранены отдельно от этапов 7–8 в [[quality-gates]]. Воспроизводимые проверки описаны в [[test-strategy]].
 
-**Этап 10 «Релиз»: `[-]` в работе, 4/7.** Текущий контракт — [[0009-render-free-neon-free-release|ADR-0009]] и [[deployment]]: Render Free, public GHCR, отдельные Neon Free targets, DB maintenance barrier и owner orchestration. Исторические GCP/foundation/backend изменения сохранены в [[deployment-gcp-history]], незакоммиченные Terraform HCL/scripts/templates остаются вне текущей публикации. Владелец разрешил scoped Git/cloud/DB действия для первого deployment после обязательных gates. По его выбору вместо прежнего общего Render workspace проверен отдельный account `usr-dalsn92d0e5s738gnrbg` / workspace `tea-dalsn92d0e5s738gnr60`: Hobby, пустой, без payment method, pending charges и invoices; GitHub production и DPAPI bundle привязаны к новому owner. Постоянный Render API key создан в новом аккаунте, защищён DPAPI/ACL и передан в GitHub `production.RENDER_API_KEY`; официальные API reads подтвердили exact account, единственный owner и отсутствие services. Neon prerequisites, создание ресурсов, реальные TLS/proxy/digest/cold start, deployment и recovery ещё должны получить hosted evidence. Опубликованный SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` и его digest сохраняются без повторной сборки.
+**Этап 10 «Релиз»: [-] в работе, 5/7.** Публичный сервис https://work-card-demo.onrender.com использует опубликованный digest source SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) и [release records](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждают staging, persistent/live Render reference и canonical production smoke. Manual и scheduled reset проходили; 26 сентября resolver завершился сетевым ECONNRESET до owner job, 27 сентября reset снова успешен. Два Neon проекта находятся на Free. Полная clean recovery, 26-часовое elapsed наблюдение и заключительный audit остаются открытыми; совместимого предыдущего image для rollback drill нет.
 
 - **Frontend vertical slice — выполнено:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
 - **Качество — выполнено:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
-- **Релиз — в работе, 4/7:** Render/Neon design/config, workflows и runtime/owner controls прошли полный CI main SHA; первый public GHCR digest и постоянный release record опубликованы, см. [[quality-gates]]. Provisioning, staging/production qualification и hosted evidence ещё предстоят.
+- **Релиз — в работе, 5/7:** опубликованный digest развернут на Render, staging/production smoke и reset подтверждены. Clean recovery и финальное закрытие документации ещё предстоят; см. [[deployment]].
 - **Упаковка портфолио — не начато:** README, диаграммы, demo script, скриншоты, ограничения и ретроспектива.
 - **Финальный аудит — не начато:** сверка scope, критериев готовности, документации и воспроизводимости.
 

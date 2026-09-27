@@ -4,9 +4,9 @@
 
 ## Текущий статус
 
-**На 17 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» остаётся в работе на 4/7 до фактической hosted qualification. Целевой профиль — один Render Free service + отдельные Neon Free PostgreSQL 18 projects, публичный GHCR image и стоимость $0 при сохранении free-квот.**
+**На 27 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» в работе на 5/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging и production smoke прошли; полный clean recovery и 26-часовое elapsed наблюдение остаются открытыми.**
 
-Локально реализованы код, конфигурация, owner maintenance и workflows по [ADR-0009](docs/architecture/adr/0009-render-free-neon-free-release.md). [Deployment](docs/release/deployment.md) описывает первый запуск, ограничения сна/квот и clean synthetic recovery; [Quality gates](docs/engineering/quality-gates.md) отделяет фактически выполненные проверки от будущего hosted evidence. Владелец разрешил scoped commit/push, PR и merge после обязательных gates, публикацию GHCR, один Render Free service, два Neon Free projects и необходимые secrets/owner operations только для установленных ресурсов этого проекта. Read-only preflight аккаунтов начат; создание ресурсов, первый работающий deployment и hosted qualification ещё должны быть подтверждены release records. Платные опции, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены.
+Код и release workflow опубликованы. [Deployment](docs/release/deployment.md) связывает фактический [запуск Render](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) с [release records](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) исходного SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7. Платные опции, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены; полная hosted qualification ещё открыта.
 
 - Этапы 1–4 завершены: product scope, доменная модель, требования и 14-шаговый UX-прототип согласованы.
 - Этап 5 завершён: приняты архитектурные артефакты и ADR-0001–ADR-0006.
@@ -23,7 +23,7 @@
 - Текущий release contract: build once `linux/amd64` → public GHCR → exact digest через temporary staging Docker в один Render Free production service. Manual main-only release требует успешный CI того же SHA, Trivy, SQL checksums и versioned evidence.
 - Контракт требует отдельных Neon Free projects PostgreSQL 18 для production/staging; обычный CI использует disposable локальную БД. Direct TCP/TLS `verify-full` проверяет expected host/database; runtime SQL-role не получает owner privileges.
 - Owner CLI того же image выполняет bootstrap/reset/verify/release. DB maintenance/generation и shared/exclusive advisory barrier защищают reads, sessions и commands; через 26 часов без reset + verify API fail-closed. Reset не запускает seed; history посетителей не требуется для recovery.
-- `/health/live` и Docker/Render liveness не обращаются к БД, `/health/ready` отдельно проверяет DB/schema/gate. Сохраняются session/CSRF/Origin, DB budgets, SPA и nonroot image; реальные TLS/proxy/digest/cold-start наблюдения ещё требуют разрешённого hosted запуска.
+- /health/live не обращается к БД; /health/ready проверяет БД и gate. На публичном Render оба endpoint и главная страница ответили HTTP 200 27 сентября 2026 года; это текущее наблюдение, а не доказательство всех recovery gates.
 - Прежняя GCP подготовка и незакоммиченные foundation/backend additions сохранены как локальная история в [историческом runbook](docs/release/deployment-gcp-history.md) и [неактивном Terraform](infra/terraform/README.md). По репозиторию GCP deployment не выполнялся; наличие GCP ресурсов в аккаунтах сейчас не проверялось. Terraform HCL/scripts/templates не входят в текущую публикацию Render/Neon.
 
 ## Локальный запуск и браузерный сценарий

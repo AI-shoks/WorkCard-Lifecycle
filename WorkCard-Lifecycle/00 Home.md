@@ -6,9 +6,9 @@ tags:
   - case-study
   - workcard
 status: active
-version: 22
+version: 23
 owner: navigation
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Production Work Card Workflow
@@ -17,7 +17,7 @@ updated: 2026-09-17
 
 ## Сейчас
 
-**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]; read-only preflight начат. Локальная реализация не заменяет ещё не завершённые hosted qualification и release evidence.**
+**На 27 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» в работе на 5/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging и production smoke прошли; полный clean recovery и 26-часовое elapsed наблюдение остаются открытыми.** Подробности — [[deployment]] и [[backlog]].
 
 ### Подтверждения предыдущих этапов
 
