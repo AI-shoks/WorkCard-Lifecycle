@@ -1,0 +1,216 @@
+name: Qualify isolated staging recovery database
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type QUALIFY EXISTING RECOVERY DB
+        required: true
+        type: string
+      mode:
+        description: Full elapsed check or repeat reset/browser after an earlier full attempt
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - retry-browser
+permissions: {}
+concurrency:
+  group: work-card-owner-and-release
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+    working-directory: WorkCard-Lifecycle
+jobs:
+  preflight:
+    name: Resolve the exact published release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      image: ${{ steps.release.outputs.image }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - name: Require main and verify the immutable release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$CONFIRMATION" == 'QUALIFY EXISTING RECOVERY DB' ]]
+          [[ "$MODE" == full || "$MODE" == retry-browser ]]
+          source_sha=1195892f15f2f240dd04f39e8388d6bb8802d9a7
+          image="$(node scripts/release/fetch-release.mjs "$source_sha")"
+          [[ "$image" == 'ghcr.io/ai-shoks/workcard-lifecycle/work-card@sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057' ]]
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect "$image" | jq -e --arg sha "$source_sha" '.[0] | .Os == "linux" and .Architecture == "amd64" and .Config.Labels["org.opencontainers.image.revision"] == $sha' > /dev/null
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: recovery-release-manifest
+          path: WorkCard-Lifecycle/docs/release/manifests/1195892f15f2f240dd04f39e8388d6bb8802d9a7.json
+          if-no-files-found: error
+          retention-days: 7
+
+  elapsed_gate:
+    name: Observe the 26-hour fail-closed runtime
+    needs: preflight
+    if: inputs.mode == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging-runtime
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - name: Probe the existing recovery DB before any owner reset
+        env:
+          IMAGE: ${{ needs.preflight.outputs.image }}
+          SOURCE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SIGNING_SECRET: ${{ secrets.SESSION_SIGNING_SECRET }}
+          NEON_DATABASE_HOST: ${{ vars.NEON_DATABASE_HOST }}
+          EXPECTED_DATABASE_USER: workcard_app
+        run: |
+          set -euo pipefail
+          DATABASE_URL="$(node scripts/release/recovery-target.mjs)"
+          export DATABASE_URL NEON_DATABASE_HOST SESSION_SIGNING_SECRET
+          NEON_DATABASE_NAME=workcard_recovery_20260917
+          export NEON_DATABASE_NAME
+          docker run --detach --name work-card-recovery-elapsed --init --publish 127.0.0.1:3001:3000 \
+            -e APP_ENV=staging -e APP_ORIGIN=http://127.0.0.1:3001 -e HOST=0.0.0.0 -e PORT=3000 -e PROXY_TRUST_MODE=none \
+            -e DATABASE_URL -e SESSION_SIGNING_SECRET -e NEON_DATABASE_HOST -e NEON_DATABASE_NAME "$IMAGE" > /dev/null
+          live=000
+          for attempt in $(seq 1 60); do
+            live="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 http://127.0.0.1:3001/health/live || true)"
+            [[ "$live" == 200 ]] && break
+            sleep 2
+          done
+          [[ "$live" == 200 ]]
+          ready="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 20 http://127.0.0.1:3001/health/ready)"
+          users="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 20 http://127.0.0.1:3001/api/v1/demo-users)"
+          [[ "$ready" == 503 && "$users" == 503 ]]
+          mkdir -p .quality-results/recovery-qualification
+          jq -n --arg observed "$(date --utc +'%Y-%m-%dT%H:%M:%SZ')" --arg image "$IMAGE" \
+            --argjson live "$live" --argjson ready "$ready" --argjson users "$users" \
+            '{schemaVersion:1,kind:"workcard-recovery-elapsed-gate",observedAt:$observed,immutableImage:$image,database:"workcard_recovery_20260917",liveStatus:$live,readyStatus:$ready,demoUsersStatus:$users,status:"passed"}' \
+            > .quality-results/recovery-qualification/elapsed-gate.json
+      - name: Stop only the temporary elapsed runtime
+        if: always()
+        run: docker rm --force work-card-recovery-elapsed || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: recovery-elapsed-gate
+          path: WorkCard-Lifecycle/.quality-results/recovery-qualification/elapsed-gate.json
+          if-no-files-found: error
+          retention-days: 7
+
+  recovery_owner:
+    name: Confirm actual age, verify, and reset only the recovery DB
+    needs: [preflight, elapsed_gate]
+    if: ${{ always() && needs.preflight.result == 'success' && (needs.elapsed_gate.result == 'success' || (inputs.mode == 'retry-browser' && needs.elapsed_gate.result == 'skipped')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging-owner
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - name: Verify elapsed state and perform fixed owner reset
+        env:
+          IMAGE: ${{ needs.preflight.outputs.image }}
+          SOURCE_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+          NEON_DATABASE_HOST: ${{ vars.NEON_DATABASE_HOST }}
+          EXPECTED_DATABASE_USER: workcard_owner
+          PRODUCTION_NEON_HOST: ${{ vars.PRODUCTION_NEON_HOST }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          [[ -n "$PRODUCTION_NEON_HOST" && "$NEON_DATABASE_HOST" != "$PRODUCTION_NEON_HOST" ]]
+          MIGRATION_DATABASE_URL="$(node scripts/release/recovery-target.mjs)"
+          export MIGRATION_DATABASE_URL NEON_DATABASE_HOST
+          APP_ENV=staging
+          NEON_DATABASE_NAME=workcard_recovery_20260917
+          export APP_ENV NEON_DATABASE_NAME
+          mkdir -p .quality-results/recovery-qualification
+          if [[ "$MODE" == full ]]; then
+            node scripts/release/recovery-age.mjs stale .quality-results/recovery-qualification/stale-age.json
+          fi
+          docker pull --platform linux/amd64 "$IMAGE"
+          timeout --signal=TERM --kill-after=30s 600s docker run --rm --init \
+            -e APP_ENV -e MIGRATION_DATABASE_URL -e NEON_DATABASE_HOST -e NEON_DATABASE_NAME \
+            "$IMAGE" node dist/owner-maintenance.js verify
+          timeout --signal=TERM --kill-after=30s 600s docker run --rm --init \
+            -e APP_ENV -e MIGRATION_DATABASE_URL -e NEON_DATABASE_HOST -e NEON_DATABASE_NAME \
+            "$IMAGE" node dist/owner-maintenance.js reset
+          node scripts/release/recovery-age.mjs fresh .quality-results/recovery-qualification/fresh-age.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: recovery-owner-age
+          path: WorkCard-Lifecycle/.quality-results/recovery-qualification/*-age.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  recovered_smoke:
+    name: Run canonical browser against the reset recovery DB
+    needs: [preflight, recovery_owner]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging-runtime
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: recovery-release-manifest
+          path: WorkCard-Lifecycle/docs/release/manifests
+      - name: Start exact image with recovery-only runtime credentials
+        env:
+          IMAGE: ${{ needs.preflight.outputs.image }}
+          SOURCE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SIGNING_SECRET: ${{ secrets.SESSION_SIGNING_SECRET }}
+          NEON_DATABASE_HOST: ${{ vars.NEON_DATABASE_HOST }}
+          EXPECTED_DATABASE_USER: workcard_app
+        run: |
+          set -euo pipefail
+          DATABASE_URL="$(node scripts/release/recovery-target.mjs)"
+          export DATABASE_URL NEON_DATABASE_HOST SESSION_SIGNING_SECRET
+          NEON_DATABASE_NAME=workcard_recovery_20260917
+          export NEON_DATABASE_NAME
+          docker pull --platform linux/amd64 "$IMAGE"
+          docker run --detach --name work-card-recovery-smoke --init --publish 127.0.0.1:3001:3000 \
+            -e APP_ENV=staging -e APP_ORIGIN=http://127.0.0.1:3001 -e HOST=0.0.0.0 -e PORT=3000 -e PROXY_TRUST_MODE=none \
+            -e DATABASE_URL -e SESSION_SIGNING_SECRET -e NEON_DATABASE_HOST -e NEON_DATABASE_NAME "$IMAGE" > /dev/null
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3001/health/ready > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Run the complete canonical public smoke without credentials
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install --with-deps chromium
+          mkdir -p .quality-results/recovery-qualification
+          node scripts/release/public-smoke.mjs \
+            docs/release/manifests/1195892f15f2f240dd04f39e8388d6bb8802d9a7.json \
+            http://127.0.0.1:3001 local .quality-results/recovery-qualification/recovery-smoke.json
+      - name: Stop only the temporary recovered runtime
+        if: always()
+        run: docker rm --force work-card-recovery-smoke || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: recovery-canonical-smoke
+          path: WorkCard-Lifecycle/.quality-results/recovery-qualification/recovery-smoke.json
+          if-no-files-found: warn
+          retention-days: 7
