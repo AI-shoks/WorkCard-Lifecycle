@@ -163,6 +163,7 @@ jobs:
   recovered_smoke:
     name: Run selected browser against the reset recovery DB
     needs: [preflight, recovery_owner]
+    if: ${{ always() && needs.preflight.result == 'success' && needs.recovery_owner.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging-runtime
