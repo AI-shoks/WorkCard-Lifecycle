@@ -212,6 +212,12 @@ test(`${hosted ? 'hosted ' : ''}${canonical ? 'canonical 112 → 3 → 250' : 'c
   observePage(page);
   await documentNavigation(page, '/batches/new');
   await role(page, 'planner');
+  if (hosted && !canonical) {
+    const compactPassportId = process.env['QUALITY_COMPACT_PASSPORT_ID'];
+    if (!compactPassportId) throw new Error('Hosted compact passport ID is required.');
+    await page.getByLabel('Подготовленный паспорт').selectOption(compactPassportId);
+    await expect(page.locator('.summary-strip strong').last()).toHaveText('6');
+  }
   await expect(page.getByLabel('Количество изделий в партии')).toHaveValue('112');
   const created = await uiCommand(page, '/production-batches', 'Создать партию', 201);
   const batchId: string = created.batch.id;

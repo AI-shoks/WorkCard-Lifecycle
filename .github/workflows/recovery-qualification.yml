@@ -152,6 +152,9 @@ jobs:
             -e APP_ENV -e MIGRATION_DATABASE_URL -e NEON_DATABASE_HOST -e NEON_DATABASE_NAME \
             "$IMAGE" node dist/owner-maintenance.js reset
           node scripts/release/recovery-age.mjs fresh .quality-results/recovery-qualification/fresh-age.json
+          if [[ "$MODE" == compact-only ]]; then
+            node scripts/release/recovery-compact-fixture.mjs prepare
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -215,6 +218,7 @@ jobs:
           QUALITY_HOSTED: "1"
           QUALITY_PUBLIC_HOSTED: "1"
           QUALITY_CANONICAL: "0"
+          QUALITY_COMPACT_PASSPORT_ID: 20000000-0000-4000-8000-000000000002
         run: |
           set -euo pipefail
           pnpm exec playwright install --with-deps chromium
@@ -233,6 +237,7 @@ jobs:
             sourceSha: '1195892f15f2f240dd04f39e8388d6bb8802d9a7',
             immutableImage: process.env.IMAGE,
             database: 'workcard_recovery_20260917',
+            passportId: process.env.QUALITY_COMPACT_PASSPORT_ID,
             origin: process.env.QUALITY_BASE_URL,
             status: 'passed',
             scale: 'compact-112-3-6',
@@ -260,5 +265,46 @@ jobs:
         with:
           name: recovery-compact-smoke
           path: WorkCard-Lifecycle/.quality-results/recovery-qualification/recovery-compact.json
-          if-no-files-found: warn
+          if-no-files-found: error
+          retention-days: 7
+
+  recovery_compact_cleanup:
+    name: Reset and remove only the temporary compact recovery fixture
+    needs: [preflight, recovery_owner, recovered_smoke]
+    if: ${{ always() && inputs.mode == 'compact-only' && needs.preflight.result == 'success' && needs.recovery_owner.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging-owner
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: ./.github/actions/setup-workspace
+      - name: Reset synthetic changes and remove the exact compact passport
+        env:
+          IMAGE: ${{ needs.preflight.outputs.image }}
+          SOURCE_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+          NEON_DATABASE_HOST: ${{ vars.NEON_DATABASE_HOST }}
+          EXPECTED_DATABASE_USER: workcard_owner
+          PRODUCTION_NEON_HOST: ${{ vars.PRODUCTION_NEON_HOST }}
+        run: |
+          set -euo pipefail
+          [[ -n "$PRODUCTION_NEON_HOST" && "$NEON_DATABASE_HOST" != "$PRODUCTION_NEON_HOST" ]]
+          MIGRATION_DATABASE_URL="$(node scripts/release/recovery-target.mjs)"
+          export MIGRATION_DATABASE_URL NEON_DATABASE_HOST
+          APP_ENV=staging
+          NEON_DATABASE_NAME=workcard_recovery_20260917
+          export APP_ENV NEON_DATABASE_NAME
+          docker pull --platform linux/amd64 "$IMAGE"
+          timeout --signal=TERM --kill-after=30s 600s docker run --rm --init \
+            -e APP_ENV -e MIGRATION_DATABASE_URL -e NEON_DATABASE_HOST -e NEON_DATABASE_NAME \
+            "$IMAGE" node dist/owner-maintenance.js reset
+          node scripts/release/recovery-compact-fixture.mjs cleanup \
+            .quality-results/recovery-qualification/compact-cleanup.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: recovery-compact-cleanup
+          path: WorkCard-Lifecycle/.quality-results/recovery-qualification/compact-cleanup.json
+          if-no-files-found: error
           retention-days: 7
