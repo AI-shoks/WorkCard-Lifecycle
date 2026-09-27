@@ -7,13 +7,14 @@ on:
         required: true
         type: string
       mode:
-        description: Full elapsed check or repeat reset/browser after an earlier full attempt
+        description: Full elapsed check, browser retry, or hosted compact smoke
         required: true
         default: full
         type: choice
         options:
           - full
           - retry-browser
+          - compact-only
 permissions: {}
 concurrency:
   group: work-card-owner-and-release
@@ -44,7 +45,7 @@ jobs:
           set -euo pipefail
           [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main ]]
           [[ "$CONFIRMATION" == 'QUALIFY EXISTING RECOVERY DB' ]]
-          [[ "$MODE" == full || "$MODE" == retry-browser ]]
+          [[ "$MODE" == full || "$MODE" == retry-browser || "$MODE" == compact-only ]]
           source_sha=1195892f15f2f240dd04f39e8388d6bb8802d9a7
           image="$(node scripts/release/fetch-release.mjs "$source_sha")"
           [[ "$image" == 'ghcr.io/ai-shoks/workcard-lifecycle/work-card@sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057' ]]
@@ -114,7 +115,7 @@ jobs:
   recovery_owner:
     name: Confirm actual age, verify, and reset only the recovery DB
     needs: [preflight, elapsed_gate]
-    if: ${{ always() && needs.preflight.result == 'success' && (needs.elapsed_gate.result == 'success' || (inputs.mode == 'retry-browser' && needs.elapsed_gate.result == 'skipped')) }}
+    if: ${{ always() && needs.preflight.result == 'success' && (needs.elapsed_gate.result == 'success' || ((inputs.mode == 'retry-browser' || inputs.mode == 'compact-only') && needs.elapsed_gate.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: staging-owner
@@ -160,7 +161,7 @@ jobs:
           retention-days: 7
 
   recovered_smoke:
-    name: Run canonical browser against the reset recovery DB
+    name: Run selected browser against the reset recovery DB
     needs: [preflight, recovery_owner]
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -197,6 +198,7 @@ jobs:
           done
           exit 1
       - name: Run the complete canonical public smoke without credentials
+        if: inputs.mode != 'compact-only'
         run: |
           set -euo pipefail
           pnpm exec playwright install --with-deps chromium
@@ -204,13 +206,58 @@ jobs:
           node scripts/release/public-smoke.mjs \
             docs/release/manifests/1195892f15f2f240dd04f39e8388d6bb8802d9a7.json \
             http://127.0.0.1:3001 local .quality-results/recovery-qualification/recovery-smoke.json
+      - name: Run hosted compact lifecycle without credentials
+        if: inputs.mode == 'compact-only'
+        env:
+          IMAGE: ${{ needs.preflight.outputs.image }}
+          QUALITY_BASE_URL: http://127.0.0.1:3001
+          QUALITY_HOSTED: "1"
+          QUALITY_PUBLIC_HOSTED: "1"
+          QUALITY_CANONICAL: "0"
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test quality/browser/lifecycle.spec.ts --project=desktop
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { mkdir, readFile, writeFile } from 'node:fs/promises';
+          const result = JSON.parse(await readFile('.quality-results/browser-hosted-smoke.json', 'utf8'));
+          assert.equal(result.stats.expected, 1);
+          assert.equal(result.stats.unexpected, 0);
+          assert.equal(result.stats.flaky, 0);
+          assert.equal(result.stats.skipped, 0);
+          const report = {
+            schemaVersion: 1,
+            kind: 'workcard-recovery-hosted-compact',
+            sourceSha: '1195892f15f2f240dd04f39e8388d6bb8802d9a7',
+            immutableImage: process.env.IMAGE,
+            database: 'workcard_recovery_20260917',
+            origin: process.env.QUALITY_BASE_URL,
+            status: 'passed',
+            scale: 'compact-112-3-6',
+            expectedTests: result.stats.expected,
+            unexpectedTests: result.stats.unexpected,
+            startedAt: result.stats.startTime,
+            durationMs: result.stats.duration,
+          };
+          await mkdir('.quality-results/recovery-qualification', { recursive: true });
+          await writeFile('.quality-results/recovery-qualification/recovery-compact.json',
+            `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' });
+          NODE
       - name: Stop only the temporary recovered runtime
         if: always()
         run: docker rm --force work-card-recovery-smoke || true
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
+        if: ${{ always() && inputs.mode != 'compact-only' }}
         with:
           name: recovery-canonical-smoke
           path: WorkCard-Lifecycle/.quality-results/recovery-qualification/recovery-smoke.json
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && inputs.mode == 'compact-only' }}
+        with:
+          name: recovery-compact-smoke
+          path: WorkCard-Lifecycle/.quality-results/recovery-qualification/recovery-compact.json
           if-no-files-found: warn
           retention-days: 7
