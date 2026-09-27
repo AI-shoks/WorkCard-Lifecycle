@@ -1,7 +1,7 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 38
+version: 39
 owner: project
 updated: 2026-09-27
 ---
@@ -10,7 +10,7 @@ updated: 2026-09-27
 
 Оперативные задачи проекта следуют каноническому [[project-plan|roadmap]]. Требования к поведению системы хранятся в `docs/requirements/`, а принятые решения — в [[decision-log]] и [[adr-index|ADR]].
 
-**На 27 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» в работе на 5/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging и production smoke прошли; полный clean recovery и 26-часовое elapsed наблюдение остаются открытыми.**
+**На 27 сентября 2026 года этапы 1–10 закрыты; этап 10 «Релиз» выполнен на 7/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging, production и recovery canonical/compact browser прошли; 26-часовой fail-closed подтверждён на реально просроченной recovery-БД.** Rollback drill не проверен из-за отсутствия предыдущего совместимого образа.
 
 ## Выполнено — этапы 1–4
 
@@ -94,17 +94,17 @@ Desktop/mobile UI, все 14 шагов прототипа и `window.runUxCopyA
 
 **Этап 9 закрыт 2026-09-05:** результаты локальной реализации относятся к implementation SHA `3ee65709966f5775928de87783fd2946d085e2bc`. `pnpm check` прошёл с 157 frontend и 15 API tests (10 обычных + 5 PostgreSQL), новые PostgreSQL проверки — 10/10. Compact desktop/mobile и отдельный canonical 250 UI процесс успешны; dependency/secret/image gates, новый no-cache clean-container и профиль 10 000 карточек выполнены. Strict docs: 55 документов, 0 errors/warnings; semantic review — без конфликтов. Точные условия, исправления и ограничения — [[quality-gates]]. Через GitHub API подтверждены `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` для того же SHA в обоих запусках выше.
 
-## В работе — этап 10 «Релиз»
+## Завершено — этап 10 «Релиз»
 
 - [x] Принять текущий $0 release design в [[0009-render-free-neon-free-release|ADR-0009]]; заменить ADR-0007/0008 с сохранением истории, bounded public demo и clean synthetic recovery.
 - [x] Описать один Render Free image-backed service и отдельные Neon Free projects; прежний GCP Terraform/foundation/backend contract сохранить неактивным историческим вариантом.
 - [x] Адаптировать manual main-only build-once workflow к public GHCR, exact digest/scan/migration checksums, versioned release evidence и lifetime retention; заменить GCP-only IaC gate deployment-contract checks без удаления других gates.
 - [x] Реализовать runtime/owner pre-deploy contract: direct Neon verify-full target validation, SQL runtime-role boundary, persistent maintenance/generation, shared/exclusive barrier и 26h fail-closed, liveness без DB и безопасный Render proxy/logging contract.
-- [ ] Завершить фактическую hosted qualification того же digest: temporary staging Docker + отдельный Neon project, non-superuser owner/repeat, TLS, роль, races/cancellation, browser compact/canonical, proxy/logging/cold start и clean recovery. Локальные fixtures не закрывают пункт.
+- [x] Завершить фактическую hosted qualification того же digest: [deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) подтвердил temporary staging Docker, отдельный Neon project и staging/production canonical smoke; [recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) подтвердил 192,58 часа elapsed, fail-closed `200/503/503`, owner verify/reset и canonical 250/254/payroll read-back; [recovery compact](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) прошёл 6-card browser с отдельным synthetic паспортом и подтверждённой очисткой. TLS/role, cancellation/race, proxy/logging и cold-start observations связаны с [[deployment]] и supplemental release evidence.
 - [x] Выполнить production promotion: release record подтверждает persistent и resolved digest; manual reset 19 сентября и scheduled reset 27 сентября прошли. Render API и Neon UI 27 сентября показывают Free; release records сохранены, owner/runtime secrets разделены по jobs. Предыдущего совместимого digest для rollback нет, поэтому rollback drill остаётся непроверенным. Сбой scheduled reset 26 сентября произошёл на сетевом чтении образа до owner job.
-- [ ] Сохранить фактическое hosted evidence, strict documentation audit и semantic review; закрыть этап только по этим результатам.
+- [x] Сохранить фактическое hosted evidence в versioned [release assets](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7), выполнить strict documentation audit и semantic review текущих утверждений; ограничения указаны в [[deployment]].
 
-**Прогресс этапа 10 — 5/7:** [release evidence](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждает staging, live Render digest и production smoke. Чистая recovery БД прошла empty → migrate → bootstrap и TLS/role checks, но её canonical browser завершился HTTP 500 при подготовке сессии. 26-часовой elapsed fail-closed и rollback drill не подтверждены. Следующий шаг — безопасный повтор recovery HTTP/browser на существующей БД, затем итоговый audit. Исторический GCP Terraform остаётся вне релиза.
+**Этап 10 закрыт — 7/7:** [release evidence](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждает live Render digest, staging/production smoke, recovery canonical/compact и SHA256-связанные отчёты с проверенными публикациями. Первый recovery browser HTTP 500 и промежуточные compact attempts сохранены как неуспешные; успешные повторы 27 сентября указаны отдельно. Rollback drill остаётся явно непроверенным. Исторический GCP Terraform вне релиза; следующий этап — упаковка портфолио.
 
 ## Maintenance
 

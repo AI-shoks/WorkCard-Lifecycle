@@ -1,9 +1,9 @@
 ---
 artifact_id: project.risk-register
 status: active
-version: 11
+version: 12
 owner: project
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Risk Register
@@ -24,7 +24,7 @@ updated: 2026-09-17
 | R-012 | Mutable tag или rebuild между staging/production создаст непроверенный release | средняя | высокое | Build once; public GHCR digest; manifest/scan/checksums и Render persistent reference/resolved digest сверяются по [[deployment]] |
 | R-013 | Owner DB secret попадёт в runtime service или browser/обычный CI | средняя | высокое | Отдельные GitHub owner/runtime/Render environments, step-scoped secrets, один owner контейнер exact digest; runtime без owner, browser без DB/PG/deployment variables. Реальный binding проверяется hosted по [[environments]] |
 | R-014 | Application rollback окажется несовместим с уже применённой schema | средняя | высокое | Только backward-compatible migrations в rollback window; destructive change требует expand/contract, restore rehearsal и ADR |
-| R-015 | Локальный код/config или workflow fixture будут выданы за работающий deployment | средняя | высокое | Разделять локальные tests и будущие hosted observations; этап 10 закрывается по фактическому digest/deployment/TLS/proxy/reset/smoke evidence. Аккаунты в этой задаче не инспектируются |
+| R-015 | Локальный код/config или workflow fixture будут выданы за работающий deployment | средняя | высокое | Разделять локальные tests и фактические hosted observations; релизный digest, deployment, TLS/proxy/reset/smoke и проверенные Free targets связаны с [[deployment]] и долговечным release evidence |
 | R-016 | Исторический GCP: Постоянная стоимость Cloud SQL превысит бюджет portfolio demo | средняя | высокое | Foundation сразу создаёт две always-on Cloud SQL; текущий list-price subtotal около `$4.31/7 суток` без usage-dependent backup/log/network/tax/FX. Обычные budget alerts не являются hard spending cap. До `apply` нужны фактическая смета/billing eligibility и fail-closed `destroyBy`; default window 7 дней, абсолютный максимум 30 дней с extension approval, затем двухфазный teardown по [[deployment-gcp-history]] |
 | R-017 | Общая публичная DB будет испорчена посетителем или накопит данные до отказа | высокая | высокое | Synthetic-only, предупреждение, 20 партий/500 sessions, expiry/cleanup, daily owner reset без seed и автоматический 26h fail-closed по [[0009-render-free-neon-free-release|ADR-0009]] |
 | R-018 | Исторический GCP: Runbook снимет public access и не вернёт его либо расширит IAM policy сверх `allUsers roles/run.invoker` | средняя | высокое | Единственный executor — `work-card-deployer`; custom role содержит только get/set IAM на одном production service, не `roles/run.admin`; runbook сохраняет policy snapshots, использует обязательный restore и останавливается при постороннем diff |

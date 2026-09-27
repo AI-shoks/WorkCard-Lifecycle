@@ -4,9 +4,9 @@
 
 ## Текущий статус
 
-**На 27 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» в работе на 5/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging и production smoke прошли; полный clean recovery и 26-часовое elapsed наблюдение остаются открытыми.**
+**На 27 сентября 2026 года этапы 1–10 закрыты; этап 10 «Релиз» выполнен на 7/7. Публичное демо работает на Render с двумя Neon Free PostgreSQL 18 projects. Staging/production и canonical/compact browser на ранее чисто восстановленной recovery-БД прошли; fail-closed подтверждён после 192,58 часа без reset.** Предыдущего совместимого образа для rollback drill нет, поэтому он остаётся непроверенным.
 
-Код и release workflow опубликованы. [Deployment](docs/release/deployment.md) связывает фактический [запуск Render](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) с [release records](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) исходного SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7. Платные опции, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены; полная hosted qualification ещё открыта.
+Код и release workflow опубликованы. [Deployment](docs/release/deployment.md) связывает [запуск Render](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053), [recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944), [recovery compact](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) и [release evidence](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) с исходным SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7. Платные опции, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены.
 
 - Этапы 1–4 завершены: product scope, доменная модель, требования и 14-шаговый UX-прототип согласованы.
 - Этап 5 завершён: приняты архитектурные артефакты и ADR-0001–ADR-0006.

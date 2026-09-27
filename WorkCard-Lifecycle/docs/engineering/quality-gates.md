@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 23
+version: 24
 owner: engineering
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Quality Gates
@@ -27,7 +27,19 @@ pnpm check
 
 Каталог `docs/` исключён из Prettier: governed documentation имеет собственную metadata/link проверку через `project-docs-auditor` и обязательный semantic pass. Корневые README/Home и прочие Markdown вне исключённых каталогов продолжают участвовать в formatter gate.
 
-## Первый публичный deployment — подготовка 2026-09-17
+## Текущий hosted release gate — 2026-09-27
+
+Этап 10 закрыт на 7/7 для source SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` и immutable digest `sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057`. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) прошёл все семь jobs: exact image, отдельный Neon staging, canonical staging browser, production owner, Render persistent/live digest и public smoke. [Release assets](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) сохраняют пять hash-chained records, staging/Render reports, proxy observations и supplemental результаты. Manual reset 19 сентября и scheduled reset 27 сентября успешны; сетевой сбой scheduled resolver 26 сентября остановился до owner job.
+
+[Recovery run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) прошёл четыре jobs на том же образе и существующей ранее чисто восстановленной staging БД. Прямое время PostgreSQL дало возраст `693304,27` секунды (`192,58` часа); до reset live/ready/demo-users ответили `200/503/503`. После owner verify/reset возраст стал `1,80` секунды; полный canonical smoke прошёл 15 проверок, включая 250 закрытых карточек, audit 254/254, payroll read-back и rate-limit `429`. Четыре обезличенных отчёта и supplemental receipt опубликованы с SHA256; шесть файлов повторно скачаны и сверены. Первый неудачный recovery browser от 19 сентября остаётся исторической попыткой, а не PASS.
+
+[Hosted compact run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) на том же digest прошёл 6-card desktop lifecycle через UI без DB/owner credentials в browser job. Только в recovery-БД owner добавил отдельный synthetic паспорт; после browser отдельный owner job сбросил mutable данные, удалил этот паспорт и подтвердил сохранность canonical fixtures. Два обезличенных отчёта, supplemental receipt и SHA256 опубликованы в том же release; все четыре assets повторно скачаны и совпали побайтно. Ранее один compact run пропустил browser job из-за условия `needs`, второй честно завершился на несоответствии canonical 250-card fixture; ни один не выдан за PASS.
+
+Локальные hosted reports фиксируют TLS/role и cancellation/race; предыдущий supplemental receipt сохраняет выбранные результаты cancellation, proxy/logging и cold-start наблюдений, а подробные raw reports остаются в ignored `.quality-results`. Два Neon проекта и Render service проверены как Free 27 сентября; плата вне free-квот не обещается. Совместимого предыдущего image нет, поэтому rollback drill непроверен и не включён в квалификацию. Финальный strict docs audit и semantic review сверили текущие утверждения с этими границами.
+
+## Историческая подготовка первого публичного deployment — 2026-09-17
+
+Следующий раздел фиксирует состояние подготовки на указанную дату; его незавершённые prerequisites не описывают текущий релиз.
 
 Пользователь разрешил scoped commit/push/PR/merge после обязательных checks, один Render Free image service, два отдельных Neon Free PG18 projects, необходимые secrets/environments, публикацию GHCR, owner operations и hosted qualification. Платные планы/overage, GCP apply/destroy и удаление чужих данных запрещены. Разрешение не является свидетельством выполненного deployment.
 

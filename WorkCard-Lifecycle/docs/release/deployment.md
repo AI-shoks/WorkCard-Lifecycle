@@ -1,14 +1,14 @@
 ---
 artifact_id: release.deployment
 status: accepted
-version: 16
+version: 17
 owner: release
 updated: 2026-09-27
 ---
 
 # Deployment
 
-Контракт [[0009-render-free-neon-free-release|ADR-0009]] реализован для одного Render Free service и двух отдельных Neon Free PostgreSQL 18 projects. Владелец разрешил scoped Git/cloud/DB действия только для этих ресурсов. Платные планы, add-ons, overage, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены. Ниже отделены фактические результаты от ещё открытых recovery и qualification gates.
+Контракт [[0009-render-free-neon-free-release|ADR-0009]] реализован для одного Render Free service и двух отдельных Neon Free PostgreSQL 18 projects. Владелец разрешил scoped Git/cloud/DB действия только для этих ресурсов. Платные планы, add-ons, overage, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены. Ниже зафиксированы фактические результаты hosted qualification и её границы.
 
 Репозиторий — источник текущей реализации. Workflows находятся в `.github/workflows/` родительского Git root; shell steps работают в `WorkCard-Lifecycle/`. GCP Terraform неактивен. Полный прежний runbook, включая foundation/backend work, сохранён в [[deployment-gcp-history]]; его исторические сведения об аккаунтах не являются новой внешней проверкой.
 
@@ -18,7 +18,13 @@ updated: 2026-09-27
 
 [Manual reset](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35454127224) и [scheduled reset 27 сентября](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36305239932) успешны. [Scheduled run 26 сентября](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36227442468) остановился на сетевом ECONNRESET при read-only image resolution; owner job не запускался. Текущий Render API подтвердил Free service, отключённый auto-deploy и постоянную ссылку на тот же digest; Neon UI — Free organization с ровно двумя проектами. Предыдущего совместимого digest нет: rollback drill непроверен.
 
-Отдельная staging recovery БД прошла empty → migrate → bootstrap → verify, owner/runtime TLS и role checks. Её canonical browser завершился HTTP 500 при подготовке demo-session; успешный полный recovery smoke не зафиксирован. Опубликованный supplemental receipt прямо ограничивает общий qualification claim и не доказывает 26 часов elapsed fail-closed либо rollback. Подробные локальные отчёты сохранены в ignored .quality-results; их выборочная публичная сводка не заменяет повторный успешный проход. Полная hosted qualification и закрытие этапа остаются открытыми.
+Эксплуатационный владелец одиночного portfolio demo — владелец проекта. Он проверяет результаты ежедневного reset и состояние 26-часового gate, Free-квоты Render/Neon, актуальность rotation identifiers и сохранность GHCR image/release assets; при сбое расписания применяет документированный manual reset. Автоматическое расписание не снимает эту ответственность.
+
+Отдельная staging recovery БД прошла empty → migrate → bootstrap → verify, owner/runtime TLS и role checks. Первый canonical browser 19 сентября завершился HTTP 500 при подготовке demo-session; этот неуспех сохранён в исходном supplemental receipt. [Повторный recovery run 27 сентября](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) на том же неизменном digest прошёл все четыре jobs. До reset реальный возраст последней проверки БД составил 192,58 часа: `/health/live` ответил `200`, readiness и demo-users — `503`. Owner verify и reset обновили возраст до 1,8 секунды; затем полный canonical browser прошёл 15 проверок, включая `250/250` закрытых карточек, `254/254` audit read-back, payroll и rate-limit `429`.
+
+В [release assets](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) добавлены `recovery-elapsed-36316059944.json`, `recovery-stale-age-36316059944.json`, `recovery-fresh-age-36316059944.json`, `recovery-smoke-36316059944.json` и `supplemental-recovery-qualification-36316059944.json` с SHA256. Все шесть опубликованных файлов повторно скачаны и сверены по SHA256. Исторические detailed reports создания БД, TLS/roles, cancellation и proxy/cold-start остаются локально в ignored `.quality-results`; опубликованные предыдущие receipt и release records содержат их выборочные результаты и hashes. Эти отчёты не подменяются новым browser run. Rollback drill остаётся непроверенным: предыдущего совместимого образа нет.
+
+[Hosted compact run 27 сентября](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) использовал тот же release digest и только существующую recovery-БД. Owner добавил отдельный synthetic паспорт на 3 комплекта/6 карточек, browser job без DB/owner credentials прошёл полный compact lifecycle, затем отдельный owner job сбросил mutable данные и удалил временный паспорт; canonical fixtures остались неизменными. Обезличенные `recovery-compact-36320856998.json`, `recovery-compact-cleanup-36320856998.json`, `supplemental-recovery-compact-36320856998.json` и `.sha256` опубликованы в том же release и повторно скачаны с совпадающими SHA256. Первый compact run пропустил browser job из-за условия workflow, второй остановился на canonical 250-card fixture; только третий run засчитан как PASS. Production БД и опубликованный image при этих проверках не менялись.
 
 ## Deployment contract
 
@@ -110,11 +116,13 @@ node dist/owner-maintenance.js release
 4. Повторить `proxy-probe.mjs ORIGIN SOURCE_SHA proxy-only OUTPUT` и `render-observations.mjs REPORT OUTPUT`: проверить liveness/log peer chain, HTTPS, client IP и spoofed XFF по независимому runner egress. Отсутствие evidence останавливает launch. Далее `node dist/owner-maintenance.js bootstrap` завершает seed + verify и открывает gate в рамках уже разрешённых owner operations.
 5. Полный обязательный hosted smoke/records, включая реальные sessions/Origin/CSRF и app readiness, остаётся gate promotion. Режим `observe` никогда не квалифицируется как готовое демо: readiness всегда `503`.
 
-Эта разрешённая hosted процедура ещё должна быть подтверждена фактическими records. Observe не является дополнительным сервисом, не включает keepalive и не требует owner credentials в runtime.
+Эта процедура подтверждена фактическими [deploy records](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) и release evidence выше. Observe не является дополнительным сервисом, не включает keepalive и не требует owner credentials в runtime.
 
-## Перед первым разрешённым deployment
+## Исходный checklist перед первым разрешённым deployment
 
-1. Завершить локальные gates и strict docs audit; выполнить scoped commit/push, PR и merge после обязательных проверок. Получить успешный полный CI того же `main` SHA, который будет опубликован. Текущие uncommitted changes не имеют удалённого CI.
+Следующие пункты сохранены как критерии первого запуска; их фактические результаты и ограничения приведены выше.
+
+1. Завершить локальные gates и strict docs audit; выполнить scoped commit/push, PR и merge после обязательных проверок. Получить успешный полный CI того же `main` SHA, который будет опубликован. Публикуемый SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` получил полный удалённый CI.
 2. Подтвердить точные аккаунты/targets, тариф/квоты/$0, разные direct host/database и владельца эксплуатации. Создать только два разрешённых Neon Free PG18 projects; единственный Render Free image service создаётся с опубликованным digest по процедуре closed-gate observe выше.
 3. Настроить environments, runtime/owner secret boundaries и rotation identifiers по [[environments]], не записывая payload в Git/evidence. Production runtime secrets/origin задаются при создании Render service; proxy allowlist — только после безопасного наблюдения по последовательности выше. Никаких runtime owner credentials.
 4. Выполнить image publication и отдельное изменение GHCR public visibility; сохранить manifest/scan/assets на весь lifecycle. Настроить target metadata для Render adapter и reset current digest без mutable tags; первая private публикация продолжается через `resume_run_id` без rebuild.
@@ -129,4 +137,4 @@ Preflight 2026-09-17 подтвердил публичный repository `AI-shok
 
 После scoped PR/merge и полного CI main SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` image опубликован один раз: [release record](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7), exact digest `sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057`. Anonymous pull и опубликованный scan прошли; resume не потребовался. Смена Render аккаунта не меняет этот release: при следующем manual deploy явно выбирать этот `release_sha`, не собирать повторно.
 
-Этот runbook задаёт контракт и фиксирует проверенное состояние на указанную дату. Перед новым изменением provider bindings, billing и quotas проверяются заново; исторический preflight не подменяет актуальную проверку. Полная hosted qualification и закрытие этапа 10 пока не подтверждены.
+Этот runbook задаёт контракт и фиксирует проверенное состояние на указанную дату. Перед новым изменением provider bindings, billing и quotas проверяются заново; исторический preflight не подменяет актуальную проверку. Этап 10 закрыт по совокупности release records, canonical/compact hosted recovery, сохранённого evidence, strict документационного аудита и semantic review; ограничение rollback отмечено явно.

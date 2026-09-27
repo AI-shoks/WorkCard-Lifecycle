@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.ci-pipeline
 status: accepted
-version: 16
+version: 17
 owner: engineering
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # CI Pipeline
@@ -102,4 +102,4 @@ SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf` подтверждён успеш
 
 ## Закрытие этапа 9
 
-Этап 9 закрыт 2026-09-05: implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): все 6 обязательных jobs имеют `completed/success` для того же SHA в каждом запуске, включая image scan в `container`. Полная матрица и локальные результаты — [[quality-gates]]. Это историческое закрытие этапа 9; текущий Render/Neon этап 10 и его локальные проверки описаны выше и в [[quality-gates]], без утверждения о hosted deployment.
+Этап 9 закрыт 2026-09-05: implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): все 6 обязательных jobs имеют `completed/success` для того же SHA в каждом запуске, включая image scan в `container`. Полная матрица и локальные результаты — [[quality-gates]]. Это историческое закрытие этапа 9; фактический Render/Neon deployment этапа 10 подтверждён отдельно в [[deployment]].
