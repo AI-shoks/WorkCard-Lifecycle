@@ -96,9 +96,31 @@ it('audit insert failure rolls back every command, all roots, immutable results,
   await faultThenRetry('QUALITY_CONTROLLER', `/production-batches/${batchId}/final-acceptance`, {
     expectedBatchVersion: 2,
   });
-  await faultThenRetry('ADMIN_AUDITOR', `/work-cards/${lastCardId}/payroll-export`, {
+  const exported = await faultThenRetry(
+    'ADMIN_AUDITOR',
+    `/work-cards/${lastCardId}/payroll-export`,
+    {
+      expectedCardVersion: 5,
+    },
+  );
+  const beforeRepeat = await businessSnapshot(db);
+  const repeatCommandId = randomUUID();
+  const repeated = await api.post('ADMIN_AUDITOR', `/work-cards/${lastCardId}/payroll-export`, {
+    commandId: repeatCommandId,
     expectedCardVersion: 5,
   });
+  expect(repeated.statusCode).toBe(200);
+  expect(repeated.json().payrollRecord).toEqual(exported.payrollRecord);
+  const afterRepeat = await businessSnapshot(db);
+  const receipts = afterRepeat['command_receipts'];
+  expect(receipts).toHaveLength(beforeRepeat['command_receipts']!.length + 1);
+  afterRepeat['command_receipts'] = beforeRepeat['command_receipts']!;
+  expect(afterRepeat).toEqual(beforeRepeat);
+  const repeatReceipt = await db.owner.query(
+    'SELECT state, event_count FROM command_receipts WHERE command_id = $1',
+    [repeatCommandId],
+  );
+  expect(repeatReceipt.rows).toEqual([{ state: 'SUCCEEDED', event_count: 0 }]);
 });
 
 it('late receipt failure and business insert failure also roll back the complete release', async () => {

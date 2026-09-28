@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 10
+version: 12
 owner: engineering
-updated: 2026-09-17
+updated: 2026-09-28
 ---
 
 # Repository Structure
@@ -63,4 +63,4 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 ## Критерий принятия
 
-Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender и hosted smoke/evidence validators покрыты позитивными и негативными tests; `ci.yml`, `release.yml`, `deploy.yml`, `reset.yml` и `rollback.yml` требуют `actionlint`. GCP Terraform results являются историческими; активный `release_iac` проверяет новый deployment contract. Фактические текущие проверки — [[quality-gates]]; полный удалённый CI текущего `main` SHA и hosted qualification ещё должны быть подтверждены отдельно.
+Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender и hosted smoke/evidence validators покрыты позитивными и негативными tests. Штатная job `release_iac` задаёт `actionlint` для пяти workflows: `ci.yml`, `release.yml`, `deploy.yml`, `reset.yml`, `rollback.yml`. `recovery-qualification.yml` отсутствует в выбранном Git checkout; утверждение о его проверке этим CI не переносится из исторических материалов. Успешное выполнение текущего кандидата ещё не подтверждено. GCP Terraform results исторические; активный `release_iac` проверяет Render/Neon deployment contract. Удалённый CI, deployment и hosted recovery для опубликованного digest подтверждены в [[quality-gates]] и [[deployment]]; локальное состояние другого SHA не подменяет эти записи.

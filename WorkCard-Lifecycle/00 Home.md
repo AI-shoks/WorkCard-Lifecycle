@@ -6,9 +6,9 @@ tags:
   - case-study
   - workcard
 status: active
-version: 22
+version: 28
 owner: navigation
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Production Work Card Workflow
@@ -17,7 +17,7 @@ updated: 2026-09-17
 
 ## Сейчас
 
-**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]; read-only preflight начат. Локальная реализация не заменяет ещё не завершённые hosted qualification и release evidence.**
+**На 27 сентября 2026 года этапы 1–11 закрыты; этап 12 «Финальный аудит» в работе. FA-01/02 закрыты локально в текущем незакоммиченном дереве; итоговый DoD и квалификация выбранной версии требуют отдельного решения. Ручное подтверждение пользователя без SHA/окружения не перенесено на изменённый код; публичный образ не менялся. Результаты и чек-лист — [[final-audit]].** Портфолио-кейс собран в [README](README.md): [[demo-script|короткий показ]], [[screenshots|реальные экраны]], [[engineering-retrospective|решения и ограничения]]. Этап 10 «Релиз» сохраняет исторический результат 7/7: Render/Neon Free, staging/production и recovery canonical/compact; после 192,58 часа без reset recovery API отказал закрытым gate и восстановился после owner reset. Rollback drill не проверен: предыдущего совместимого образа нет. Подробности — [[deployment]] и [[backlog]].
 
 ### Подтверждения предыдущих этапов
 

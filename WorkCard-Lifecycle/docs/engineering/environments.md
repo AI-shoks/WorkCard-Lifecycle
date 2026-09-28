@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.environments
 status: accepted
-version: 13
+version: 14
 owner: engineering
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Environments and Secrets
@@ -61,7 +61,7 @@ Staging runtime с `APP_ENV=staging` может использовать direct 
 
 Runtime и owner URL содержат точный direct hostname, ожидаемое имя database и единственный `sslmode=verify-full`. Сертификат и hostname проверяются. `-pooler`, socket paths, чужие target host/database, downgrade, повторные параметры и конфликтующие overrides отклоняются. `PG*`/TLS overrides нельзя использовать для обхода contract; `NODE_TLS_REJECT_UNAUTHORIZED=0` запрещён. Полный URL содержит пароль и всегда считается secret. Логи не должны печатать URL или raw parser/driver error.
 
-Direct endpoint необходим из-за session advisory locks и startup timeout options. Общая PostgreSQL session у transaction pooler не обеспечивает эти ожидания. Реальное TLS соединение и CA/hostname validation проверяются только в отдельно разрешённой hosted qualification; unit tests доказывают contract/parser behavior.
+Direct endpoint необходим из-за session advisory locks и startup timeout options. Общая PostgreSQL session у transaction pooler не обеспечивает эти ожидания. Реальное TLS соединение, CA/hostname validation и границы ролей проверены на hosted targets; фактические results и ограничения — [[deployment]]. Unit tests отдельно доказывают contract/parser behavior.
 
 ## Secret boundaries
 
@@ -99,4 +99,4 @@ Pino пишет однострочный JSON с безопасными service/
 
 ## Граница проверки
 
-Владелец разрешил настройку environments/secrets и создание одного Render Free service и двух Neon Free projects в рамках первого deployment. Read-only preflight GitHub и отдельного Render аккаунта подтверждён; billing facts и точные границы ресурсов записаны в [[deployment]]. Один public image и постоянный release record опубликованы для SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7`; смена Render аккаунта не требует повторной сборки. Создание demo targets, реальные DB operations и hosted qualification ещё требуют фактических records. Фактический Neon Free plan и общий $0-профиль эксплуатации ещё не подтверждены. Разрешение не распространяется на посторонние БД/resources или платные опции; обычный CI сохраняет только disposable PostgreSQL. Доказанные проверки и конкретные ограничения — [[quality-gates]]; hosted checklist — [[deployment]].
+В рамках разрешённого первого deployment созданы один Render Free service и два Neon Free projects. Текущие provider facts и границы ресурсов записаны в [[deployment]]; public image и постоянный release record опубликованы для SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` без повторной сборки. Deploy и recovery runs подтвердили реальные DB operations, hosted smoke, 26h fail-closed и owner reset; Render API и Neon UI 27 сентября подтвердили Free-профиль. Это наблюдение не является гарантией будущей стоимости вне free-квот. Разрешение не распространяется на посторонние БД/resources или платные опции; обычный CI сохраняет только disposable PostgreSQL. Доказанные проверки и ограничения — [[quality-gates]] и [[deployment]].

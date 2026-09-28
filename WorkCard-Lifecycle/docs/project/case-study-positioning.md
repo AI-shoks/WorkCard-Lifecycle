@@ -1,9 +1,9 @@
 ---
 artifact_id: project.case-study-positioning
 status: accepted
-version: 11
+version: 14
 owner: project
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Case Study Positioning
@@ -17,8 +17,10 @@ updated: 2026-09-17
 - данные, партия, нормы, пользователи и payroll являются синтетическими;
 - implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) демонстрирует product analysis, AS-IS/TO-BE analysis, domain modeling, requirements engineering, UX design, traceability, принятую техническую архитектуру, воспроизводимый инженерный фундамент и проверенный backend vertical slice;
 - отдельная цифровая `FinalBatchAcceptance` является синтетическим TO-BE-решением уровня партии, а не утверждением о существующей заводской ИС;
-- связанный frontend flow закрыт на этапе 8 SHA [`b00ff294a7b7ce1e09379c088969d9a02bd033bf`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf), полный quality-этап — на этапе 9 SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc); этап 10 в работе на 4/7: Render Free/Neon Free design по [[0009-render-free-neon-free-release|ADR-0009]], GHCR workflows и runtime/owner controls подготовлены локально, а provisioning и hosted evidence ещё нет;
-- ограничения и допущения документируются явно.
+- связанный frontend flow закрыт на этапе 8 SHA [b00ff294a7b7ce1e09379c088969d9a02bd033bf](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf), quality-этап — на этапе 9 SHA [3ee65709966f5775928de87783fd2946d085e2bc](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc); этап 10 закрыт на 7/7: публичное Render/Neon демо, production smoke, recovery canonical/compact и elapsed fail-closed подтверждены [[deployment]];
+- упаковка этапа 11 завершена: [README](../../README.md), [[demo-script|короткий показ]], [[screenshots|реальные снимки с происхождением]] и [[engineering-retrospective|инженерная ретроспектива]]; это не закрывает отдельный финальный аудит этапа 12;
+- роль автора описывается через предметное исследование, модель, требования, UX, реализацию, проверки и релиз; ни наличие кода, ни участие инструментов не используются как доказательство единоличной разработки;
+- ограничения и допущения документируются явно; D-029 в [[decision-log]] фиксирует правила упаковки.
 
 ## Чего не утверждаем
 
@@ -27,7 +29,7 @@ updated: 2026-09-17
 - что метрики получены от реального предприятия;
 - что mock payroll рассчитывает настоящую зарплату;
 - что система соответствует всем требованиям промышленной MES;
-- что уже выполнены deployment, staging/production qualification или фактический hosted runtime.
+- что выполнен rollback drill: предыдущего совместимого образа для него нет.
 
 ## Публичная доказательность
 
@@ -36,6 +38,7 @@ updated: 2026-09-17
 - технический UUID `WorkCard` не называется номером детали и не создаёт ложной серийной прослеживаемости;
 - синтетическое per-card закрытие WorkCard не называется финальной приёмкой всей партии или цифровой подписью БТК;
 - цифровая финальная приёмка показывается отдельной неизменяемой записью actor/time/ID и не называется копией подписи на физической карточке;
-- утверждения о бизнес-функциях появятся только после их кода, тестов и воспроизводимой демонстрации.
+- утверждения о бизнес-функциях опираются на код, тесты и воспроизводимую демонстрацию;
+- снимки локальной SPA, свежий экран публичного сервиса и hosted reports имеют разные даты и окружения; диагностический кадр неуспешной попытки не используется как PASS evidence.
 
 Исторический implementation commit этапа 7 и DB integration tests дают два раздельных доказательства: масштабный выпуск `3 → 250` с `254` release events и компактный API-only процесс от создания партии до final acceptance, payroll и audit/read-back. Они также проверяют trusted roles, ранний auth/CSRF order, concurrency, replay и immutable boundaries. Этап 8 добавил реальный browser flow, а этап 9 — compact/canonical browser gates, PostgreSQL regressions, security/image gates и performance profile. Для SHA этапа 9 успешны все 6 обязательных jobs в [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850). Эти результаты не доказывают production deployment: он относится к этапу 10.

@@ -1,16 +1,16 @@
 ---
 artifact_id: project.backlog
 status: active
-version: 37
+version: 44
 owner: project
-updated: 2026-09-17
+updated: 2026-09-28
 ---
 
 # Backlog
 
 Оперативные задачи проекта следуют каноническому [[project-plan|roadmap]]. Требования к поведению системы хранятся в `docs/requirements/`, а принятые решения — в [[decision-log]] и [[adr-index|ADR]].
 
-**На 2026-09-17 этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7. Текущий target — Render Free + Neon Free по [[0009-render-free-neon-free-release|ADR-0009]]: один публичный GHCR image, отдельные DB projects, owner maintenance barrier и ежедневный reset. Владелец разрешил первый deployment и необходимые scoped Git/cloud/DB действия по [[deployment]]; read-only preflight начат. Локальная реализация не заменяет ещё не завершённые hosted qualification и release evidence.**
+**На 27 сентября 2026 года этапы 1–11 закрыты; этап 12 «Финальный аудит» в работе: статическая и документационная части выполнены, FA-01/02 закрыты локальными проверками изменённого дерева; итоговый DoD и квалификация выбранной версии открыты. Прежняя ручная проверка пользователя не переносится на изменённый код.** Упаковка включает README, схему, сценарий, реальные снимки и ретроспективу. Этап 10 «Релиз» сохраняет результат 7/7: публичный Render/Neon Free, staging/production и recovery canonical/compact, 26-часовой fail-closed на реально просроченной recovery-БД. Rollback drill не проверен из-за отсутствия предыдущего совместимого образа.
 
 ## Выполнено — этапы 1–4
 
@@ -94,17 +94,43 @@ Desktop/mobile UI, все 14 шагов прототипа и `window.runUxCopyA
 
 **Этап 9 закрыт 2026-09-05:** результаты локальной реализации относятся к implementation SHA `3ee65709966f5775928de87783fd2946d085e2bc`. `pnpm check` прошёл с 157 frontend и 15 API tests (10 обычных + 5 PostgreSQL), новые PostgreSQL проверки — 10/10. Compact desktop/mobile и отдельный canonical 250 UI процесс успешны; dependency/secret/image gates, новый no-cache clean-container и профиль 10 000 карточек выполнены. Strict docs: 55 документов, 0 errors/warnings; semantic review — без конфликтов. Точные условия, исправления и ограничения — [[quality-gates]]. Через GitHub API подтверждены `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` для того же SHA в обоих запусках выше.
 
-## В работе — этап 10 «Релиз»
+## Завершено — этап 10 «Релиз»
 
 - [x] Принять текущий $0 release design в [[0009-render-free-neon-free-release|ADR-0009]]; заменить ADR-0007/0008 с сохранением истории, bounded public demo и clean synthetic recovery.
 - [x] Описать один Render Free image-backed service и отдельные Neon Free projects; прежний GCP Terraform/foundation/backend contract сохранить неактивным историческим вариантом.
 - [x] Адаптировать manual main-only build-once workflow к public GHCR, exact digest/scan/migration checksums, versioned release evidence и lifetime retention; заменить GCP-only IaC gate deployment-contract checks без удаления других gates.
 - [x] Реализовать runtime/owner pre-deploy contract: direct Neon verify-full target validation, SQL runtime-role boundary, persistent maintenance/generation, shared/exclusive barrier и 26h fail-closed, liveness без DB и безопасный Render proxy/logging contract.
-- [ ] Завершить фактическую hosted qualification того же digest: temporary staging Docker + отдельный Neon project, non-superuser owner/repeat, TLS, роль, races/cancellation, browser compact/canonical, proxy/logging/cold start и clean recovery. Локальные fixtures не закрывают пункт.
-- [ ] Выполнить разрешённое production promotion в Render; подтвердить persistent reference/resolved digest, daily/manual reset и совместимый rollback, quotas/$0 settings, secret boundaries и retention release records. При отсутствии предыдущего совместимого image явно сохранить rollback как непроверенный.
-- [ ] Сохранить фактическое hosted evidence, strict documentation audit и semantic review; закрыть этап только по этим результатам.
+- [x] Завершить фактическую hosted qualification того же digest: [deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) подтвердил temporary staging Docker, отдельный Neon project и staging/production canonical smoke; [recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) подтвердил 192,58 часа elapsed, fail-closed `200/503/503`, owner verify/reset и canonical 250/254/payroll read-back; [recovery compact](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) прошёл 6-card browser с отдельным synthetic паспортом и подтверждённой очисткой. TLS/role, cancellation/race, proxy/logging и cold-start observations связаны с [[deployment]] и supplemental release evidence.
+- [x] Выполнить production promotion: release record подтверждает persistent и resolved digest; manual reset 19 сентября и scheduled reset 27 сентября прошли. Render API и Neon UI 27 сентября показывают Free; release records сохранены, owner/runtime secrets разделены по jobs. Предыдущего совместимого digest для rollback нет, поэтому rollback drill остаётся непроверенным. Сбой scheduled reset 26 сентября произошёл на сетевом чтении образа до owner job.
+- [x] Сохранить фактическое hosted evidence в versioned [release assets](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7), выполнить strict documentation audit и semantic review текущих утверждений; ограничения указаны в [[deployment]].
 
-**Прогресс этапа 10 — 4/7:** локально реализованные design/config/workflows/runtime controls не являются удалённым запуском. Результаты проверок текущего дерева — [[quality-gates]]. Историческая GCP foundation preparation `136/0/0`, full `167/0/0`, GCS templates и preflight сохранены в [[deployment-gcp-history]] и [Terraform README](../../infra/terraform/README.md); они не активный next step, а незакоммиченные Terraform HCL/scripts/templates не входят в текущую публикацию. Scoped commit/push, PR/merge после gates, GHCR publication и Render/Neon operations разрешены; следующий результат — фактический hosted deployment с evidence по [[deployment]], который ещё не подтверждён.
+**Этап 10 закрыт — 7/7:** [release evidence](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждает live Render digest, staging/production smoke, recovery canonical/compact и SHA256-связанные отчёты с проверенными публикациями. Первый recovery browser HTTP 500 и промежуточные compact attempts сохранены как неуспешные; успешные повторы 27 сентября указаны отдельно. Rollback drill остаётся явно непроверенным. Исторический GCP Terraform вне релиза; материалы завершённой упаковки приведены ниже.
+
+## Выполнено — этап 11 «Упаковка портфолио»
+
+- [x] Переписать [README](../../README.md) как короткий вход в кейс: задача, моя роль, процесс, архитектура, подтверждения и запуск.
+- [x] Добавить схему фактической архитектуры и сверить её с сервером, контрактами и release design.
+- [x] Доработать [[demo-script]]: показ за 5–7 минут, подготовка и fallback, отдельно полный canonical lifecycle.
+- [x] Добавить [[screenshots|четыре реальных снимка]] с датой, окружением, размером сценария и происхождением. Диагностический кадр не объявлять доказательством PASS.
+- [x] Написать [[engineering-retrospective|ограничения и ретроспективу]] с конкретными решениями и компромиссами.
+- [x] Сверить публичные evidence, локальные исходники снимков и код; проверить ссылки, strict documentation audit, целевой semantic review и diff.
+
+**Закрыт 2026-09-27:** материалы готовы; первый strict audit после их добавления — 61 документ, 0 errors/warnings. Сохранённые recovery assets скачаны и сверены с опубликованными SHA256 без повторного запуска приложения. Снимки сентября и текущий read-only экран публичного демо разграничены. Изменения приложения, инфраструктуры, commit/push и публикация не входят в упаковку. Документационное решение — D-029 в [[decision-log]].
+
+## В работе — этап 12 «Финальный аудит»
+
+- [x] Сверить весь scope, 37 acceptance criteria, traceability и Definition of Done с кодом, тестами и evidence; полный PASS критериев не заявлен, замечания — [[final-audit]].
+- [x] Проверить актуальность evidence по source/image/executor SHA и окружениям; инструкции воспроизведения сверить с кодом и конфигурацией без запуска.
+- [x] Пользователь подтвердил успешную ручную проверку демо; сообщение получено 2026-09-27. Это user-reported результат без указанных SHA/окружения; подробности — [[final-audit]].
+- [x] Согласовать архитектурные документы с `pg`/SQL и локальным payroll в workflow handler; заменить ADR-0001/0006 новым решением со взаимными ссылками, сохранив историческое содержание. См. [[adr-index]].
+- [x] Сверить README, схему, demo-script, снимки, ограничения и ретроспективу; выполнить strict/link audit, semantic review и diff только этого аудита.
+- [x] Закрыть FA-01/02 отдельным техническим продолжением без расширения MVP: typed payload, aggregate/version/insert-count guards, обязательные IDs комплектов в release event, ключевые негативные assertions и полные rollback snapshots. Свежие unit/API/PostgreSQL и статические результаты — [[quality-gates]], scope — [[final-audit]].
+- [x] Выполнить короткий UI-smoke агента и внести его проверенные результаты в канонические документы: выпуск 250/аудит 254, первая карточка и открытый gate, две payroll-команды с одной записью и событиями 1/0, отдельная final acceptance и повторное чтение. На входе сверки 28 сентября совпали 22/22 hashes; финальная партия подготовлена API/SQL, полный 250-card UI lifecycle не заявляется. Источники агента/пользователя/исторического CI разделены — [[final-audit]].
+- [x] Подготовить итоговую сверку всех 22 пунктов DoD и анализ влияния FA-03. Рекомендация — оставить этап 12 и roadmap открытыми; сам вывод не является закрытием.
+- [ ] FA-03: связать выбранный состав текущего кандидата с точным commit и получить недостающие семь обязательных CI checks с raw evidence. Минимум — один штатный CI; подтверждённые unit/API/UI-smoke отдельно не повторять. Причины и состав — [[final-audit#FA-03 — выбранная версия и минимальные дальнейшие проверки]]. Commit/push/CI dispatch в этой документационной задаче не выполняются.
+- [ ] Отдельно принять решение о закрытии по полному DoD, сохранив границу исходников и опубликованного `1195892…`. Если готовность включает новый hosted runtime, нужны его release/health/logging evidence. FA-05 явно остаётся непроверенным; этап 12 и roadmap открыты.
+
+Rollback drill остаётся непроверенным. Его нельзя закрыть наличием workflow или повторным запуском того же digest; для отдельной проверки нужен предыдущий совместимый image и разрешение на соответствующие внешние действия.
 
 ## Maintenance
 

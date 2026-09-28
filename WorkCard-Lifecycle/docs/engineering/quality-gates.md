@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 23
+version: 29
 owner: engineering
-updated: 2026-09-17
+updated: 2026-09-28
 ---
 
 # Quality Gates
@@ -27,11 +27,76 @@ pnpm check
 
 Каталог `docs/` исключён из Prettier: governed documentation имеет собственную metadata/link проверку через `project-docs-auditor` и обязательный semantic pass. Корневые README/Home и прочие Markdown вне исключённых каталогов продолжают участвовать в formatter gate.
 
-## Первый публичный deployment — подготовка 2026-09-17
+## Техническое закрытие FA-01/02 — 2026-09-27
+
+Локальные проверки относятся к HEAD `4e813f5a9641abe3068d1dfc544399d557028316` **плюс изменения рабочего дерева этой задачи**, а не к опубликованному image или новому commit. Исходный снимок и task diff, исключающий предшествующие изменения, сохранены локально; публично доступны [сводка и ограничения](../testing/fa-0102-evidence.md) и [индекс hashes](../testing/evidence/fa-0102-summary.json). Raw-архивы с локальными путями и состоянием среды не входят в Git-кандидат; сводка не заменяет их при независимой проверке. FA-01/02 закрыты по коду и свежим результатам; этап 12, roadmap и полный DoD остаются открытыми до отдельного решения о выбранной версии.
+
+Окружение: Windows, bundled Node `24.19.0`, Vitest `4.1.11`, новая PostgreSQL `18.6` в отдельном временном каталоге на loopback, SCRAM. Перед/после DB runs проверены точные directory/PID/port/server version и созданные DB/roles; inherited DB environment очищен. Quality harness использует собственные случайные `q9_*` DB; integration — отдельные non-superuser owner/runtime роли. Рабочая/публичная БД не использовалась. После проверок собственный cluster остановлен через `pg_ctl -D` и удалены только его данные/credentials; raw cleanup-отчёт сохранён локально. Первая подготовка initdb не прошла из-за кириллицы пути бинарников; использована локальная ASCII temp-копия того же PG18.6 без загрузки/изменения инфраструктуры. Setup notes сохранены в том же локальном архиве; [публичная сводка](../testing/fa-0102-evidence.md#Локальные-тесты) не раскрывает пути или PID.
+
+| Gate | Команда / область | Фактический результат |
+|---|---|---|
+| Typed audit unit | `vitest run apps/api/src/audit-event.test.ts` | **85/85 PASS**, [сводка результатов](../testing/fa-0102-evidence.md#Локальные-тесты); все 12 event types, обязательные поля/типы/identity, release IDs/count, final version |
+| Existing API unit | `vitest run apps/api/src --exclude '**/workflow.integration.test.ts' --exclude '**/audit-event.test.ts' --maxWorkers=1` | **69/69 PASS**, [сводка результатов](../testing/fa-0102-evidence.md#Локальные-тесты) |
+| PostgreSQL faults/negatives | `vitest run --config quality/vitest.config.ts quality/transactions.test.ts quality/audit-invariants.test.ts quality/negative-workflow.test.ts --maxWorkers=1 --no-file-parallelism` | **14/14 PASS**: transactions 2, audit invariants 6, key negatives 6; [сводка результатов](../testing/fa-0102-evidence.md#Локальные-тесты) |
+| Existing API/PostgreSQL regression | Из `apps/api`: `vitest run src/workflow.integration.test.ts --testNamePattern '^(?!.*T-API-DEMO-RETENTION)' --maxWorkers=1 --no-file-parallelism` | **5 PASS, 1 intentionally excluded** retention/reset вне scope; [сводка результатов](../testing/fa-0102-evidence.md#Локальные-тесты). 250/254 release, 60+52, concurrency, first/final acceptance, payroll, read-back и compact HTTP; browser не запускался |
+| Static / API build | Scoped Prettier + ESLint шести TS-файлов; `tsc -p apps/api/tsconfig.json --noEmit`; `tsc -p tsconfig.quality.json --noEmit`; `tsc -p apps/api/tsconfig.build.json` | **PASS**; прямые локальные Node entrypoints из `node_modules`, без изменения manifests/lockfile/dependencies |
+| Strict docs / semantic / task diff | `project-docs-auditor --fail-on-warning`; смысловая сверка и diff относительно снимка до задачи | Финальный результат записан в локальном checks.md; публично описана [применимость свидетельств](../testing/fa-0102-evidence.md#Применимость-hashes) |
+
+В техническом продолжении не запускались браузерное демо, полный E2E, полный `pnpm check`/CI, container/security/performance/release gates; reset рабочих окружений, deployment, cloud, commit/push/publication не выполнялись. Rollback drill остаётся непроверенным. Опубликованный runtime не обновлялся; прежнее подтверждение пользователя без SHA/окружения не распространяется на эти изменения. Следующий отдельный UI-smoke выполнил этот целевой ручной пункт. Его результаты и границы приведены ниже; обязательные gates выбранной версии остаются предметом FA-03.
+
+## UI-smoke агента — 2026-09-27, сверка артефактов 2026-09-28
+
+Источник — локальные report.md, web.json, семь DOM-снимков и шесть скриншотов; [публичная сводка UI-smoke](../testing/fa-0102-evidence.md#UI-smoke) сохраняет результаты и границы. API из исходников через tsx, Vite production build по отчёту, отдельная disposable PostgreSQL 18.6 на loopback. Это действия агента через Computer Use после разрешения пользователя. Историческое сообщение пользователя без SHA/окружения и прежние CI/release PASS учитываются отдельно.
+
+| Проверка | Результат сохранённого UI-smoke |
+|---|---|
+| Создание/выпуск через UI | 112 изделий → 3 комплекта → 112/112/26 карточек; 250/250; повторный выпуск недоступен |
+| Аудит выпуска | UI: 254 ожидаемых/фактических/уникальных событий; read-only SQL: receipt.event_count = actual events = 254 |
+| Первая карточка через UI | Назначена, начата, завершена, принята БТК; CLOSED, gate открыт; SQL card version 5 и audit versions 1–5 |
+| Payroll из двух вкладок | Две разные последовательные команды; одна запись, ответы 201/200, совпадающий payrollRecord, события 1/0. Независимый DB read-back описан в [сводке UI/SQL](../testing/fa-0102-evidence.md#UI-smoke); одновременная гонка не доказана |
+| Отдельная финальная приёмка | UI приёмка SMOKE-READY и сохранность после повторного открытия; SQL FINAL_ACCEPTED, batch/result/event versions 3/3/3 и одно событие |
+| Console | 0 warn/error в двух проверенных вкладках; [сводка](../testing/fa-0102-evidence.md#UI-smoke) |
+
+SMOKE-READY создана/выпущена API, 250 CLOSED и допуски подготовлены owner SQL; эти переходы не считаются UI lifecycle. Кнопки активировались клавиатурой Enter/Space из-за неработавших мышиных действий инструмента. Полный desktop/mobile/mouse regression, полный E2E и rollback drill не заявляются.
+
+Offline сверка в этой задаче: 22/22 hashes предыдущего `task-files.json` совпали на входе; raw unit/DB результаты и DOM/SQL согласованы, исходники не изменены. `web.json` не содержит digest web bundle/raw build log; 22 hashes не являются полным fingerprint checkout времени smoke. [Сводка применимости](../testing/fa-0102-evidence.md#Применимость-hashes) отделена от нового выполнения тестов. Доказательство достаточно для указанного узкого smoke, но не для общего CI/clean-container gate. Повтор этого smoke на той же версии и отдельный ручной 250-card проход не требуются.
+
+## Остаток FA-03 и проверка документации — 2026-09-28
+
+[[final-audit#FA-03 — выбранная версия и минимальные дальнейшие проверки|Анализ влияния FA-03]] фиксирует отсутствующее evidence текущего кандидата: полный `quality`, новый `container`/image scan, `security`, обе browser matrix entries, `performance` и `release_iac`. Общий audit write path и состав приложения изменились, browser/release helpers новее прежнего release source; dependencies/UI/migrations сохранены. Минимум — один штатный CI выбранного commit с точной привязкой к проверенному составу. Его обязательные семь checks не отключаются; отдельно повторять подтверждённые локальные tests, UI-smoke и hosted recovery ради документации не нужно. Новый hosted runtime требует собственного release binding и предусмотренных observations; deployment сейчас не выполняется.
+
+Снимок документов до правок, SHA-256, diff только документационной задачи и checks.md сохранены локально отдельно от исходного dirty tree. Публичный [индекс hashes](../testing/evidence/fa-0102-summary.json) содержит цепочку семи документов и digests исходных отчётов; [сводка применимости](../testing/fa-0102-evidence.md#Применимость-hashes) отделяет эту задачу от последующей подготовки кандидата. Критерии DoD не изменены; этап 12/roadmap открыты, FA-05 непроверен.
+
+## Исходный финальный аудит документации — 2026-09-27
+
+[[final-audit]] сверил 37 AC, scope/DoD, код и фактические assertions без запуска приложения, контейнеров, браузера, E2E, reset или облачных операций. Исходное dirty tree сохранено отдельно; документационные правки не являются новым CI PASS.
+
+- Source/image — `1195892f15f2f240dd04f39e8388d6bb8802d9a7`; HEAD — `4e813f5a9641abe3068d1dfc544399d557028316`. На начало статического аудита runtime `apps/`, `packages/`, migrations и build/lock конфигурация совпадали, но browser harness/release helpers менялись. Последующее исправление FA-01/02 ниже меняет приложение; прежний PASS к нему не применяется. Доказательства привязаны к собственным executor SHA и окружениям, а не автоматически ко всему checkout.
+- Offline повторная проверка сохранённых SHA256: 26/26 файлов совпали, hash-chain пяти deployment records — 5/5. Включены manifest, image scan, release archive, четыре SQL migrations, deployment/recovery reports и supplemental receipts. Это чтение локальных файлов, не новый download или повтор сценариев.
+- Сохранённый API snapshot `portfolio-packaging/external-link-verification.json` датирован 27 сентября; `main-ci-current.json` относится к 17 сентября и другому SHA (`dfd1810…`). Название файла не задаёт актуальность. Запись handoff о CI текущего HEAD не подменяет raw job/API evidence, которого для этих runs при аудите не найдено.
+- Recovery canonical/compact выполнялись на runner origin `http://127.0.0.1:3001` с Neon recovery DB, а production smoke — на Render. Первые failed recovery/compact attempts не считаются PASS.
+- Утверждения о scheduled reset 26/27 сентября и текущем Free сохранены как ранее зафиксированные наблюдения: отдельного локального API snapshot scheduled runs в этом аудите не найдено, online состояние не перепроверялось. Manual reset 19 сентября имеет сохранённый API result.
+- Strict audit до правок: 61 документ, 0 errors/warnings; после правок: 63 документа, 0 errors/warnings. Дополнительно проверены 67 локальных ссылок README/HTML, ошибок нет; 36 внешних URL не запрашивались. Scoped Prettier README/Home прошёл. Semantic pass включает `pg`/SQL, payroll, audit guarantees, startup env, scope и статусы этапов.
+
+На исходном статическом срезе полный DoD не был объявлен: FA-01/02 фиксировали недоказанные audit guarantees и полноту отрицательных ветвей; пользователь позднее подтвердил успешную ручную проверку демо (сообщение получено 2026-09-27, SHA/окружение не указаны). Это user-reported результат, не новый CI/E2E PASS. Rollback drill по-прежнему не проверен. Локальный отчёт и diff только этого аудита находятся в ignored `.quality-results/final-audit-20260927/`.
+
+## Текущий hosted release gate — 2026-09-27
+
+Этап 10 закрыт на 7/7 для source SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` и immutable digest `sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057`. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) прошёл все семь jobs: exact image, отдельный Neon staging, canonical staging browser, production owner, Render persistent/live digest и public smoke. [Release assets](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) сохраняют пять hash-chained records, staging/Render reports, proxy observations и supplemental результаты. Manual reset 19 сентября и scheduled reset 27 сентября успешны; сетевой сбой scheduled resolver 26 сентября остановился до owner job.
+
+[Recovery run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) прошёл четыре jobs на том же образе и существующей ранее чисто восстановленной staging БД. Прямое время PostgreSQL дало возраст `693304,27` секунды (`192,58` часа); до reset live/ready/demo-users ответили `200/503/503`. После owner verify/reset возраст стал `1,80` секунды; полный canonical smoke прошёл 15 проверок, включая 250 закрытых карточек, audit 254/254, payroll read-back и rate-limit `429`. Четыре обезличенных отчёта и supplemental receipt опубликованы с SHA256; шесть файлов повторно скачаны и сверены. Первый неудачный recovery browser от 19 сентября остаётся исторической попыткой, а не PASS.
+
+[Hosted compact run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) на том же digest прошёл 6-card desktop lifecycle через UI без DB/owner credentials в browser job. Только в recovery-БД owner добавил отдельный synthetic паспорт; после browser отдельный owner job сбросил mutable данные, удалил этот паспорт и подтвердил сохранность canonical fixtures. Два обезличенных отчёта, supplemental receipt и SHA256 опубликованы в том же release; все четыре assets повторно скачаны и совпали побайтно. Ранее один compact run пропустил browser job из-за условия `needs`, второй честно завершился на несоответствии canonical 250-card fixture; ни один не выдан за PASS.
+
+Локальные hosted reports фиксируют TLS/role и cancellation/race; предыдущий supplemental receipt сохраняет выбранные результаты cancellation, proxy/logging и cold-start наблюдений, а подробные raw reports остаются в ignored `.quality-results`. Два Neon проекта и Render service проверены как Free 27 сентября; плата вне free-квот не обещается. Совместимого предыдущего image нет, поэтому rollback drill непроверен и не включён в квалификацию. Финальный strict docs audit и semantic review сверили текущие утверждения с этими границами.
+
+## Историческая подготовка первого публичного deployment — 2026-09-17
+
+Следующий раздел фиксирует состояние подготовки на указанную дату; его незавершённые prerequisites не описывают текущий релиз.
 
 Пользователь разрешил scoped commit/push/PR/merge после обязательных checks, один Render Free image service, два отдельных Neon Free PG18 projects, необходимые secrets/environments, публикацию GHCR, owner operations и hosted qualification. Платные планы/overage, GCP apply/destroy и удаление чужих данных запрещены. Разрешение не является свидетельством выполненного deployment.
 
-Фактический Git root — родительский каталог `WorkCard-Lifecycle`, remote — `AI-shoks/WorkCard-Lifecycle`; подготовка ведётся в `codex/render-neon-first-deployment`. Посторонние `Codex Workflow/`, соседние portfolio artifacts и ранее подготовленные Terraform HCL/scripts/backend templates сохраняются вне scoped commit.
+Фактический Git root — родительский каталог `WorkCard-Lifecycle`, remote — `AI-shoks/WorkCard-Lifecycle`; подготовка ведётся в `codex/render-neon-first-deployment`. Посторонние рабочие документы, соседние portfolio artifacts и ранее подготовленные Terraform HCL/scripts/backend templates сохраняются вне scoped commit.
 
 - GitHub: доступ к публичному repository подтверждён; созданы `staging-owner`, `staging-runtime`, `production-owner`, `production` с deployment branch policy только для `main`. Разные runtime-role passwords установлены только в owner environments, staging session secret — только в `staging-runtime`; остальные bindings ожидают созданных targets, см. [[environments]].
 - Исторический Render preflight: `My Workspace` (`tea-d8q4f1cvikkc73al6vq0`), Hobby, `No card on file`, начисления/прогноз `$0`, использование `0.75/750` instance hours и `0/5 GB` bandwidth были подтверждены в Billing. Пользователь затем выбрал отдельный аккаунт для WorkCard; прежний workspace и его посторонние services не используются и не изменялись.
@@ -82,7 +147,7 @@ pnpm check
 
 Текущие container build/startup и Trivy image scan **недоступны**: установленный Docker Desktop не смог поднять engine из-за ошибки переименования stale `sailor-ingest.sock`/доступа к файлу. Factory reset, удаление Docker state и изменение чужих ресурсов не выполнялись. Реальная PostgreSQL на host не заменяет обязательный container gate; сохранённые ниже старые image scans не относятся к текущему diff.
 
-Полный formatter gate не зелёный из-за трёх существовавших до задачи untracked документов в `Codex Workflow/`: `00 Codex Workflow.md`, `IMPLEMENTATION-BOARD.md`, `templates/TASK-CAPTURE.md`. Посторонние файлы не изменяются и не исключаются из gate ради результата. Поэтому `pnpm check` не объявляется полностью успешным даже при отдельных успешных lint/typecheck/tests/build.
+Полный formatter gate не зелёный из-за трёх существовавших до задачи untracked рабочих документов вне проекта. Посторонние файлы не изменяются и не исключаются из gate ради результата. Поэтому `pnpm check` не объявляется полностью успешным даже при отдельных успешных lint/typecheck/tests/build.
 
 Структурный audit после обновления связанных документов: **59 документов, 0 errors, 0 warnings**, `--fail-on-warning`. Semantic pass устранил противоречия между текущими deployment/environments/security/CI/project docs и прежним GCP выбором: ADR-0007/0008 имеют reciprocal supersession к ADR-0009; GCP runbook, результаты и IaC остаются историческими. Отсутствие structural findings само по себе не доказывает поведение приложения.
 
@@ -118,7 +183,7 @@ Docker containerd store возвращает локальный image ID `sha256
 
 ## Локальная готовность при Pending Free Trial — 2026-09-08
 
-Проверяется текущее незакоммиченное рабочее дерево ветки `codex/stage-10-task-5-foundation-plan`. При старте уже были 18 изменённых tracked files в границах задачи (включая корневой `ci.yml`) и четыре untracked foundation/backend/preflight files внутри WorkCard-Lifecycle; staged diff был пуст. Существующие изменения сохранены, соседний `WorkCard-Project-Dashboard-Site` и social preview не изменялись. Этот проход добавляет локальные исправления safety/preflight и [[deployment|чек-лист развёртывания, бюджетов и семи суток]], но не повышает этап 10 выше 4/7.
+Проверяется текущее незакоммиченное рабочее дерево ветки `codex/stage-10-task-5-foundation-plan`. При старте уже были 18 изменённых tracked files в границах задачи (включая корневой `ci.yml`) и четыре untracked foundation/backend/preflight files внутри WorkCard-Lifecycle; staged diff был пуст. Существующие изменения сохранены, соседний проект и внешний иллюстративный файл не изменялись. Этот проход добавляет локальные исправления safety/preflight и [[deployment|чек-лист развёртывания, бюджетов и семи суток]], но не повышает этап 10 выше 4/7.
 
 Системный Node в PATH — `24.18.0`, ниже package engines. Использован уже существующий bundled Node `24.19.0` (разрешён `>=24.19.0 <25`) и pnpm `11.19.0`; глобальный PATH, `.node-version` (`24.20.0` для CI), lockfile и зависимости не менялись. Terraform `1.16.1`, cached provider `7.45.0`, actionlint `1.7.12`, PostgreSQL `18.6` и Chromium найдены локально. Установок и скачивания toolchain не было.
 
@@ -160,7 +225,7 @@ Terraform review выполнялся в новой ignored копии толь�
 | Free Trial Pending, реальные inputs/approvals отсутствуют | Billing eligibility/currency, organization/folder, project IDs, contacts, approved cost/lifetime, IAM/quotas и защищённый существующий GCS backend | После активации подтвердить Billing Overview, заполнить и рассмотреть inputs по [[deployment]]; отсутствие organization/folder или state bucket требует отдельного решения, а не выдуманного ID |
 | Нет provisioned WIF/registry/workloads и exact release image | GitHub settings, publication, hosted staging, production promotion/rollback, proxy/log/socket/reset observations | Последовательно выполнить отдельно разрешённые foundation, release-image, staging и production фазы по [[deployment-gcp-history]] с фактическими digest/revision/job evidence |
 
-Python не в PATH, но strict docs audit работает через существующий `C:/Users/artem/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe`. Для локального `pnpm check` достаточно в отдельной PowerShell-сессии временно добавить `C:/Users/artem/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin` в начало PATH; системную версию менять не требуется. Terraform доступен по `C:/Users/artem/AppData/Local/Temp/workcard-terraform-1.16.1/terraform.exe`; наличие temporary binary следует перепроверять перед новым проходом.
+Python не был в PATH: strict docs audit выполнен существующим локальным bundled runtime. Для локального `pnpm check` использовался bundled Node через PATH отдельной PowerShell-сессии без смены системной версии. Terraform был доступен как временная локальная копия; её наличие и версию нужно проверять перед новым проходом. Персональные абсолютные пути в публичной документации не сохраняются.
 
 Google Cloud и GitHub settings не изменялись; `terraform apply/destroy`, remote backend initialization, release/deploy workflows, публикация image и commit/push не выполнялись. Следующий шаг после Pending — read-only подтверждение Free trial account, currency, credits и даты окончания в Billing Overview; это не разрешение на provisioning.
 
@@ -304,7 +369,7 @@ Frontend coverage включает типизированные ответы и 
 
 Сопоставлены diff и тесты с [[acceptance-criteria]], [[mvp-scope]], [[roles-permissions]], [[glossary]], [[transactions-concurrency]], [[api-contracts]] и [[definition-of-done]]. Подтверждены отдельные first-article / per-card / final-batch действия, `112 → 3 → 250`, operation-scoped нормы, UUID без идентичности физической детали, backend permissions, атомарные audit/receipts и синтетический payroll без денег. Browser setup содержит только справочники; production mutations идут через UI. Новые fault fixtures не подменяют результат browser flow. Успешные API схемы сохранены, ответ 429 использует ранее принятый `TOO_MANY_REQUESTS`.
 
-При проверке реализации различались прежние 5 integration tests, новые PostgreSQL и browser suites, compact и canonical, локальные результаты и последующий CI implementation SHA. Негативная приёмка, переделка, переназначение, deployment и этапы 10–12 не добавлены. Соседние пользовательские dashboard/Home/Obsidian/site изменения не входили в implementation commit этапа 9. Семантических противоречий в затронутых канонических документах не найдено; структурный audit учитывается отдельно.
+При проверке реализации различались прежние 5 integration tests, новые PostgreSQL и browser suites, compact и canonical, локальные результаты и последующий CI implementation SHA. Негативная приёмка, переделка, переназначение, deployment и этапы 10–12 не добавлены. Соседние пользовательские изменения документации и сайта не входили в implementation commit этапа 9. Семантических противоречий в затронутых канонических документах не найдено; структурный audit учитывается отдельно.
 
 ## Базовые проверки release orchestration этапа 10 — 2026-09-06
 

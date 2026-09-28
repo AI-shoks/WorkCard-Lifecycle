@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.technology-stack
 status: accepted
-version: 4
+version: 5
 owner: architecture
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Technology Stack
@@ -29,7 +29,7 @@ updated: 2026-09-17
 | Backend | Fastify `5`, TypeBox JSON Schema, `@fastify/swagger` | модульный монолит; маршруты не содержат доменные правила |
 | Frontend | React `19.2`, Vite `8`, собственный типизированный router поверх History API и явные resource/command states | SPA с русским производственным UI; server state перечитывается после command response, до сообщения об успехе |
 | БД | PostgreSQL `18` | текущая модель состояния + append-only audit; event sourcing не используется |
-| Доступ к данным | архитектурный выбор ADR-0001 — Drizzle ORM + `node-postgres`; фактический runtime — `pg` и параметризованный SQL | SQL migrations в Git; Drizzle пока не подключён, ORM-слой не заявляется реализованным |
+| Доступ к данным | `pg` (`node-postgres`) и параметризованный SQL по [[0010-pg-sql-and-local-payroll-service|ADR-0010]] | SQL migrations в Git; Drizzle и ORM-слой отсутствуют |
 | Контракты | TypeBox-схемы в `packages/contracts`, OpenAPI 3.1 | runtime validation и TS-типы строятся из одного определения |
 | Unit/API tests | Vitest, Fastify `inject` | быстрые domain/unit и HTTP contract tests |
 | DB integration | Vitest + PostgreSQL container | реальные constraints, транзакции, конкурентность и миграции; SQLite не подменяет PostgreSQL |
@@ -51,14 +51,14 @@ Hosted PostgreSQL patch управляется Neon; фактическая ве
 
 - Все изменяющие сценарии требуют общей транзакции PostgreSQL между предметным состоянием и audit events.
 - Масштаб MVP не оправдывает сеть между сервисами, broker, saga или distributed tracing.
-- Модули `demo-auth`, `passports`, `batches`, `work-cards`, `audit` и `payroll` имеют явные границы и могут тестироваться независимо внутри одного процесса.
+- Session/security выделены в отдельные модули; предметные команды `passports`, `batches`, `work-cards`, `audit` и `payroll` сосредоточены в `workflow-service.ts`. Это логические области одного application service, без отдельных repository/port/adapter слоёв.
 - Отделение frontend от API сохраняется на уровне workspace и контрактов, но production runtime остаётся одним origin.
 
-## Почему PostgreSQL и Drizzle
+## Почему PostgreSQL и явный SQL
 
-PostgreSQL даёт транзакции, row-level locks, `jsonb`, частичные/уникальные индексы и стабильную пятилетнюю политику поддержки major-линий. В архитектурном выборе ADR-0001 Drizzle рассматривается как слой типизированных запросов, который не скрывает SQL и допускает точечные запросы, необходимые [[transactions-concurrency|стратегии конкурентности]]. Схема и миграции остаются проверяемым SQL, а не неявным runtime-sync.
+PostgreSQL даёт транзакции, row-level locks, `jsonb` и частичные/уникальные индексы. Параметризованный SQL напрямую выражает [[transactions-concurrency|стратегию конкурентности]]. Схема и миграции остаются проверяемыми SQL-файлами; runtime-sync схемы отсутствует.
 
-Фактическая реализация backend vertical slice использует пакет `pg` из `apps/api/package.json` и параметризованные `Pool`/`PoolClient.query` в `apps/api/src/workflow-service.ts`, включая явные транзакции, locks и version predicates. Drizzle не установлен и ORM-слой не реализован. Это различие между принятым архитектурным выбором и текущим кодом фиксируется явно; историческое решение ADR-0001 не изменяется и наличие ORM не выводится из статуса завершения этапа 7.
+Реализация backend vertical slice использует пакет `pg` из `apps/api/package.json` и параметризованные `Pool`/`PoolClient.query` в `apps/api/src/workflow-service.ts`, включая явные транзакции, locks и version predicates. [[0010-pg-sql-and-local-payroll-service|ADR-0010]] принимает эту реализацию и заменяет первоначальный выбор Drizzle в ADR-0001 и payroll port/adapter в ADR-0006; body исторических решений сохранены. Доказательства успешного выполнения проверок принадлежат [[quality-gates]], а не выводятся из наличия кода.
 
 ## Осознанно не выбрано
 
@@ -86,8 +86,7 @@ PostgreSQL даёт транзакции, row-level locks, `jsonb`, частич
 - [React Versions](https://react.dev/versions) — текущая стабильная ветка React 19.2.
 - [Vite Releases](https://vite.dev/releases) — поддерживаемая ветка Vite 8 и политика обновлений.
 - [PostgreSQL Versioning](https://www.postgresql.org/support/versioning/) — PostgreSQL 18 поддерживается до 2030 года.
-- [Drizzle transactions](https://orm.drizzle.team/docs/transactions) — явная transaction API и PostgreSQL isolation options.
 
 ## Критерий принятия
 
-Решение принято после согласования [[system-context]], [[er-model]], [[api-contracts]], [[transactions-concurrency]], [[audit-log-design]], [[mock-integrations]], [[security-baseline]] и ADR `0001`–`0006`. Наличие Docker или package manifest само по себе не доказывает готовность стека.
+Первоначальное решение принято после согласования [[system-context]], [[er-model]], [[api-contracts]], [[transactions-concurrency]], [[audit-log-design]], [[mock-integrations]], [[security-baseline]] и ADR `0001`–`0006`; текущие SQL/payroll границы уточнены ADR-0010. Наличие Docker или package manifest само по себе не доказывает готовность стека.

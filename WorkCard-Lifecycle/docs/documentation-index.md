@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 23
+version: 28
 owner: project
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Documentation Index
@@ -45,7 +45,7 @@ docs/
 
 ## Текущая контрольная точка
 
-**Этапы 1–9 закрыты; этап 10 остаётся в работе на 4/7.** Текущий [[0009-render-free-neon-free-release|ADR-0009]] задаёт Render Free + Neon Free, public GHCR, temporary staging, owner maintenance и 26h fail-closed. GCP решения заменены с сохранением [[deployment-gcp-history|исторического runbook]] и Terraform. Владелец разрешил scoped Git/cloud/DB действия для первого deployment; read-only preflight начат, GitHub environments созданы по [[environments]]. Локальные проверки не доказывают ещё не завершённую hosted qualification. Статус — [[deployment]] и [[quality-gates]].
+**Этапы 1–11 закрыты на 27 сентября 2026 года; FA-01/02 этапа 12 закрыты локально в текущем незакоммиченном дереве. Этап 12 и roadmap открыты до отдельного решения по полному DoD и квалификации выбранной версии — [[final-audit]].** Ручное подтверждение пользователя без SHA/окружения и исторические release PASS не переносятся на изменённый код; публичный образ не менялся. Упаковка: [README и схема](../README.md), [[demo-script|короткий показ]], [[screenshots|реальные экраны]], [[engineering-retrospective|решения и ограничения]]. Релиз сохраняет исторические 7/7 по hosted evidence. [[0009-render-free-neon-free-release|ADR-0009]] задаёт Render Free + Neon Free, public GHCR, temporary staging, owner maintenance и 26h fail-closed. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053), [recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) и [recovery compact с очисткой](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) подтверждают staging/production smoke и recovery того же digest; versioned assets — в [[deployment]]. GCP решения сохранены как [[deployment-gcp-history|история]]. Rollback drill непроверен без предыдущего совместимого образа.
 
 Этап 9 зафиксирован implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc). На 2026-09-05 через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): все 6 обязательных jobs успешны в каждом запуске для этого SHA. Автоматизация качества описана в [[test-strategy]], локальные результаты и полная матрица CI — в [[quality-gates]].
 

@@ -1,88 +1,98 @@
-# Production Work Card Workflow
+# WorkCard-Lifecycle — жизненный цикл производственной карточки
 
-Независимый portfolio case study цифрового жизненного цикла производственной рабочей карточки. Предметная основа опирается на личный производственный опыт, интервью с бывшим мастером и обезличенную физическую карточку; точные demo-данные и TO-BE-решения синтетические.
+**Независимый портфолио-кейс:** от бумажного задания и правил приёмки до работающего веб-приложения с ролевым процессом, PostgreSQL и публичным демо. Предметная основа — личный производственный опыт автора, ретроспективное интервью с бывшим мастером и обезличенная рабочая карточка. Данные и цифровой процесс синтетические; внедрения на заводе и измеренного производственного эффекта нет.
 
-## Текущий статус
+[Открыть демо](https://work-card-demo.onrender.com) · [Показ за 5–7 минут](docs/portfolio/demo-script.md#короткий-показ) · [Экраны](docs/portfolio/screenshots.md) · [Ретроспектива](docs/portfolio/engineering-retrospective.md)
 
-**На 17 сентября 2026 года этапы 1–9 закрыты; этап 10 «Релиз» остаётся в работе на 4/7 до фактической hosted qualification. Целевой профиль — один Render Free service + отдельные Neon Free PostgreSQL 18 projects, публичный GHCR image и стоимость $0 при сохранении free-квот.**
+## Задача и моя роль
 
-Локально реализованы код, конфигурация, owner maintenance и workflows по [ADR-0009](docs/architecture/adr/0009-render-free-neon-free-release.md). [Deployment](docs/release/deployment.md) описывает первый запуск, ограничения сна/квот и clean synthetic recovery; [Quality gates](docs/engineering/quality-gates.md) отделяет фактически выполненные проверки от будущего hosted evidence. Владелец разрешил scoped commit/push, PR и merge после обязательных gates, публикацию GHCR, один Render Free service, два Neon Free projects и необходимые secrets/owner operations только для установленных ресурсов этого проекта. Read-only preflight аккаунтов начат; создание ресурсов, первый работающий deployment и hosted qualification ещё должны быть подтверждены release records. Платные опции, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены.
+Сделать явными ответственность и условия перехода задания: кто выпускает карточки, кто назначает и фиксирует работу, когда БТК разрешает обработку партии и чем закрытие одной карточки отличается от приёмки всей партии. История должна объяснять результат действия, а повтор или конкурентный запрос — не создавать дубликат.
 
-- Этапы 1–4 завершены: product scope, доменная модель, требования и 14-шаговый UX-прототип согласованы.
-- Этап 5 завершён: приняты архитектурные артефакты и ADR-0001–ADR-0006.
-- Этап 6 завершён: создан воспроизводимый инженерный фундамент с pnpm workspace, Fastify, React, PostgreSQL bootstrap, Docker Compose и CI.
-- Backend vertical slice этапа 7 завершён implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1): trusted demo-session, read projections, все девять команд, optimistic concurrency, транзакционный audit, отдельная финальная приёмка и mock payroll.
-- Для implementation SHA этапа 7 локально подтверждены format, lint, typecheck, 11 обычных тестов, 5 PostgreSQL integration tests, production build, миграции `0001`–`0003`, повторный seed/runtime verification и clean-container.
-- [Push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041) этого SHA полностью зелёные: `Code and database quality` и `Clean container startup` завершены успешно.
-- В текущем checkout реализован frontend vertical slice этапа 8: русские ролевые экраны `S-01`–`S-07`, серверная demo-session, создание и выпуск, назначение и ведение карточек, БТК, журнал действий и тестовый учёт нормо-часов. Команды проходят через реальный API, а успех требует ответа сервера и полного контрольного чтения.
-- Исторический результат этапа 8 на 5 сентября 2026 года: реализация прошла `pnpm check` с production build, `157` frontend tests и `9` обычных API tests; отдельно прошли `5/5` реальных PostgreSQL integration tests. Установка с frozen lockfile и dependency audit успешны; после заключительной установки frontend suite повторно дал `157/157`.
-- Полный браузерный процесс выполнен на итоговой production SPA и новой чистой PostgreSQL `18.6`: выпуск `3/250`, все `250` lifecycle, отдельная финальная приёмка, полный audit выпуска `254` и единственная payroll-запись с read-back после обновления. Производственные состояния не подставлялись через mocks, API shortcuts или SQL.
-- Runtime UI проверен на desktop/mobile: `16` проверок экранов и защищённого доступа, без утечек технических кодов, сломанных accessibility-ссылок и горизонтальных переполнений.
-- Этап 8 завершён implementation SHA `b00ff294a7b7ce1e09379c088969d9a02bd033bf`: локальный clean-container без кэша с новым томом и [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130) / [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414) подтвердили `quality` и `container`. В среде той исторической проверки Docker был доступен; это не утверждение о наличии Docker в текущем shell.
-- Этап 9 завершён implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc): реальные Playwright/SPA/API/PostgreSQL проверки, fault injection транзакций и миграций, security gates и воспроизводимый performance profile. Compact (6 карточек) и canonical (250 карточек) проверяются отдельно. Через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)`, `performance` — 6/6 успешных jobs в каждом запуске для этого SHA. Локальные результаты этапа 9: `157` frontend, `10` обычных API, `5` PostgreSQL integration и `10` новых PostgreSQL regression tests — PASS. Подробности — в [Quality gates](docs/engineering/quality-gates.md), [backlog](docs/project/backlog.md) и [Definition of Done](docs/project/definition-of-done.md).
-- Текущий release contract: build once `linux/amd64` → public GHCR → exact digest через temporary staging Docker в один Render Free production service. Manual main-only release требует успешный CI того же SHA, Trivy, SQL checksums и versioned evidence.
-- Контракт требует отдельных Neon Free projects PostgreSQL 18 для production/staging; обычный CI использует disposable локальную БД. Direct TCP/TLS `verify-full` проверяет expected host/database; runtime SQL-role не получает owner privileges.
-- Owner CLI того же image выполняет bootstrap/reset/verify/release. DB maintenance/generation и shared/exclusive advisory barrier защищают reads, sessions и commands; через 26 часов без reset + verify API fail-closed. Reset не запускает seed; history посетителей не требуется для recovery.
-- `/health/live` и Docker/Render liveness не обращаются к БД, `/health/ready` отдельно проверяет DB/schema/gate. Сохраняются session/CSRF/Origin, DB budgets, SPA и nonroot image; реальные TLS/proxy/digest/cold-start наблюдения ещё требуют разрешённого hosted запуска.
-- Прежняя GCP подготовка и незакоммиченные foundation/backend additions сохранены как локальная история в [историческом runbook](docs/release/deployment-gcp-history.md) и [неактивном Terraform](infra/terraform/README.md). По репозиторию GCP deployment не выполнялся; наличие GCP ресурсов в аккаунтах сейчас не проверялось. Terraform HCL/scripts/templates не входят в текущую публикацию Render/Neon.
+Моя роль — автор кейса: исследование и границы задачи, модель предметной области, требования и критерии приёмки, русский ролевой UX, реализация frontend/backend, проверки и выпуск демонстрации. Работа прослеживается от [происхождения решений](docs/project/decision-provenance.md) через [требования](docs/requirements/requirements-traceability.md) к коду и [проверкам](docs/engineering/quality-gates.md). Интервью не выдаётся за формальное обследование предприятия; [позиционирование](docs/project/case-study-positioning.md) отделяет наблюдения от проектных решений.
 
-## Локальный запуск и браузерный сценарий
+## Реализованный процесс
 
-Из каталога `WorkCard-Lifecycle/` выполните:
+**ПДБ создаёт партию и выпускает комплекты → мастер назначает и ведёт работу → БТК принимает первую деталь и каждую карточку → БТК отдельно принимает завершённую партию.** Администратор просматривает журнал и создаёт тестовую запись нормо-часов закрытой карточки.
+
+- Партия содержит несколько комплектов по группам операций. Норма сохраняется снимком; карточка не является серийным номером физической детали.
+- Приёмка первой детали разрешает обработку только своего комплекта. Рабочий видит свои назначения; начало и завершение фиксирует мастер.
+- Финальная приёмка доступна после принятых первых деталей и закрытия всех обязательных карточек. Это отдельная неизменяемая запись БТК, а не автоматически вычисленный статус.
+- Тестовый учёт сохраняет нормо-часы один раз. Денежных расчётов и связи с бухгалтерией нет; этот учёт не является условием финальной приёмки.
+
+Канонический пример: **112 изделий → 3 комплекта (112 + 112 + 26) → 250 карточек**. Это заданный синтетический план демонстрации, а не универсальная формула производства. Распределение первого комплекта `1 + 59 + 52` даёт исполнителям 60 и 52 карточки без выдуманных диапазонов номеров деталей. [Команды](apps/api/src/workflow-service.ts) · [Данные примера](apps/api/src/demo-fixtures.ts).
+
+![Финальная приёмка партии: 112 изделий, 3 комплекта, 250 закрытых карточек](docs/portfolio/images/03-final-acceptance-desktop.png)
+
+Реальная SPA, локальный успешный браузерный проход от **17 сентября 2026 года**. Это исторический снимок, не текущие данные публичного сервиса. [Происхождение и остальные экраны](docs/portfolio/screenshots.md).
+
+## Архитектура
+
+```mermaid
+flowchart TB
+  User["Посетитель: подготовленная демонстрационная роль"]
+  subgraph Render["Один Render Free service · один Docker image"]
+    SPA["React + Vite · русские ролевые экраны"]
+    API["Fastify · сессия, права, Origin/CSRF · команды и чтения"]
+    SPA -->|"HTTP, один origin"| API
+  end
+  Contracts["Общие TypeScript / TypeBox контракты"] -.-> SPA
+  Contracts -.-> API
+  User --> SPA
+  API -->|"pg + SQL · TLS verify-full · runtime-роль"| DB
+  DB[("Neon PostgreSQL 18 · production<br/>состояние + результаты команд + аудит<br/>финальная приёмка + тестовые нормо-часы")]
+  Owner["Отдельный owner job · тот же image<br/>миграции / reset / verify"] --> DB
+  CI["GitHub Actions · CI → сборка → GHCR exact digest"] --> Render
+  CI --> Staging["Временный staging Docker + отдельный Neon project"]
+```
+
+Это модульный монолит: API раздаёт собранную SPA, PostgreSQL хранит текущее состояние, а аудит объясняет изменения. Запись нормо-часов находится в той же БД. Схема показывает реализованные компоненты: `pg` и SQL, без отдельного payroll-сервиса. [Код API](apps/api/src/app.ts) · [Контракты](packages/contracts/src/workflow.ts) · [Deployment](docs/release/deployment.md).
+
+| Решение                                                            | Зачем оно нужно                                                                      |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Одна транзакция для изменения, результата команды и аудита         | Ошибка записи не оставляет частично выполненное действие                             |
+| Версии агрегатов, блокировки строк и сохранённый результат команды | Конкурентное изменение получает конфликт, повтор доставки — прежний результат        |
+| Успех UI после ответа команды и контрольного чтения                | При потере ответа интерфейс перечитывает данные без автоматического повтора действия |
+| Полный серверный журнал массовой операции                          | Выпуск проверяется по всем 254 событиям: партия + 3 комплекта + 250 карточек         |
+| Раздельные runtime и owner, закрытие API при просроченном reset    | Браузер и сервер приложения не получают административные полномочия БД               |
+
+Подробности и цена решений — в [ретроспективе](docs/portfolio/engineering-retrospective.md). Подготовленные пользователи позволяют показать роли, но не заменяют персональную идентификацию, SSO или промышленную модель доступа.
+
+## Что проверено
+
+Ниже сохранённые результаты конкретных версий, а не новый прогон текущего рабочего дерева.
+
+| Доказательство                                                                                                                                                                     | Результат и граница                                                                                                                            |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| [CI релизного SHA](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35210700261)                                                                                        | 7 успешных jobs: код/БД, контейнер, безопасность, compact/canonical браузер, performance, release contract                                     |
+| [Публикация образа](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35211261430)                                                                                       | Одна сборка, публичное скачивание по digest; сохранённый Trivy scan без HIGH/CRITICAL на дату проверки                                         |
+| [Staging и публичное демо](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053)                                                                                | Реальный браузер → API → PostgreSQL: 250 закрытых карточек, отдельная финальная приёмка, 254 события выпуска, чтение той же записи нормо-часов |
+| [Recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) и [compact](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) | Полный и сокращённый процессы на recovery-БД; отказ API после реальных 192,58 часа без reset и восстановление после owner reset                |
+
+Релиз: source SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7`. [Manifest](docs/release/manifests/1195892f15f2f240dd04f39e8388d6bb8802d9a7.json) и [release assets](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) связывают образ и отчёты; [quality gates](docs/engineering/quality-gates.md) сохраняют историю, условия и неуспешные попытки. Число 254 относится только к событиям выпуска. **Rollback drill не проверен: предыдущего совместимого образа нет.**
+
+Первоначальный финальный аудит 27 сентября выполнен статически на checkout с HEAD `4e813f5a9641abe3068d1dfc544399d557028316` и локальными изменениями; приложение и тестовые сценарии при нём не запускались. Последующая работа закрыла FA-01/02 локально в текущем незакоммиченном дереве: добавлены проверки audit payload/version и доказательства существенных негативных сценариев, выполнены целевые unit/API/PostgreSQL проверки. [Отчёт аудита](docs/project/final-audit.md) отделяет эти результаты от исторического релиза и ручного подтверждения пользователя; публичный образ не менялся, полный DoD требует отдельного решения для выбранной версии.
+
+## Как открыть и показать
+
+1. Откройте [демо](https://work-card-demo.onrender.com) и дождитесь пробуждения сервиса.
+2. Выберите «Специалист ПДБ», затем «Новая партия»: паспорт показывает группы операций, количества карточек и нормы.
+3. Используйте [сценарий показа за 5–7 минут](docs/portfolio/demo-script.md#короткий-показ). Полный проход 250 карточек описан отдельно и не обещается за несколько минут.
+
+Демо общее для посетителей. Сброс изменений и сессий запланирован ежедневно; готовой завершённой партии может не быть. Бесплатный контур допускает сон, холодный старт и недоступность по квотам. При сбое расписания требуется обслуживание владельцем; после 26 часов без успешного reset API закрывается. Если демо недоступно, используйте [снимки экранов](docs/portfolio/screenshots.md) и сохранённые отчёты.
+
+Локально нужны Docker Desktop с Linux engine и свободные порты. Из каталога `WorkCard-Lifecycle`:
 
 ```powershell
 docker compose up --build --wait --wait-timeout 180
 docker compose run --rm --no-deps readiness
 ```
 
-После успешной отдельной проверки readiness откройте `http://localhost:3000/`. Вход выбирает подготовленного синтетического пользователя. Полные условия запуска и работы с БД приведены в [Local development](docs/engineering/local-development.md).
+После успешной readiness-проверки откройте [localhost:3000](http://localhost:3000/). Подготовка окружения, явный выбор env-файла для host-команд и диагностика — в [инструкции запуска](docs/engineering/local-development.md). Инструкции сверены с кодом и конфигурацией без запуска; команды не требуют удаления существующих томов.
 
-[Demo script](docs/portfolio/demo-script.md) описывает полный путь `112 → 3 комплекта → 250 карточек`, распределение `1 + 59 + 52`, отдельную финальную приёмку, проверку 254 событий выпуска и payroll read-back. Для финальной приёмки все карточки должны пройти реальные команды мастера и БТК; готовое закрытое состояние в SPA не подставляется.
+## Ограничения и дальнейшая работа
 
-Смена роли при незавершённой форме требует подтверждения: отмена сохраняет ввод, подтверждение очищает формы, диалоги, выбор карточек и защищённые данные. При конфликте или неизвестном исходе UI перечитывает связанные объекты без повтора команды; новая попытка требует нового решения пользователя. Технические коды находятся только во вложенном закрытом блоке «Сведений о прототипе».
+Нет отрицательного контроля и доработки, переназначения, повторного выпуска, редактирования паспортов/норм, серийной прослеживаемости деталей и реальных выплат. Цифровая приёмка не заменяет физические подписи БТК. Производительность на синтетических данных не является заводским SLA. [Scope](docs/product/mvp-scope.md) · [Подробные ограничения](docs/portfolio/engineering-retrospective.md#ограничения).
 
-В проверенном сценарии оба комплекта по `112` получили распределение `1 + 59 + 52`, третий из `26` — `1 + 25`. Первые детали и все `247` карточек обработки партии прошли действия мастера и БТК через UI; actor/time/ID отдельной финальной приёмки совпали с read-back. Payroll выполнил один `POST` и два успешных `GET` той же записи, без нового export при обновлении. Неперехваченных или неожиданных browser errors не было; начальные `401` до входа и `404` отсутствующей payroll-записи являются ожидаемыми состояниями.
+На 27 сентября 2026 года этапы 1–11 завершены; в этапе 12 выполнены статическая сверка, исправления документации и локальное закрытие FA-01/02. **Этап 12 и весь roadmap остаются открытыми до отдельного решения по полному DoD и квалификации выбранной версии.** Пользователь подтвердил ручную проверку демо без точного SHA/окружения; это подтверждение не переносится на изменённый код. Статус и ограничения — в [аудите](docs/project/final-audit.md), [плане](docs/project/project-plan.md) и [backlog](docs/project/backlog.md), [чек-лист ручной проверки](docs/portfolio/demo-script.md#отложенная-ручная-проверка-этапа-12). Исторический GCP/Terraform-вариант сохранён в [отдельном runbook](docs/release/deployment-gcp-history.md); он не является текущим размещением.
 
-Документационный прототип отдельно прошёл `window.runUxCopyAudit()` на desktop/mobile: все `14` шагов, `70` сочетаний роли и шага, `7` системных состояний и `0` нарушений. Живая SPA также прошла отдельный desktop/mobile audit: `16` проверок с `0` нарушений языка, технической границы, accessibility-ссылок и горизонтального layout. Эти два результата не смешиваются; подробности приведены в [Quality gates](docs/engineering/quality-gates.md).
-
-## Репозиторий и навигация
-
-- [Repository](https://github.com/AI-shoks/WorkCard-Lifecycle)
-- [Наглядная карта проекта](docs/project-dashboard.html)
-- [Roadmap](docs/project/project-plan.md)
-- [Backlog](docs/project/backlog.md)
-- [Decision log](docs/project/decision-log.md)
-- [Architecture](docs/architecture/technology-stack.md)
-- [Render configuration](infra/render/README.md)
-- [Исторический GCP Terraform](infra/terraform/README.md)
-- [Local development](docs/engineering/local-development.md)
-- [[00 Home|Vault index]], [[mvp-scope|scope]], [[decision-provenance|происхождение решений]], [[documentation-index|индекс материалов]]
-
-## Исправленная предметная модель
-
-- одна `ProductionBatch` имеет несколько `WorkCardSet` по операциям/группам;
-- норматив принадлежит operation scope / комплекту, а не партии;
-- `WorkCard` имеет внутренний UUID и не нумерует/не идентифицирует физическую деталь;
-- каждая карточка содержит `batchQuantitySnapshot`;
-- мастер назначает карточки и фиксирует начало/завершение;
-- БТК положительно принимает первую деталь до серии; отдельное per-card закрытие WorkCard является синтетическим TO-BE-решением;
-- отдельная digital `FinalBatchAcceptance` входит в MVP как одна неизменяемая запись всей завершённой партии; она не выводится из карточек и не заменяет физические подписи БТК;
-- отрицательный контроль, доработка, переназначение и повторный выпуск вне MVP.
-
-## Канонический demo-fixture
-
-Точное соотношение `112 → 112 + 112 + 26 = 250` выбрано как синтетический demo-сценарий для воспроизводимой проверки. Оно иллюстрирует связь «одна партия → несколько комплектов», но не выдаётся за наблюдавшийся пример реального производства.
-
-1. `PLANNER` как ПДБ выбирает подготовленный паспорт и создаёт партию `112`.
-2. Один выпуск создаёт три operation-scoped комплекта `112 + 112 + 26 = 250` карточек.
-3. Мастер назначает и проводит first-article карточку; БТК положительно открывает serial gate.
-4. Первый полный комплект получает assignment summary `60 + 52 = 112` без диапазонов номеров деталей.
-5. Мастер фиксирует serial work, БТК синтетической per-card командой закрывает карточку; это не `FinalBatchAcceptance` всей партии.
-6. После `3/3` first-article gates и `250/250 CLOSED` БТК отдельной командой принимает завершённую партию; read-back показывает actor, time и acceptance ID.
-7. Admin создаёт единственную mock payroll-запись operation-scoped нормы и читает audit log.
-
-Прототип проходит 14-шаговый сценарий интерактивно, переключает требуемые роли и показывает backend-oriented permission states, включая отдельную финальную приёмку партии и её read-back.
-
-## Честные границы
-
-Проект не является внедрённой MES, не хранит серийную идентичность деталей, не редактирует паспорта/нормы, не рассчитывает зарплату и не подключается к реальным системам. Backend permissions и optimistic concurrency остаются окончательной границей.
+[Карта документации](docs/documentation-index.md) · [Домашняя страница проекта](00%20Home.md) · [Архитектурные решения](docs/architecture/adr/README.md) · [Репозиторий](https://github.com/AI-shoks/WorkCard-Lifecycle)
