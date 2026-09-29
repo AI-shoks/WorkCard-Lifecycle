@@ -1,7 +1,7 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 33
+version: 34
 owner: engineering
 updated: 2026-09-29
 ---
@@ -10,19 +10,23 @@ updated: 2026-09-29
 
 ## Интеграция с main — 2026-09-29
 
-Локально подготовлено согласование кандидата `2d4609ad0188a0ec2e77ef1065195971aa14c455` и его документационной сверки с `main` `c9278aff50aa68d34e1df2bfdfe338e6311d1d55`. Сохранены recovery workflow, helpers и browser harness из main; разрешены конфликты в десяти документах. Объединённый состав требует собственного штатного CI в ветке/PR и после merge в main: успешный run `36449212344/1` относится только к прежнему кандидату.
+[PR #17](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/17) объединён с main `bdb2647520639b9ca690dfd6d00402076463a63a`; собственный [push CI 36544788733](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733) прошёл 7/7. Сохранены recovery workflow, helpers и browser harness из main, исправления журнала FA-01/02 и минимальное обновление `fast-uri`. Прежний CI `2d4609ad…` остаётся отдельным историческим результатом.
 
-**Выбранный финиш — завершённый портфолио-кейс.** По решению пользователя от 29 сентября публичное демо сохраняет прежний релиз `1195892…` с явными ограничениями. Обновление сайта, новый image и rollback drill не входят в оставшуюся работу. Проверенные исходники и исторические hosted результаты описываются раздельно; этап 12 и roadmap пока открыты. Основание — D-033 в [[decision-log]]. Прежние CI/hosted результаты ниже сохраняют свои версии.
+**Текущая цель — обновлённое публичное демо и завершённый портфолио-кейс (D-034).** Пользователь 29 сентября заменил прежний отказ от обновления. Проверенный main `bdb2647520639b9ca690dfd6d00402076463a63a` прошёл [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733); точный image опубликован и просканирован. Переключение сайта ещё не выполнено: требуется завершить проверку тарифов/квот и штатный staging/deployment. Этап 12 и roadmap остаются открытыми; rollback drill не проверен. Текущие результаты — [[deployment#Обновление демо 2026-09-29]].
 
 Локально в отдельном checkout выполнены frozen install и `pnpm check` на Node 24.20.0 / pnpm 11.19.0: format, lint, typecheck, 154 API unit, 158 web unit, 94 release-helper tests и production build — PASS. Шесть DB integration tests штатно пропущены без DB URL; contracts workspace не содержит самостоятельных tests. DB/browser/container/performance/security jobs этим локальным запуском не заменяются. В первоначальном объединении миграции, contracts, lockfile и workflows не менялись; шесть TS-файлов FA-01/02 совпадают с `2d4609ad…`, recovery helpers и browser harness — с main. Отдельный actionlint 1.7.12 проверил все шесть workflows, включая recovery; внешние shellcheck/pyflakes не запускались. Это локальная проверка объединения, не CI нового commit и не hosted qualification.
+
+## Проверка документов обновления демо — 2026-09-29
+
+В отдельном checkout от `bdb2647…` сохранён точный опубликованный manifest и обновлены текущая цель D-034, preflight и план восстановления. Приложение, lockfile, SQL migrations и workflows не менялись. Strict `project-docs-auditor`: 64 документа, 0 errors, 0 warnings; README/Home/HTML: 73 локальные ссылки без отсутствующих targets; scoped Prettier и `git diff --check` — PASS. Смысловая сверка сохраняет различие нового опубликованного image и прежнего фактического размещения; этап 12/roadmap не закрыты. Блокирующий preflight и подтверждённые внешние результаты — [[deployment#Обновление демо 2026-09-29]].
 
 ## Security после интеграции — 2026-09-29
 
 Первый CI объединения `6b8510e0cc7d43ed3b0462e71e0a8b9d53687e2b` ([push](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36543159871), [PR](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36543226705)) выявил четыре HIGH findings для двух версий `fast-uri`: [CVE-2026-84292](https://github.com/advisories/GHSA-qw65-cvwx-89v3) и [CVE-2026-84394](https://github.com/advisories/GHSA-58mr-gqgx-xq4g). Поэтому dependency audit и Trivy exact runtime image завершились ошибкой; этот состав не был слит в main. Исторический PASS кандидата от 28 сентября сохраняется как результат на дату проверки, а не гарантия отсутствия новых advisories.
 
-Минимальное исправление меняет только транзитивные версии `fast-uri` в lockfile: `3.1.6 → 3.1.8`, `4.1.3 → 4.2.1`, в пределах диапазонов родительских пакетов. Другие зависимости, manifests, workflows и пороги проверок сохранены; suppressions и overrides не добавлены. После обновления `pnpm check` прошёл; локальный обязательный `pnpm audit --audit-level=high` вернул exit 0: HIGH/CRITICAL — 0, moderate — 1. Оставшийся [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v) относится к `undici 8.10.1` через тестовый `jsdom` (dev dependency); он не скрыт и не исправлен этим узким обновлением. Новый состав требует собственных полных CI checks.
+Минимальное исправление меняет только транзитивные версии `fast-uri` в lockfile: `3.1.6 → 3.1.8`, `4.1.3 → 4.2.1`, в пределах диапазонов родительских пакетов. Другие зависимости, manifests, workflows и пороги проверок сохранены; suppressions и overrides не добавлены. После обновления `pnpm check` прошёл; локальный обязательный `pnpm audit --audit-level=high` вернул exit 0: HIGH/CRITICAL — 0, moderate — 1. Оставшийся [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v) относится к `undici 8.10.1` через тестовый `jsdom` (dev dependency); он не скрыт и не исправлен этим узким обновлением. Новый состав вошёл в main `bdb2647…`, его полный CI 7/7 подтверждён выше; свежий локальный audit 29 сентября снова вернул 0 HIGH/CRITICAL и 1 moderate.
 
-В lockfile прежнего hosted source `1195892…` остаются `fast-uri 3.1.6/4.1.3`; обновление исходников не исправляет уже размещённое демо. Достижимость этих уязвимостей в live runtime не проверялась. Его исторические security/health/logging результаты не считаются текущей проверкой безопасности; сайт остаётся прежним по D-033, release/deployment не выполняются.
+В lockfile прежнего hosted source `1195892…` остаются `fast-uri 3.1.6/4.1.3`; обновление исходников не исправляет уже размещённое демо. Достижимость этих уязвимостей в live runtime не проверялась. Его исторические security/health/logging результаты не считаются текущей проверкой безопасности; D-034 заменил прежний отказ от обновления: новый image уже опубликован, переключение ещё впереди; [[deployment#Обновление демо 2026-09-29]].
 
 Один локальный gate объединяет форматирование кода, статический анализ, строгую типизацию, тесты и production build:
 

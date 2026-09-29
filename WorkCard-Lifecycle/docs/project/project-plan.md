@@ -1,7 +1,7 @@
 ---
 artifact_id: project.plan
 status: active
-version: 39
+version: 40
 owner: project
 updated: 2026-09-29
 ---
@@ -19,20 +19,23 @@ updated: 2026-09-29
 
 ## Прогресс
 
-**Выбранный финиш — завершённый портфолио-кейс.** По решению пользователя от 29 сентября публичное демо сохраняет прежний релиз `1195892…` с явными ограничениями. Обновление сайта, новый image и rollback drill не входят в оставшуюся работу. Проверенные исходники и исторические hosted результаты описываются раздельно; этап 12 и roadmap пока открыты. Решение пользователя зафиксировано как D-033 в [[decision-log]].
+**Текущая цель — обновлённое публичное демо и завершённый портфолио-кейс (D-034).** Пользователь 29 сентября заменил прежний отказ от обновления. Проверенный main `bdb2647520639b9ca690dfd6d00402076463a63a` прошёл [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733); точный image опубликован и просканирован. Переключение сайта ещё не выполнено: требуется завершить проверку тарифов/квот и штатный staging/deployment. Этап 12 и roadmap остаются открытыми; rollback drill не проверен. Текущие результаты — [[deployment#Обновление демо 2026-09-29]].
 
-Локально подготовлено согласование кандидата `2d4609ad0188a0ec2e77ef1065195971aa14c455` и его документационной сверки с `main` `c9278aff50aa68d34e1df2bfdfe338e6311d1d55`. Сохранены recovery workflow, helpers и browser harness из main; разрешены конфликты в десяти документах. Результат пока не имеет собственного commit/CI: успешный run `36449212344/1` относится только к прежнему кандидату.
+[PR #17](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/17) объединён с main `bdb2647520639b9ca690dfd6d00402076463a63a`; собственный [push CI 36544788733](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733) прошёл 7/7. Сохранены recovery workflow, helpers и browser harness из main, исправления журнала FA-01/02 и минимальное обновление `fast-uri`. Прежний CI `2d4609ad…` остаётся отдельным историческим результатом.
 
 Оставшийся путь:
 
 - [x] Подготовить объединение с актуальным main и разрешить документальные конфликты, сохранив обе линии изменений.
-- [ ] Получить разрешение на commit/push/PR/merge подготовленного состава.
-- [ ] Получить штатный CI окончательного состава и завершить интеграцию; прежний CI кандидата не подменяет эту проверку.
-- [ ] Принять итог портфолио с явной границей исходники/прежнее демо и закрыть этап 12/roadmap.
+- [x] Получить разрешение на commit/push/PR/merge и новое обновление существующего демо (D-034).
+- [x] Объединить PR #17 и проверить собственный main CI `bdb2647…`: 7/7.
+- [x] Опубликовать точный image, сохранить scan/records и проверить совместимость прежнего образа.
+- [ ] Завершить текущую проверку тарифов/квот Render/Neon и staging qualification.
+- [ ] Выполнить штатный deployment, проверить фактическую версию, health, audit/logging и reset mechanism.
+- [ ] Принять итог портфолио с квалифицированной новой размещённой версией и закрыть этап 12/roadmap.
 
-Новый hosted release, cloud reset и проверенный rollback не являются шагами этого выбранного пути. Непроверенный FA-05 сохраняется как ограничение.
+D-034 включает release/deployment и необходимый staging reset. Публичный reset запрещён. FA-05 сохраняется как непроверенный rollback drill; совместимость образов не заменяет испытание.
 
-**На 29 сентября 2026 года этапы 1–11 закрыты.** Этап 11 оформил README, архитектурную схему, короткий показ, реальные снимки, ограничения и ретроспективу. Этап 10 «Релиз» сохраняет исторический результат 7/7: Render/Neon Free, staging/production/recovery canonical и compact, отказ просроченного recovery gate до owner reset. Rollback drill остаётся непроверенным без предыдущего совместимого образа. **Этап 12 «Финальный аудит» в работе: CI `36449212344/1` подтвердил 7/7 checks исходников `2d4609ad…` с FA-01/02; 22 пункта DoD сверены. FA-03 закрыт по этим исходникам решением D-032 от 29 сентября; этап 12/roadmap открыты. Принятое D-032 и граница исторического hosted source `1195892…` — [[final-audit]].** Ручное подтверждение пользователя без SHA/окружения и исторические release PASS не перенесены на изменённый код; публичный образ не менялся.
+Этапы 1–11 закрыты; этап 12 и roadmap открыты до квалификации нового размещения. Main `bdb2647…` прошёл CI 7/7, его image опубликован со scan HIGH/CRITICAL=0. Публичный сервис пока использует `1195892…`; актуальные тарифы/квоты, staging и deployment остаются незавершёнными. [[deployment#Обновление демо 2026-09-29|Состояние обновления]].
 
 | № | Этап | Статус | Результат |
 |---:|---|---|---|
@@ -46,9 +49,9 @@ updated: 2026-09-29
 | 7 | Backend vertical slice | `[x]` выполнено | Код, DB integration, local clean-container и CI implementation SHA подтверждены |
 | 8 | Frontend vertical slice | `[x]` выполнено | Полный браузерный процесс, clean-container и CI подтверждены для `b00ff294…` |
 | 9 | Качество | `[x]` выполнено | SHA `3ee65709966f5775928de87783fd2946d085e2bc`: все 6 обязательных jobs успешны в push и PR; ссылки ниже |
-| 10 | Релиз | `[x]` выполнено, 7/7 | Exact digest, Render/Neon Free, staging/production/recovery canonical и compact smoke, elapsed fail-closed подтверждены; rollback drill ограничен отсутствием прежнего совместимого image |
+| 10 | Релиз | `[x]` выполнено, 7/7 | Exact digest, Render/Neon Free, staging/production/recovery canonical и compact smoke, elapsed fail-closed подтверждены; rollback drill остаётся непроверенным |
 | 11 | Упаковка портфолио | `[x]` выполнено | README, схема, короткий показ, 4 реальных снимка с происхождением, ограничения и ретроспектива; аудит затронутых материалов пройден |
-| 12 | Финальный аудит | `[-]` в работе | CI `2d4609ad…` — 7/7; DoD: 20 подтверждено, hosted evidence исторические, итоговое решение ожидается. FA-03 закрыт по этим исходникам; FA-05 непроверен |
+| 12 | Финальный аудит | `[-]` в работе | Main `bdb2647…`: CI 7/7 и image/scan опубликованы; новое размещение ожидает preflight и staging. FA-05 непроверен |
 
 ## Этапы 0–4 — выполнены
 
@@ -106,13 +109,13 @@ updated: 2026-09-29
 
 **Этап 9 закрыт, 2026-09-05:** implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc) на момент проверки совпадал с локальным HEAD и head PR #1 в `codex/portfolio`. Через GitHub API подтверждены успешные [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): `quality`, `container` с image scan, `security`, `browser (compact)`, `browser (canonical)` и `performance` — все 6/6 в каждом запуске. Локальные browser/PostgreSQL/security/performance/clean-container gates, strict documentation audit и semantic review также пройдены; результаты этапа 9 и ссылки на каждую job сохранены отдельно от этапов 7–8 в [[quality-gates]]. Воспроизводимые проверки описаны в [[test-strategy]].
 
-**Этап 10 «Релиз»: [x] закрыт, 7/7.** Публичный сервис https://work-card-demo.onrender.com использует опубликованный digest source SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) и [release records](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждают staging, persistent/live Render reference и canonical production smoke. [Recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) подтвердил 192,58 часа elapsed, fail-closed API, owner reset и полный 250-card browser на отдельной ранее чисто восстановленной БД; [recovery compact](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) прошёл 6-card browser и удалил временный synthetic паспорт. Manual и scheduled reset проходили; сетевой сбой resolver 26 сентября не запускал owner job, 27 сентября reset снова успешен. Два Neon проекта находятся на Free. Rollback drill не заявляется: предыдущего совместимого образа нет.
+**Историческое закрытие этапа 10 «Релиз»: [x], 7/7, на 27 сентября.** Публичный сервис https://work-card-demo.onrender.com использует опубликованный digest source SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) и [release records](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) подтверждают staging, persistent/live Render reference и canonical production smoke. [Recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) подтвердил 192,58 часа elapsed, fail-closed API, owner reset и полный 250-card browser на отдельной ранее чисто восстановленной БД; [recovery compact](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) прошёл 6-card browser и удалил временный synthetic паспорт. Manual и scheduled reset проходили; сетевой сбой resolver 26 сентября не запускал owner job, 27 сентября reset снова успешен. Два Neon проекта находятся на Free. Rollback drill не заявляется: предыдущего совместимого образа нет.
 
 - **Frontend vertical slice — выполнено:** роли, таблицы партии/комплектов/карточек, массовые действия, история и связь с реальным API.
 - **Качество — выполнено:** расширенная стратегия тестов, миграции, security/performance checks и end-to-end сценарий.
 - **Релиз — выполнен, 7/7:** exact digest развернут на Render, staging/production/recovery smoke и elapsed fail-closed подтверждены; evidence и ограничения — [[deployment]].
 - **Упаковка портфолио — выполнено:** [README](../../README.md), схема реализованной архитектуры, [[demo-script|показ за 5–7 минут]], [[screenshots|галерея]] и [[engineering-retrospective|инженерные решения и ограничения]].
-- **Финальный аудит — в работе:** CI `2d4609ad…` — 7/7 и 22 пункта DoD сверены; FA-03 закрыт по этим исходникам решением D-032 от 29 сентября, hosted evidence остаются у `1195892…`, этап 12/roadmap открыты — [[final-audit]].
+- **Финальный аудит — в работе:** Этапы 1–11 закрыты; этап 12 и roadmap открыты до квалификации нового размещения. Main `bdb2647…` прошёл CI 7/7, его image опубликован со scan HIGH/CRITICAL=0. Публичный сервис пока использует `1195892…`; актуальные тарифы/квоты, staging и deployment остаются незавершёнными. [[deployment#Обновление демо 2026-09-29|Состояние обновления]].
 
 ### Этап 11 — выполнено 27 сентября 2026 года
 
