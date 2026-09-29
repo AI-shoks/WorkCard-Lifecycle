@@ -1,14 +1,14 @@
 ---
 artifact_id: architecture.er-model
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-09-06
+updated: 2026-09-27
 ---
 
 # ER Model
 
-Физическая модель PostgreSQL для [[domain-model]]. Она хранит текущее состояние обычными таблицами и отдельный append-only audit; event sourcing не используется.
+Физическая модель PostgreSQL для [[domain-model]]. Она хранит текущее состояние обычными таблицами и отдельный append-only audit; event sourcing не используется. Имена и constraints сверены статически с SQL migrations `0001`–`0004` по [[0010-pg-sql-and-local-payroll-service|ADR-0010]]; это не результат нового запуска migrations.
 
 ## Принципы отображения
 
@@ -29,12 +29,12 @@ erDiagram
     PRODUCTION_PASSPORTS ||--o{ PRODUCTION_BATCHES : selected_for
     PRODUCTION_BATCHES ||--|{ BATCH_OPERATION_PLAN_SNAPSHOTS : freezes
     PRODUCTION_BATCHES ||--o{ WORK_CARD_SETS : releases
-    BATCH_OPERATION_PLAN_SNAPSHOTS ||--|| WORK_CARD_SETS : materializes
+    BATCH_OPERATION_PLAN_SNAPSHOTS ||--o| WORK_CARD_SETS : materializes_on_release
     WORK_CARD_SETS ||--|{ WORK_CARDS : groups
-    DEMO_USERS ||--o{ WORK_CARDS : assigned_to
+    DEMO_USERS o|--o{ WORK_CARDS : assigned_to
     PRODUCTION_BATCHES ||--o| FINAL_BATCH_ACCEPTANCES : accepted_by
     WORK_CARDS ||--o| PAYROLL_RECORDS : exported_as
-    COMMAND_RECEIPTS ||--|{ AUDIT_EVENTS : proves
+    COMMAND_RECEIPTS ||--o{ AUDIT_EVENTS : proves
 ```
 
 `audit_events.aggregate_id` — полиморфный UUID без общего FK: целевые таблицы имеют разные жизненные циклы, а append-only событие должно пережить изменение projection. Существование aggregate проверяет application service до insert.
@@ -46,11 +46,12 @@ erDiagram
 | Колонка | Тип / constraint |
 |---|---|
 | `id` | `uuid primary key` |
+| `username` | `text not null unique`; синтетический стабильный login, не пароль |
 | `display_name` | `text not null` |
-| `role` | `text not null check in (PLANNER, MASTER, WORKER, QUALITY_CONTROLLER, ADMIN_AUDITOR)` |
-| `is_active` | `boolean not null default true` |
+| `role_code` | `text not null check in (PLANNER, MASTER, WORKER, QUALITY_CONTROLLER, ADMIN_AUDITOR)` |
+| `enabled` | `boolean not null default true` |
 
-Индекс: `(role, is_active)`. Пользователи синтетические; паролей и реальных кадровых данных нет.
+Отдельного индекса `(role_code, enabled)` нет. Пользователи синтетические; паролей и реальных кадровых данных нет.
 
 ### `demo_sessions`
 
@@ -59,13 +60,14 @@ erDiagram
 | `id` | `uuid primary key` — opaque session ID из подписанной cookie |
 | `demo_user_id` | `uuid not null references demo_users(id)` |
 | `csrf_token_hash` | `bytea not null` |
-| `created_at`, `expires_at`, `last_seen_at` | `timestamptz not null` |
+| `created_at`, `expires_at`, `idle_expires_at`, `last_seen_at` | `timestamptz not null`; check ограничивает порядок timestamps |
+| `generation` | `bigint not null default 1 check > 0`; generation текущего допуска |
 
 Индексы: `(expires_at)`, `(demo_user_id)`. Истёкшая/idle/disabled session удаляется при неуспешной аутентификации; создание новой session очищает все истёкшие rows под общим advisory lock и применяет лимит 500. Owner-only daily reset удаляет оставшиеся sessions вместе с mutable demo aggregates; предметные команды sessions не создают.
 
 ### `production_passports`
 
-`id uuid PK`, `code text`, `revision text`, `product_name text`, `created_at timestamptz`; `unique(code, revision)`. Reference rows доступны API только для чтения.
+`id uuid PK`, `product_code text`, `revision text`, `product_name text`, `planned_quantity integer check > 0`, `data_provenance text = SYNTHETIC_DEMO`, `created_at timestamptz`; `unique(product_code, revision)`. Reference rows доступны API только для чтения. API проецирует `product_code` как `code`.
 
 ### `operation_plans`
 
@@ -73,12 +75,18 @@ erDiagram
 |---|---|
 | `id` | `uuid primary key` |
 | `passport_id` | `uuid not null references production_passports(id)` |
-| `position` | `integer not null check (position > 0)` |
-| `scope_code`, `scope_name` | `text not null` |
+| `operation_number` | `integer not null check (operation_number > 0)`; API `position` |
+| `scope_code`, `operation_name` | `text not null`; API отображает `operation_name` как `scopeName` |
 | `norm_hours` | `numeric(8,2) not null check (norm_hours > 0)` |
 | `planned_card_count` | `integer not null check (planned_card_count > 0)` |
 
-Constraints: `unique(passport_id, position)`, `unique(passport_id, scope_code)`.
+Constraints: `unique(passport_id, operation_number)`, `unique(passport_id, scope_code)`. Migration `0003` приводит первоначальный `numeric(10,4)` к `numeric(8,2)`, отклоняя потерю точности/диапазона.
+
+### Служебное состояние
+
+`schema_migrations` хранит `version integer PK`, `name text unique`, `checksum char(64)` и `applied_at timestamptz`; migration runner проверяет неизменность всей применённой истории.
+
+`demo_maintenance_state` — singleton row: `singleton boolean PK CHECK(singleton)`, `maintenance boolean`, `maintenance_requested boolean`, `generation bigint CHECK > 0`, nullable `last_reset_verified_at timestamptz` и `runtime_role_name name`. Новая БД начинается с закрытым gate. Runtime имеет только `SELECT`; owner управляет maintenance, generation и verified timestamp по [[database-bootstrap]].
 
 ## Партия и snapshots
 
@@ -117,7 +125,7 @@ Snapshot создаётся при создании партии, а не при
 | `norm_hours_snapshot` | `numeric(8,2) not null check > 0` |
 | `planned_card_count` | `integer not null check > 0` |
 | `gate_status` | `text not null check in (FIRST_ARTICLE_PENDING, SERIAL_ALLOWED)` |
-| `first_article_work_card_id` | `uuid null`, deferred FK после создания `work_cards` |
+| `first_article_work_card_id` | `uuid null`, deferred FK после создания `work_cards`; заполняется уже при выборе первой карточки до открытия gate |
 | `first_article_controller_id`, `first_article_accepted_at` | nullable, заполняются вместе с открытием gate |
 | `version` | `integer not null check > 0` |
 | `released_at` | `timestamptz not null` |
@@ -141,7 +149,7 @@ Constraints: composite FK `(plan_snapshot_id, batch_id)` на snapshot той ж
 | `released_at`, `assigned_at`, `started_at`, `completed_at`, `closed_at` | `timestamptz` по достигнутому состоянию |
 | `released_by`, `assigned_by`, `started_by`, `completed_by`, `closed_by` | FK на `demo_users`; release actor обязателен, остальные появляются по состоянию |
 
-Checks требуют `purpose/assignee` пустыми только в `RELEASED` и заполненными после назначения. `closure_type` пуст до `CLOSED` и соответствует purpose в терминальном состоянии. Набор timestamps/actors монотонно дополняется согласно state machine. Изменение purpose/assignee назад запрещает application layer; интеграционные тесты подтверждают отсутствие соответствующих команд.
+Checks требуют `purpose/assignee` пустыми только в `RELEASED` и заполненными после назначения. `closure_type` пуст до `CLOSED` и соответствует purpose в терминальном состоянии. Набор timestamps/actors монотонно дополняется согласно state machine. Команд обратного изменения purpose/assignee в API нет; результаты выполнения integration tests учитываются отдельно в [[quality-gates]].
 
 Индексы:
 
@@ -171,6 +179,7 @@ Deferred FK `work_card_sets.first_article_work_card_id → work_cards.id` и app
 | `command_id uuid primary key` | клиентский idempotency key |
 | `command_type text` | тип команды, неизменяемый для этого ID |
 | `actor_id uuid`, `actor_role text` | доверенный контекст выполнения |
+| `request_fingerprint char(64)` | fingerprint запроса; одинаковый ID с другим body/target не допускается |
 | `correlation_id uuid not null unique` | объединяет все события команды |
 | `state text` | `IN_PROGRESS` внутри транзакции, затем `SUCCEEDED`; deferred constraint trigger запрещает commit незавершённой строки |
 | `http_status integer`, `result_type text`, `result_id uuid`, `response_body jsonb` | стабильный replay результата |
@@ -185,7 +194,7 @@ Deferred FK `work_card_sets.first_article_work_card_id → work_cards.id` и app
 
 - `unique(aggregate_type, aggregate_id, aggregate_version)`;
 - FK `(command_id)` на `command_receipts` — deferred до конца транзакции;
-- index `(aggregate_type, aggregate_id, aggregate_version, id)`;
+- index `(aggregate_type, aggregate_id, aggregate_version, occurred_at, id)`;
 - index `(correlation_id, occurred_at, id)`;
 - index `(command_id)`.
 
@@ -193,15 +202,12 @@ Runtime role имеет `SELECT/INSERT`, но не `UPDATE/DELETE`; trigger до
 
 ## Порядок миграций
 
-1. extensions/служебные функции и DB roles;
-2. reference/session tables;
-3. batches и snapshots;
-4. sets/cards и deferred cross-links;
-5. immutable results;
-6. receipts/audit, grants и immutability triggers;
-7. seed отдельной идемпотентной migration-командой.
+1. `0001_foundation.sql`: синтетические users, passports, operation plans.
+2. `0002_backend-vertical-slice.sql`: sessions, batches/snapshots, sets/cards, receipts, immutable results, audit, cross-links и triggers.
+3. `0003_align-operation-plan-norm-precision.sql`: проверяемое приведение точности нормы к `numeric(8,2)`.
+4. `0004_demo-maintenance-state.sql`: persistent gate и session generation.
 
-Каждая migration имеет `up` SQL и проверяется на чистой PostgreSQL 18. Для destructive schema migration обязателен отдельный review; `drizzle push` не используется в CI/production.
+`migration-runner.ts` создаёт history table и runtime role, применяет каждый новый SQL-файл в отдельной транзакции, затем обновляет grants отдельной транзакцией. Initial seed — отдельная owner-операция, не migration-файл. Применённые файлы защищены проверкой checksums; destructive schema migration требует отдельного review. Проверка на чистой PostgreSQL 18 является gate; доказательства конкретных запусков — [[quality-gates]].
 
 ## Проверяемые свойства
 

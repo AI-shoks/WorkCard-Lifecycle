@@ -1,14 +1,14 @@
 ---
 artifact_id: requirements.traceability
 status: accepted
-version: 6
+version: 10
 owner: requirements
-updated: 2026-09-05
+updated: 2026-09-28
 ---
 
 # Requirements Traceability
 
-Сквозная матрица: Evidence → Decision → BR → UC → US → AC → Future Test. Test IDs — объявленные цели покрытия, а не утверждение о реализации. `N/A` используется только с явным объяснением неприменимости звена.
+Сквозная матрица: Evidence → Decision → BR → UC → US → AC → Test target. Test IDs — объявленные цели покрытия, а не имена выполненных тестов. Фактические файлы, assertions, все 37 AC и границы сохранённых PASS сопоставлены в [[final-audit#Трассировка всех 37 acceptance criteria|аудите этапа 12]]. `N/A` используется только с явным объяснением неприменимости звена.
 
 ## Обозначения
 
@@ -20,7 +20,7 @@ updated: 2026-09-05
 
 ## Матрица функций MVP
 
-| Функция | Evidence | Decision | BR | UC | US | AC | Future Test |
+| Функция | Evidence | Decision | BR | UC | US | AC | Test target |
 |---|---|---|---|---|---|---|---|
 | ПДБ выбирает подготовленный паспорт | `ASIS-006` | `D-016` | `BR-001`, `BR-010`, `BR-011` | `UC-001` | `US-001` | `AC-BAT-001`, `AC-AUT-001` | `T-DOM-BATCH-001`, `T-API-BATCH-001`, `T-E2E-LIFECYCLE-001` |
 | Партия имеет много комплектов | `ASIS-003` | `D-014` | `BR-012`–`BR-016` | `UC-002` | `US-002`, `US-013` | `AC-BAT-002`, `AC-BAT-003`, `AC-TXN-001` | `T-DOM-RELEASE-001`, `T-API-RELEASE-001`, `T-API-FIXTURE-112-001` |
@@ -71,7 +71,7 @@ updated: 2026-09-05
 
 ## Покрытие продуктовых обязательств
 
-| Обязательство | Evidence | Decision | BR | UC | US | AC | Future Test |
+| Обязательство | Evidence | Decision | BR | UC | US | AC | Test target |
 |---|---|---|---|---|---|---|---|
 | `112 → 3 комплекта → 250 карточек` | `N/A` — синтетический demo-fixture, не факт AS-IS | `D-014`, `D-018`, `D-024` | `BR-012`–`BR-014` | `UC-002`, `UC-011` | `US-002`, `US-013` | `AC-BAT-002`, `AC-READ-002` | `T-API-FIXTURE-112-001` |
 | Нет индивидуальной нумерации деталей | `ASIS-001`, `ASIS-002` | `D-014` | `BR-004`, `BR-014` | `UC-002`, `UC-011` | `US-013` | `AC-BAT-002`, `AC-READ-002` | `T-E2E-NO-SEQUENCE-001` |
@@ -82,9 +82,9 @@ updated: 2026-09-05
 | Отдельная цифровая финальная приёмка всей партии | `ASIS-010`, `ASIS-011` | `D-021` | `BR-036`–`BR-039` | `UC-015` | `US-021` | `AC-FBA-001`–`AC-FBA-007` | `T-DOM-FINAL-BATCH-001`, `T-API-FINAL-BATCH-PREMATURE-001`, `T-API-FINAL-BATCH-IDEMPOTENCY-001`, `T-API-FINAL-BATCH-CONFLICT-001`, `T-API-FINAL-BATCH-TXN-001`, `T-API-FINAL-BATCH-PERMISSION-001`, `T-API-FINAL-BATCH-READ-001`, `T-E2E-FINAL-BATCH-001` |
 | Синтетическое per-card quality confirmation | `ASIS-010`, `ASIS-011` — контекст, не прямая копия | `D-009`, `D-020` | `BR-033`–`BR-036` | `UC-006` | `US-007` | `AC-LIF-004`, `AC-LIF-005`, `AC-READ-002` | `T-DOM-STATE-003`, `T-API-QUALITY-001`, `T-E2E-PROVENANCE-001` |
 
-## Каталог future tests для скорректированных обязательств
+## Каталог целей тестирования для скорректированных обязательств
 
-| Test ID | Будущая проверка |
+| Test ID | Цель проверки |
 |---|---|
 | `T-E2E-NO-SEQUENCE-001` | UI не показывает карточки как детали `1..N`. |
 | `T-DOM-NORM-001` | Норма принадлежит operation scope/комплекту. |
@@ -107,6 +107,33 @@ updated: 2026-09-05
 | `T-API-FINAL-BATCH-READ-001` | Read-back возвращает acceptance ID, актора, время, command ID и результирующую версию без побочного эффекта. |
 | `T-E2E-FINAL-BATCH-001` | После all-closed summary БТК отдельно принимает партию, а UI показывает actor/time/ID и не называет запись физической подписью. |
 
+## Фактическое дополнение FA-01/02 — 2026-09-27
+
+| Criteria / существующее evidence | Существенное дополнение | Фактическое выполнение |
+|---|---|---|
+| AC-AUD-001/004: SQL PK/unique, общая transaction, 254 release events и существующий audit read-back | `audit-event.test.ts`: 12 typed payload shapes; `audit-invariants.test.ts`: malformed payload, event/stored version mismatch, missing root, increment и suppressed insert; `workCardSetIds` соответствует созданным sets | Unit 85/85; PostgreSQL audit invariants 6/6 PASS |
+| AC-TXN-001, AC-LIF-003, AC-FBA-005, AC-PAY-002: existing faults всех 9 команд + replay | `transactions.test.ts` сохраняет full snapshot/retry; дополнен проверкой нового payroll command с нулём events и только одним новым receipt | PostgreSQL 2/2 PASS |
+| AC-ASG-002: existing concurrent assignment проверял 200/409 и победившие версии | `negative-workflow.test.ts`: empty/duplicate/mixed/missing selection, invalid assignee, first selection cardinality, closed gate; актуальная RELEASED card вместе со stale или ASSIGNED card; set/card conflicts | Входит в 6/6 PostgreSQL PASS; все восемь таблиц неизменны при каждом отказе |
+| AC-LIF-005: existing happy path/role denials и отсутствующие out-of-scope routes/contracts | Повторные start/complete/quality над CLOSED обоих purposes, повторная first acceptance и попытка новой first selection при открытом gate с актуальными versions | Входит в тот же 6/6 PASS; full snapshots |
+| AC-FBA-002: прежний premature test одновременно имел несколько невыполненных условий | Три независимых fixtures: pending gate, отсутствующая serial card при неизменном plan, незакрытая card; SQL assertions доказывают единственную нарушенную предпосылку | Три теста входят в тот же 6/6 PASS; acceptance/link/status/version/event/receipt не меняются |
+| AC-CON-001, AC-FBA-004: existing races и UI recovery assertions | Все 8 команд с expected version, включая обе roots first acceptance, set/card assignment, stale payroll до и после immutable result; exact conflict metadata | Входит в тот же 6/6 PASS; Create не имеет previous version |
+
+Числа в строках не суммируются повторно: targeted quality suite содержит 14 tests всего (6 + 2 + 6). Команды, окружение и остальные результаты — [[quality-gates]]. Наличие теста отделено от этих свежих PASS; исторические browser/CI evidence не перенесены на изменённый checkout. Это достаточное ключевое покрытие FA-01/02, не отдельный тест для каждой из 45 строк negative catalog.
+
+## Фактический UI-smoke агента — 2026-09-27
+
+Локальные артефакты UI-smoke сверены 28 сентября с DOM, скриншотами и независимым read-only SQL; [публичная сводка](../testing/fa-0102-evidence.md#UI-smoke) сохраняет результаты и ограничения, raw-архив остаётся вне Git-кандидата. 22/22 hashes результата FA-01/02 совпали с исходным состоянием этой задачи. Это дополнительное свидетельство агента по исправленному коду; сообщение пользователя без SHA/окружения и старые CI/release результаты остаются отдельными источниками. Строки ниже дополняют покрытие AC, но не доказывают каждую часть указанных критериев одним smoke.
+
+| AC / цель покрытия | Что подтверждено | Что этим smoke не доказано |
+|---|---|---|
+| AC-BAT-001–003; T-E2E-LIFECYCLE-001 в части выпуска | UI создание и выпуск 3 комплектов / 112+112+26=250, запрет повторного выпуска в UI | Все backend negative branches и весь lifecycle одной партии |
+| AC-AUD-003; T-E2E-AUDIT-001 | Связанный набор: UI 254/254 уникальных, SQL receipt/actual 254 | Полнота каждой другой команды, неизменяемость и отказы; fault cases — отдельные FA-01 tests |
+| AC-ASG-001, AC-LIF-001–003; T-E2E-FIRST-ARTICLE-001 | Одна первая карточка назначена/начата/завершена/принята через UI; CLOSED/version 5, открытый gate | Массовое 60+52, serial quality, все 250 UI transitions |
+| AC-PAY-001/002/005, AC-READ-003; T-E2E-PAYROLL-001 | Две вкладки, два разных command_id, одна payroll row, одинаковый ответ-запись и события 1/0; SQL независимо подтверждает UI | Одновременная гонка AC-PAY-004 этим последовательным smoke не проверена; concurrency остаётся API evidence |
+| AC-FBA-001/007; T-E2E-FINAL-BATCH-001 в части отдельного действия/чтения | БТК принял SMOKE-READY через UI; запись сохраняется после повторного открытия, SQL versions 3/3/3 и одно событие | Партия создана/выпущена API, её 250 закрытий и gates подготовлены SQL; полный UI lifecycle, replay команды и FBA negative tests этим smoke не проверены |
+
+Клавиатурное управление было обходом ограничения мышиных действий инструмента; 0 console warn/error относится к двум проверенным вкладкам. Полная матрица viewport/состояний не заявляется. Smoke не доказывает новый CI или сборку immutable image: digest web bundle не сохранён. Полный DoD и оставшиеся доказательства выбранной версии — [[final-audit]]; повтор указанного короткого smoke для переноса в документацию не требуется.
+
 ## Правило сопровождения
 
-Изменение AS-IS сначала обновляет [[decision-provenance]] и решения, затем scope, правила, обе стороны этой матрицы, UX и тесты. Строка о будущем тесте не является доказательством его реализации.
+Изменение AS-IS сначала обновляет [[decision-provenance]] и решения, затем scope, правила, обе стороны этой матрицы, UX и тесты. Строка о цели теста не доказывает ни наличие assertions, ни успешный запуск. Реальные suite/results и локальное закрытие FA-01/02 указаны в [[final-audit]]; structural audit сам по себе не доказывает критерии и не закрывает весь DoD.

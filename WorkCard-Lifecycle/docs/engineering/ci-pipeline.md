@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.ci-pipeline
 status: accepted
-version: 17
+version: 18
 owner: engineering
-updated: 2026-09-27
+updated: 2026-09-29
 ---
 
 # CI Pipeline
@@ -86,11 +86,11 @@ Scheduled Actions могут опаздывать, пропускаться ил
 
 GitHub environments разделяют `staging-owner`, `staging-runtime`, `production-owner` и `production` (Render adapter). Secrets задаются только в нужных steps/containers. Полная матрица имён — [[environments]]. Current/previous GHCR image и GitHub Release assets не удаляются автоматической retention policy весь срок эксплуатации/rollback; workflow artifacts не заменяют этот архив.
 
-Владелец разрешил scoped commit/push, PR/merge после обязательных gates, полный CI и ручные release/deploy/reset/rollback workflows для установленных ресурсов проекта. Успешные удалённые runs текущей реализации и hosted qualification ещё должны быть привязаны к фактическому `main` SHA/digest; прежние runs этого не доказывают. Фактические результаты перечислены в [[quality-gates]] и release records по [[deployment]].
+Исторические разрешения commit/push, PR/merge и owner/release workflows относились к выполненным задачам и указанным в их результатах версиям. Они не являются разрешением для новых операций. По D-033 в [[decision-log]] завершается портфолио с прежним демо; новый release/deployment в эту цель не входит. Подготовленному объединению с main нужны собственные commit/CI и разрешение на Git-публикацию. Фактические результаты с привязкой к SHA перечислены в [[quality-gates]], исторические hosted records — в [[deployment]].
 
 ## Критерий принятия
 
-Закрытие этапа 9 требует зелёных `quality`, `container` (включая image scan), `security`, обеих `browser` matrix entries и `performance` для одного implementation SHA. Локальные проверки и успешные runs прежнего SHA не подменяют этот gate. Scoped commit/push и PR/merge разрешены владельцем для текущей задачи после обязательных проверок; gate полного CI того же `main` SHA перед release сохраняется. Workflow не меняет branch protection через API; здесь зафиксирован критерий приёмки проекта.
+Закрытие этапа 9 требует зелёных `quality`, `container` (включая image scan), `security`, обеих `browser` matrix entries и `performance` для одного implementation SHA. Локальные проверки и успешные runs прежнего SHA не подменяют этот gate. Для объединённого состава сохраняются все семь текущих checks, включая `release_iac`; разрешение на commit/push и PR/merge относится к конкретному подготовленному результату. Gate полного CI того же `main` SHA перед возможным будущим release сохраняется. Workflow не меняет branch protection через API; здесь зафиксирован критерий приёмки проекта.
 
 Workflow обнаруживается GitHub из корневой `.github/workflows/`, а shell steps выполняются в `WorkCard-Lifecycle/`. Implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) подтверждён полностью зелёными [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581627867) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33581630041): в обоих запусках jobs `Code and database quality` и `Clean container startup` завершены успешно. Это закрывает удалённый acceptance gate этапа 7. Неблокирующее предупреждение GitHub о переводе runtime используемых actions с Node.js 20 на 24 учтено как maintenance item в [[backlog]].
 

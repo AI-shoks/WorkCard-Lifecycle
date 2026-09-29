@@ -33,6 +33,7 @@ import type {
   WorkCardStatus,
 } from '@work-card/contracts';
 import type { Pool, PoolClient } from 'pg';
+import { assertValidAuditInsert, type AuditInsert } from './audit-event.js';
 
 import {
   acquireRuntimeAdmission,
@@ -78,14 +79,6 @@ type CommandReceiptRow = {
   request_fingerprint: string;
   response_body: unknown;
   state: string;
-};
-
-type AuditInsert = {
-  aggregateId: string;
-  aggregateType: string;
-  aggregateVersion: number;
-  data: Record<string, unknown>;
-  eventType: string;
 };
 
 type BatchRow = {
@@ -314,6 +307,34 @@ async function insertAuditEvents(
   events: AuditInsert[],
 ): Promise<void> {
   if (events.length === 0) return;
+  for (const event of events) assertValidAuditInsert(event);
+  // All referenced roots were inserted or locked by this command. Compare with
+  // the rows in this transaction, not with a second copy of the event array.
+  const versions = await client.query<{ valid: boolean }>(
+    `WITH expected AS (
+       SELECT * FROM jsonb_to_recordset($1::jsonb)
+         AS e("aggregateType" text, "aggregateId" uuid, "aggregateVersion" integer)
+     )
+     SELECT bool_and(CASE e."aggregateType"
+       WHEN 'ProductionBatch' THEN batch.version = e."aggregateVersion"
+       WHEN 'WorkCardSet' THEN card_set.version = e."aggregateVersion"
+       WHEN 'WorkCard' THEN card.version = e."aggregateVersion"
+       WHEN 'PayrollRecord' THEN payroll.id IS NOT NULL AND e."aggregateVersion" = 1
+       ELSE false END IS TRUE) AS valid
+     FROM expected e
+     LEFT JOIN production_batches batch
+       ON e."aggregateType" = 'ProductionBatch' AND batch.id = e."aggregateId"
+     LEFT JOIN work_card_sets card_set
+       ON e."aggregateType" = 'WorkCardSet' AND card_set.id = e."aggregateId"
+     LEFT JOIN work_cards card
+       ON e."aggregateType" = 'WorkCard' AND card.id = e."aggregateId"
+     LEFT JOIN payroll_records payroll
+       ON e."aggregateType" = 'PayrollRecord' AND payroll.id = e."aggregateId"`,
+    [JSON.stringify(events)],
+  );
+  if (versions.rows[0]?.valid !== true) {
+    throw new Error('Audit event version does not match its persisted aggregate.');
+  }
   const values: unknown[] = [];
   const tuples = events.map((event, index) => {
     const offset = index * 11;
@@ -333,13 +354,22 @@ async function insertAuditEvents(
     const placeholders = Array.from({ length: 11 }, (_, item) => `$${offset + item + 1}`);
     return `(${placeholders.join(', ')})`;
   });
-  await client.query(
+  const inserted = await client.query(
     `INSERT INTO audit_events(
        id, event_type, aggregate_type, aggregate_id, aggregate_version, occurred_at,
        actor_id, actor_role, command_id, correlation_id, payload
      ) VALUES ${tuples.join(', ')}`,
     values,
   );
+  if (inserted.rowCount !== events.length) {
+    throw new Error('The complete audit event set was not inserted.');
+  }
+}
+
+function assertVersionIncrement(version: number, previousVersion: number): void {
+  if (version !== previousVersion + 1) {
+    throw new Error('An aggregate version must increase by exactly one.');
+  }
 }
 
 async function loadCard(queryable: Queryable, workCardId: string): Promise<CardRow | null> {
@@ -856,6 +886,7 @@ export function createWorkflowService(
               batch.version,
             );
           }
+          assertVersionIncrement(resultingVersion, batch.version);
           events.unshift({
             eventType: 'ProductionBatchReleased',
             aggregateType: 'ProductionBatch',
@@ -863,6 +894,9 @@ export function createWorkflowService(
             aggregateVersion: resultingVersion,
             data: {
               batchId,
+              workCardSetIds: events
+                .filter((event) => event.eventType === 'WorkCardSetCreated')
+                .map((event) => event.aggregateId),
               setCount: snapshotsResult.rows.length,
               cardCountTotal: cardCount,
             },
@@ -990,7 +1024,8 @@ export function createWorkflowService(
           let resultingSetVersion = cardSet.version;
           const events: AuditInsert[] = [];
           if (body.purpose === 'FIRST_ARTICLE') {
-            if (sortedIds.length !== 1) {
+            const firstArticleId = sortedIds[0];
+            if (sortedIds.length !== 1 || !firstArticleId) {
               throw invalidBusinessInput(
                 'INVALID_FIRST_ARTICLE_SELECTION',
                 'Для первой детали нужно выбрать ровно одну карточку.',
@@ -1010,12 +1045,13 @@ export function createWorkflowService(
               [setId, sortedIds[0], body.expectedSetVersion],
             );
             resultingSetVersion = updatedSet.rows[0]?.version ?? cardSet.version;
+            assertVersionIncrement(resultingSetVersion, cardSet.version);
             events.push({
               eventType: 'FirstArticleWorkCardSelected',
               aggregateType: 'WorkCardSet',
               aggregateId: setId,
               aggregateVersion: resultingSetVersion,
-              data: { setId, workCardId: sortedIds[0], gateStatus: cardSet.gate_status },
+              data: { setId, workCardId: firstArticleId, gateStatus: cardSet.gate_status },
             });
           } else if (cardSet.gate_status !== 'SERIAL_ALLOWED') {
             throw gateClosed();
@@ -1033,6 +1069,9 @@ export function createWorkflowService(
             throw stateConflict('Не удалось атомарно назначить весь выбранный набор.');
           }
           for (const card of updatedCards.rows) {
+            const previous = cardsResult.rows.find((entry) => entry.id === card.id);
+            if (!previous) throw new Error('Updated card was not locked by this command.');
+            assertVersionIncrement(card.version, previous.version);
             events.push({
               eventType: 'WorkCardAssigned',
               aggregateType: 'WorkCard',
@@ -1139,6 +1178,8 @@ export function createWorkflowService(
           if (!resultingVersion) {
             throw versionConflict('workCard', workCardId, body.expectedCardVersion, card.version);
           }
+          assertVersionIncrement(resultingVersion, card.version);
+          if (!card.assignee_id) throw new Error('Assigned card is missing its assignee.');
           const events: AuditInsert[] = [
             {
               eventType: 'WorkCardStarted',
@@ -1216,6 +1257,8 @@ export function createWorkflowService(
           if (!resultingVersion) {
             throw versionConflict('workCard', workCardId, body.expectedCardVersion, card.version);
           }
+          assertVersionIncrement(resultingVersion, card.version);
+          if (!card.assignee_id) throw new Error('Started card is missing its assignee.');
           const events: AuditInsert[] = [
             {
               eventType: 'WorkCardCompleted',
@@ -1321,6 +1364,8 @@ export function createWorkflowService(
           if (!cardVersion || !setVersion) {
             throw stateConflict('Не удалось атомарно принять первую деталь.');
           }
+          assertVersionIncrement(cardVersion, card.version);
+          assertVersionIncrement(setVersion, cardSet.version);
           const events: AuditInsert[] = [
             {
               eventType: 'WorkCardQualityConfirmed',
@@ -1429,6 +1474,7 @@ export function createWorkflowService(
           if (!resultingVersion) {
             throw versionConflict('workCard', workCardId, body.expectedCardVersion, card.version);
           }
+          assertVersionIncrement(resultingVersion, card.version);
           const events: AuditInsert[] = [
             {
               eventType: 'WorkCardQualityConfirmed',

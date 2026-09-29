@@ -1455,13 +1455,13 @@
         <div class="sidebar-note">
           <span class="label">Срез состояния</span>
           <strong>27 сентября 2026</strong>
-          <p>Этапы 1–10 закрыты. Публичное демо работает на Render Free с двумя Neon Free PostgreSQL projects; staging, production и recovery canonical/compact подтверждены сохранёнными отчётами.</p>
+          <p>Этапы 1–11 закрыты. Цель завершения — портфолио-кейс; публичное демо остаётся прежней версии с явными ограничениями. Подготовлено согласование исходников с основной веткой; итоговый CI и приёмка ещё впереди. Исторические проверки демо сохраняют собственную версию.</p>
         </div>
       </aside>
 
       <main>
         <div class="topbar">
-          <span class="live-state">Этапы 1–10 закрыты · релиз 7/7 · Render/Neon Free</span>
+          <span class="live-state">Этапы 1–11 закрыты · релиз 7/7 · этап 12 открыт · CI кандидата 7/7 · FA-03 закрыт по исходникам</span>
           <div class="toolbar" aria-label="Настройки отображения">
             <button class="icon-button" id="theme-toggle" type="button" aria-label="Переключить цветовую тему" title="Переключить тему">◐</button>
             <button class="icon-button" id="print-button" type="button" aria-label="Распечатать или сохранить в PDF" title="Печать / PDF">⇩</button>
@@ -1482,35 +1482,36 @@
             <div class="hero-grid">
               <article class="current-stage">
                 <div class="stage-topline">
-                  <span class="stage-kicker">● Этап 10 завершён</span>
-                  <span class="stage-number">Релиз — этап 10 из дорожной карты 0–12</span>
+                  <span class="stage-kicker">● Этап 11 завершён</span>
+                  <span class="stage-number">Портфолио — этап 11 из дорожной карты 0–12</span>
                 </div>
-                <h2>Релиз на Render Free + Neon Free подтверждён.</h2>
+                <h2>Портфолио-кейс готов к показу.</h2>
+                <p><a href="../README.md">README</a> объясняет задачу, роль автора, процесс, архитектуру и проверки; <a href="portfolio/demo-script.md">короткий сценарий</a>, <a href="portfolio/screenshots.md">четыре реальных скриншота</a> и <a href="portfolio/engineering-retrospective.md">ограничения с ретроспективой</a> опираются на код и сохранённые доказательства.</p>
                 <p>
                   Публичный <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7">release</a> закрепляет один исходный SHA и неизменный image digest. <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053">Deploy run</a> подтвердил staging, production и Render; <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944">recovery canonical</a> — fail-closed спустя 192,58 часа и полный 250-card browser; <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998">recovery compact</a> — 6-card browser и очистку тестового паспорта. Rollback drill остаётся непроверенным без предыдущего совместимого образа. GCP Terraform сохранён как исторический вариант.
                 </p>
                 <div class="progress-labels">
-                  <span>11 этапов завершено, включая этап 0</span>
-                  <span>Этап 10 — завершён, 7/7 задач</span>
-                  <span>2 после него</span>
+                  <span>12 этапов завершено, включая этап 0</span>
+                  <span>Этап 11 — завершён; релиз — 7/7 задач</span>
+                  <span>1 после него</span>
                 </div>
-                <div class="segmented-progress" role="img" aria-label="Из 13 этапов завершены 11, включая этап 0; этапы 11–12 не начаты">
-                  <span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment"></span><span class="segment"></span>
+                <div class="segmented-progress" role="img" aria-label="Из 13 этапов завершены 12, включая этап 0; этап 12 — финальный аудит — в работе; ручная проверка подтверждена пользователем">
+                  <span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment done"></span><span class="segment"></span>
                 </div>
               </article>
 
               <aside class="next-gate">
-                <span class="gate-icon" aria-hidden="true">11</span>
+                <span class="gate-icon" aria-hidden="true">12</span>
                 <h3>Ближайшая контрольная точка</h3>
-                <p>Упаковать подтверждённый релиз в понятный portfolio case study: demo script, ключевые экраны, ограничения и ретроспективу.</p>
-                <p class="small-note">Этап 11 ещё не начат. Evidence релиза сохранено отдельно от локальных проверок; rollback drill остаётся непроверенным.</p>
+                <p>CI <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36449212344">36449212344/1</a> подтвердил 7/7 checks исходников <code>2d4609ad…</code>. FA-03 закрыт по исходникам; этап 12/roadmap открыты. Hosted evidence относятся к <code>1195892…</code>, новый релиз не выполнялся; rollback drill непроверен.</p>
+                <p class="small-note">Статическая часть этапа 12 выполнена. Ручная проверка подтверждена пользователем; замечания DoD открыты; rollback drill непроверен.</p>
               </aside>
             </div>
 
             <div class="metrics-grid" aria-label="Ключевые показатели проекта">
-              <article class="metric-card"><strong class="accent">11</strong><span>этапов завершены, включая инициализацию 0</span></article>
-              <article class="metric-card"><strong class="amber">11</strong><span>следующий этап — упаковка портфолио</span></article>
-              <article class="metric-card"><strong class="cyan">59</strong><span>документов прошли строгий аудит без ошибок и предупреждений</span></article>
+              <article class="metric-card"><strong class="accent">12</strong><span>этапов завершены, включая инициализацию 0</span></article>
+              <article class="metric-card"><strong class="amber">12</strong><span>финальный аудит в работе; FA-03 закрыт по исходникам</span></article>
+              <article class="metric-card"><strong class="cyan">63</strong><span>документа прошли строгий аудит 28 сентября; это не CI кандидата</span></article>
               <article class="metric-card"><strong class="blue">23</strong><span>маршрута серверного сценария и demo-сессии</span></article>
             </div>
           </section>
@@ -1592,8 +1593,8 @@
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">8</span><div class="roadmap-body"><h3>Браузерный вертикальный срез</h3><p class="roadmap-question">Может ли пользователь пройти сценарий через реальный API?</p><p class="roadmap-result"><strong>Результат:</strong> 7 ролевых экранов и полный процесс 250 карточек; <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf">b00ff294</a>, <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963228130">push</a> / <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33963230414">PR CI</a> — 2/2.</p></div><span class="chip done">Завершено</span></article>
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">9</span><div class="roadmap-body"><h3>Качество</h3><p class="roadmap-question">Защищены ли критические правила на всех уровнях?</p><p class="roadmap-result"><strong>Результат:</strong> браузерные, PostgreSQL, security/performance проверки; <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc">3ee6570</a>, <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850">push</a> / <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850">PR CI</a> — 6/6.</p></div><span class="chip done">Завершено</span></article>
               <article class="roadmap-card" data-status="done"><span class="roadmap-no">10</span><div class="roadmap-body"><h3>Релиз</h3><p class="roadmap-question">Можно ли воспроизводимо развернуть и наблюдать приложение?</p><p class="roadmap-result"><strong>Результат:</strong> exact digest на Render/Neon Free, staging/production и recovery canonical/compact, 26-часовой fail-closed и сохранённые evidence; rollback drill непроверен без совместимого образа.</p></div><span class="chip done">Завершено · 7/7 задач</span></article>
-              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">11</span><div class="roadmap-body"><h3>Упаковка портфолио</h3><p class="roadmap-question">Поймёт ли работодатель ценность и глубину работы?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> ясный README, демонстрационный сценарий, изображения, ограничения и ретроспектива.</p></div><span class="chip planned">Не начато</span></article>
-              <article class="roadmap-card" data-status="planned"><span class="roadmap-no">12</span><div class="roadmap-body"><h3>Финальный аудит</h3><p class="roadmap-question">Соответствуют ли обещания реальному результату?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> проверены scope, документация, тесты, воспроизводимость и честность демонстрации.</p></div><span class="chip planned">Не начато</span></article>
+              <article class="roadmap-card" data-status="done"><span class="roadmap-no">11</span><div class="roadmap-body"><h3>Упаковка портфолио</h3><p class="roadmap-question">Поймёт ли работодатель ценность и глубину работы?</p><p class="roadmap-result"><strong>Результат:</strong> <a href="../README.md">README со схемой архитектуры</a>, <a href="portfolio/demo-script.md">сценарий показа</a>, <a href="portfolio/screenshots.md">четыре реальных скриншота</a>, <a href="portfolio/engineering-retrospective.md">ограничения и ретроспектива</a>; утверждения сверены с кодом и доказательствами.</p></div><span class="chip done">Завершено</span></article>
+              <article class="roadmap-card current" data-status="current"><span class="roadmap-no">12</span><div class="roadmap-body"><h3>Финальный аудит</h3><p class="roadmap-question">Соответствуют ли обещания реальному результату?</p><p class="roadmap-result"><strong>Ожидаемый результат:</strong> проверены scope, документация, тесты, воспроизводимость и честность демонстрации.</p></div><span class="chip current">В работе · Замечания DoD</span></article>
             </div>
 
             <div class="checkpoint">
@@ -1690,7 +1691,7 @@
 │  └─ <span class="folder">web/</span>        <span class="done">● браузерный срез</span>
 ├─ <span class="folder">packages/</span>
 │  └─ <span class="folder">contracts/</span>  <span class="done">● общие схемы</span>
-├─ <span class="folder">docs/</span>           <span class="done">● 59 документов</span>
+├─ <span class="folder">docs/</span>           <span class="done">● 63 Markdown-документа</span>
 ├─ <span class="folder">scripts/</span>        <span class="done">● UX-аудит</span>
 ├─ <span class="file">compose.yaml</span>      <span class="done">● локальный контур</span>
 ├─ <span class="file">Dockerfile</span>        <span class="done">● production-образ</span>
@@ -1737,11 +1738,11 @@
                 <p class="eyebrow">На чём основан статус</p>
                 <h2 id="quality-title">Доказательства готовности</h2>
               </div>
-              <p>Зелёный статус означает проверенный результат. Этапы 11–12 ещё не начаты и показаны отдельно от подтверждённого релиза.</p>
+              <p>Зелёный статус означает проверенный результат. Этап 11 закрыт после подготовки и аудита материалов; статическая часть этапа 12 выполнена, ручная проверка подтверждена пользователем; замечания DoD открыты.</p>
             </div>
 
             <div class="evidence-grid">
-              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено</span><span class="evidence-value">59 / 0 / 0</span></div><h3>Документация</h3><p>59 документов, 0 структурных ошибок и 0 предупреждений. Дополнительно выполнена смысловая сверка runtime contracts и границы hosted evidence.</p></article>
+              <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено</span><span class="evidence-value">61 / 0 / 0</span></div><h3>Документация</h3><p>Аудит упаковки: 61 документ, 0 структурных ошибок и 0 предупреждений. Итоги последующей сверки этапа 12 — в final-audit.md; ручная проверка подтверждена пользователем; этап открыт до решения по замечаниям DoD.</p></article>
               <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этап 7 · история</span><span class="evidence-value">11 + 5</span></div><h3>Серверные тесты на 02.09.2026</h3><p>11 обычных и 5 PostgreSQL integration tests покрывают порядок защиты routes, роли, инварианты, конфликты, масштабный выпуск и компактный API-only workflow. SHA и CI этапа 7 сохранены выше.</p></article>
               <article class="evidence-card"><div class="evidence-top"><span class="chip done">Этап 9 · пройдено</span><span class="evidence-value">157 + 25</span></div><h3>Локальные тесты этапа 9</h3><p>157 frontend, 10 обычных API, 5 PostgreSQL integration и 10 новых PostgreSQL regression tests — PASS. Условия и границы результатов сохранены в <a href="engineering/quality-gates.md">проверках качества</a>.</p></article>
               <article class="evidence-card"><div class="evidence-top"><span class="chip done">Пройдено локально</span><span class="evidence-value">3</span></div><h3>Миграции базы</h3><p>Чистая база применяет миграции 0001–0003, повторный seed и runtime verification.</p></article>
@@ -1782,14 +1783,14 @@
                 <p class="eyebrow">Маршрут к готовому MVP</p>
                 <h2 id="next-title">Что делать дальше</h2>
               </div>
-              <p>Этапы 1–10 закрыты. Этап 10 «Релиз» выполнен на 7/7 с сохранёнными hosted evidence. Далее — упаковка портфолио и финальный аудит; rollback drill остаётся ограничением.</p>
+              <p>Этапы 1–11 закрыты. Этап 10 «Релиз» выполнен на 7/7 с сохранёнными hosted evidence, материалы портфолио готовы. Все 22 DoD и CI кандидата 7/7 сверены. FA-03 закрыт по этим исходникам решением D-032 от 29 сентября; этап 12/roadmap открыты. Hosted health/logging остаются историческими; rollback drill непроверен.</p>
             </div>
 
             <div class="next-actions">
-              <article class="result-card"><span class="action-no">ШАГ 01</span><h3>Подготовить demo script · этап 11</h3><p>Описать короткий воспроизводимый путь по публичному демо и роли участников.</p><p class="definition">Статус: не начат.</p></article>
-              <article class="result-card"><span class="action-no">ШАГ 02</span><h3>Собрать визуальные материалы · этап 11</h3><p>Выбрать ключевые экраны, диаграммы и подтверждённые результаты проверок.</p><p class="definition">Статус: не начат.</p></article>
-              <article class="result-card"><span class="action-no">ШАГ 03</span><h3>Упаковать портфолио · этап 11</h3><p>Обновить README, ограничения и ретроспективу вокруг фактического релиза.</p><p class="definition">Статус: не начат.</p></article>
-              <article class="result-card"><span class="action-no">ШАГ 04</span><h3>Финальный аудит · этап 12</h3><p>Сверить scope, критерии готовности, документацию и воспроизводимость демонстрации.</p><p class="definition">Статус: не начат; завершает дорожную карту.</p></article>
+              <article class="result-card"><span class="action-no">ГОТОВО</span><h3>Сценарий показа · этап 11</h3><p><a href="portfolio/demo-script.md">Короткий сценарий</a> объясняет путь по демо, роли участников и условия показа.</p><p class="definition">Статус: завершено.</p></article>
+              <article class="result-card"><span class="action-no">ГОТОВО</span><h3>Визуальные материалы · этап 11</h3><p><a href="../README.md">Схема архитектуры</a> и <a href="portfolio/screenshots.md">четыре реальных скриншота</a> сопровождаются источниками и границами доказательств.</p><p class="definition">Статус: завершено.</p></article>
+              <article class="result-card"><span class="action-no">ГОТОВО</span><h3>Портфолио-кейс · этап 11</h3><p><a href="../README.md">README</a> и <a href="portfolio/engineering-retrospective.md">ограничения с ретроспективой</a> описывают фактический результат и инженерные решения.</p><p class="definition">Статус: завершено.</p></article>
+              <article class="result-card"><span class="action-no">ДАЛЕЕ</span><h3>Финальный аудит · этап 12</h3><p>Scope, код, тесты, evidence и документация сверены. <a href="project/final-audit.md">Замечания и ручной чек-лист</a>.</p><p class="definition">Статус: в работе; CI кандидата 7/7, D-032 утверждён по исходникам, дорожная карта не закрыта.</p></article>
             </div>
 
             <div class="boundary-box">
@@ -1807,6 +1808,10 @@
               <a href="architecture/system-context.md">Системный контекст</a>
               <a href="engineering/repository-structure.md">Структура репозитория</a>
               <a href="engineering/quality-gates.md">Проверки качества</a>
+              <a href="../README.md">Портфолио-кейс и схема архитектуры</a>
+              <a href="portfolio/demo-script.md">Сценарий показа</a>
+              <a href="portfolio/screenshots.md">Реальные скриншоты и их происхождение</a>
+              <a href="portfolio/engineering-retrospective.md">Ограничения и инженерная ретроспектива</a>
               <a href="ux/prototype.html">14-шаговый прототип</a>
               <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc">Implementation SHA этапа 9 · 3ee6570</a>
               <a href="https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850">Push CI этапа 9 · 6/6</a>
@@ -1819,7 +1824,7 @@
 
           <footer>
             <span>Production Work Card Workflow · независимый portfolio case study</span>
-            <span>Срез на 27.09.2026: этап 10 закрыт; rollback drill остаётся непроверенным</span>
+            <span>Срез на 29.09.2026: завершаем портфолио с прежним демо; этап 12 открыт до итогового CI и решения; rollback drill непроверен</span>
           </footer>
         </div>
       </main>
@@ -1873,12 +1878,13 @@
 
       const summary = [
         'Production Work Card Workflow — статус на 27.09.2026.',
-        'Закрыты этапы 1–10 и инициализация 0.',
+        'Закрыты этапы 1–11 и инициализация 0: 12 из 13 этапов.',
         'Этап 9: implementation SHA 3ee65709966f5775928de87783fd2946d085e2bc подтверждён локально, push CI и PR CI.',
         'Все 6 обязательных jobs успешны в каждом запуске: quality, container с image scan, security, browser (compact), browser (canonical), performance.',
         'Push CI: https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850.',
         'PR CI: https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850.',
         'Этап 10 «Релиз» закрыт на 7/7: exact digest на Render Free и двух Neon Free projects, staging/production и recovery canonical/compact browser, очистка test fixture и 26-часовой fail-closed подтверждены. Evidence: https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7. Rollback drill непроверен без предыдущего совместимого образа.',
+        'Этап 11 закрыт: README, схема архитектуры, короткий сценарий, четыре реальных скриншота, ограничения и ретроспектива готовы. Строгий аудит: 61 документ, 0 ошибок, 0 предупреждений. Статическая часть этапа 12 выполнена; ручная проверка подтверждена пользователем; замечания DoD открыты.',
       ].join(' ');
 
       copyButton.addEventListener('click', async () => {

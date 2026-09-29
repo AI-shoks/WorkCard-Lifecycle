@@ -1,0 +1,331 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "derived-local-summary",
+  "rawArtifactsPublished": false,
+  "reviewedOn": "2026-09-28",
+  "baseHead": "4e813f5a9641abe3068d1dfc544399d557028316",
+  "hashSemantics": "SHA-256 of the original local file bytes, before Git text normalization. Hashes identify supplied artifacts; they do not independently prove execution or make raw artifacts public.",
+  "verifiedCodeFiles": [
+    {
+      "path": "WorkCard-Lifecycle/apps/api/src/audit-event.test.ts",
+      "sha256": "dccf3d0ac607167019b5a33de48b575e7d5f31460b5aaa1f3f559ffaa4157e8f"
+    },
+    {
+      "path": "WorkCard-Lifecycle/apps/api/src/audit-event.ts",
+      "sha256": "2edf1dcb9df7ff5a46466bce43f9cd1278254ba5471daeedf85e295f075210db"
+    },
+    {
+      "path": "WorkCard-Lifecycle/apps/api/src/workflow-service.ts",
+      "sha256": "edbbd73e3438c12c72d51e64f2405dcb682c4a7308962cfc7b800ef595d7ca65"
+    },
+    {
+      "path": "WorkCard-Lifecycle/quality/audit-invariants.test.ts",
+      "sha256": "c26d00c82a43e01af6a43dba3037f2e3a1c00fed6cd29f7f4653b6830b253e96"
+    },
+    {
+      "path": "WorkCard-Lifecycle/quality/negative-workflow.test.ts",
+      "sha256": "650d9491894b56bd14d306a5554bfa14afaa531176d6433364e71cf1a2db963b"
+    },
+    {
+      "path": "WorkCard-Lifecycle/quality/transactions.test.ts",
+      "sha256": "da62034202782dc7065dfe0a33a89f1c42a6bd9d04feb92dd37b05b45da86a29"
+    }
+  ],
+  "documentationTaskHashChain": [
+    {
+      "path": "docs/project/final-audit.md",
+      "before_sha256": "f08f40c8db9f8e9921192823cbced418c75313dd48cfed8a472803a02a9fea33",
+      "after_sha256": "b7b8b1fbb57b727630a0dec952f91150da7f4f8c7267347eb9bf054b24ca9d49"
+    },
+    {
+      "path": "docs/engineering/quality-gates.md",
+      "before_sha256": "f152f45347248474a3eb673f14fa11d1f0a181b21154723c34b2aaaa4f7ed9a3",
+      "after_sha256": "8495c11201aa8e52b0186f6cb0539d04deb3c8b1db3c8203478b47f8a1992e81"
+    },
+    {
+      "path": "docs/requirements/requirements-traceability.md",
+      "before_sha256": "0429fad704d462cbe21cba01b367ec3d9f4660effa08250fdd8f18d66a82cf1a",
+      "after_sha256": "70a7582c9c41798a798a7e6ca0c0d51b092158709fac460094738ba977bb8015"
+    },
+    {
+      "path": "docs/project/backlog.md",
+      "before_sha256": "44852af03319800a61bcaaff558e202d50410fdded546e35e2878e8c414ef058",
+      "after_sha256": "f43b69d768bcd0df5133f3abd98af5ebbc89c8769fffa4841b4ead61c8a7332b"
+    },
+    {
+      "path": "docs/project/project-plan.md",
+      "before_sha256": "1b39e4432db3fae2a979d329e243d553468a9ea8b6f620e36df194d9b99ffceb",
+      "after_sha256": "af34f6fc01b80ea9ab63693bc8915452bc226c9e2bcf43ceb3e403d798c620ef"
+    },
+    {
+      "path": "docs/project/definition-of-done.md",
+      "before_sha256": "8ce0394e5f1fa80f31c2c0d577718fdabf6416d9387a61d09de847706a46daa4",
+      "after_sha256": "aedc05e58a8226db27c6af9970e5f140336252e5bb2e8c51531ada8a078633ba"
+    },
+    {
+      "path": "docs/portfolio/demo-script.md",
+      "before_sha256": "7b3a09834b03cfb07712377701dbf643407338697a70c83981cd6329b2cb4889",
+      "after_sha256": "ad563d4ca908b40b904e9b61290150e1a464f4efc0d79ad1a462c6a6822a9949"
+    }
+  ],
+  "documentationHashScope": "Seven files before and after the documentation task, not the final candidate documentation after publication edits. Candidate code remains byte-identical; final documentation is bound by the candidate Git tree.",
+  "historicalTests": {
+    "date": "2026-09-27",
+    "platform": "Windows",
+    "node": "24.19.0",
+    "vitest": "4.1.11",
+    "postgresql": "18.6",
+    "auditUnit": {
+      "passed": 85,
+      "failed": 0
+    },
+    "existingApiUnit": {
+      "passed": 69,
+      "failed": 0
+    },
+    "targetedPostgresql": {
+      "passed": 14,
+      "failed": 0,
+      "transactions": 2,
+      "auditInvariants": 6,
+      "negativeWorkflow": 6
+    },
+    "apiPostgresqlRegression": {
+      "passed": 5,
+      "failed": 0,
+      "intentionallyExcluded": 1,
+      "excludedScope": "retention/reset"
+    },
+    "staticAndApiBuild": "passed in the original technical task; not rerun for publication edits"
+  },
+  "smoke": {
+    "date": "2026-09-27",
+    "reviewedOn": "2026-09-28",
+    "actor": "agent",
+    "release": {
+      "sets": 3,
+      "cards": 250,
+      "uniqueEvents": 254
+    },
+    "firstCard": {
+      "status": "CLOSED",
+      "version": 5,
+      "serialAllowed": true
+    },
+    "payroll": {
+      "sequentialCommands": 2,
+      "records": 1,
+      "httpStatuses": [
+        201,
+        200
+      ],
+      "eventCounts": [
+        1,
+        0
+      ]
+    },
+    "finalAcceptance": {
+      "status": "FINAL_ACCEPTED",
+      "versions": [
+        3,
+        3,
+        3
+      ],
+      "events": 1,
+      "fixture": "API-created batch with 250 CLOSED cards and gates prepared by owner SQL in disposable DB"
+    },
+    "console": {
+      "checkedTabs": 2,
+      "warnings": 0,
+      "errors": 0
+    },
+    "limits": [
+      "Not a full 250-card UI lifecycle",
+      "Sequential payroll calls do not prove simultaneous concurrency",
+      "No full checkout fingerprint or independently recorded web build digest",
+      "Keyboard activation was used because mouse click/drag automation failed"
+    ]
+  },
+  "verification": {
+    "originalTaskFiles": 22,
+    "directTechnicalHashesStillMatch": 15,
+    "intentionalDocumentationUpdates": 7,
+    "technicalAndSmokeArtifactHashesMatch": 35,
+    "documentationInputSnapshotFiles": 297
+  },
+  "rawTechnicalAndSmokeArtifacts": [
+    {
+      "path": ".quality-results/fa-0102-20260927/api-unit.json",
+      "sha256": "c294550f9e42d29f6aff7485047fd8cdabbcf0a0a9f00afe55128dc110d1dcaf"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/audit-unit.json",
+      "sha256": "3bb13ed65e4bb429047c00e55e04d9a8bdfb7d0f2abf323df4226e9e333774c3"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/checks.md",
+      "sha256": "cac3014523284fd215332b5fc777baeef67a82862bb9be70f91664186af52057"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/cleanup.json",
+      "sha256": "1af26bb82646f74ba383660b0585eae610c25c3ec806aea350019704fd0317b4"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/cluster.json",
+      "sha256": "9490a2702f6efb22aa09cd5c62b8e4e66e6164b8e8953bc1cc98aa80a5ea902e"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/docs-audit.json",
+      "sha256": "799139bd3d793fa0eba944d5dbfdcbf111bd7f3c26900c0638384b34cadedc24"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/fa-api-integration.json",
+      "sha256": "0e88a6676a3f3b81afaffddace11dba21c6776dc514930656d7b52177ec37d0e"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/fa-api-integration.log",
+      "sha256": "b6570c687dc053d54484bda05efc99384e2f3bc0c8b13e9ecd0b55a9c662311e"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/fa-quality.json",
+      "sha256": "50a7d5161bfdff5b16b5916140fdf97ff292b40cf0e4f704f3108dfadb837f87"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/fa-quality.log",
+      "sha256": "e027d0878f20db247482cb1fc473576f9a2bdbaff3304e0a40acf12a41f6d3ba"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/setup-notes.txt",
+      "sha256": "2fc0cef05c4d90dc1b03dec50da0d3a6007868746780ab591d1b76056450595b"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/stop.json",
+      "sha256": "fbb9623d722896778aa00bf509725d4a4239e7eda2cd977bea5a310bed13c692"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/stop.log",
+      "sha256": "3589d2bd01f8295cc7c9ec3f5e07625fcd347ccb6f33f2d80edafe5f5217c1fb"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/task-files.json",
+      "sha256": "ca85181ad836a06ed2dba680ca42830b01291207d1cf727f52a30e666828658e"
+    },
+    {
+      "path": ".quality-results/fa-0102-20260927/task.diff",
+      "sha256": "7046e4d276e180c5d1815881e784304d82abda5a4d4f3577107c7733ad78024c"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/audit-release-dom.txt",
+      "sha256": "a57589ea8b1ca22fa74f4d130cb6ef81757436c580443a05c066186f9cca788a"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/audit-release.png",
+      "sha256": "0dd39bb4bc1eb1fff5cd15ab84cd1707766cb52a34443009157dabc8b71a01d2"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/console.json",
+      "sha256": "8b086079e8b1547e2e8770ba9be4f50ee8d6a70bd371a165ebff5ee265f2994e"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/db-readback.json",
+      "sha256": "02cfe4ba626644780b11c6c5a91b1bfe68f7bc7d5bb34a181d84352164b0bdbc"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/final-acceptance-desktop.png",
+      "sha256": "be241b94bd627fc23dbbe2ce040e26566d69468bc44428dc3c1f2fd823f11196"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/final-acceptance-dom.txt",
+      "sha256": "6195106bb1c18ac5f884752d68be7ff29bd88dd8daca3de5c14a4cba9fa56fdc"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/final-acceptance.png",
+      "sha256": "88b2e7a14e293faca10dddea2e605ec9a7bfe373b4c1ad723d510e2f09d1084c"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/final-reloaded-dom.txt",
+      "sha256": "24c6b272202285130c43d6c105d2acfb399f2b9a33e7ba55417eb148d5689bc6"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/first-acceptance-dom.txt",
+      "sha256": "d0cf5c75f99b6950803592d9bc79641cfedbf5d014e4feaa68754980847b66e2"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/first-acceptance.png",
+      "sha256": "831b642d52d9eaab1871fb376b231f5c86d2fe22a0629373b8bd374cac299b73"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/git-status.txt",
+      "sha256": "37ace51e02ccb7a0a55f69dbe6ea12b757891c42a6a2d91ea055bbaf2664c036"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/local-setup.json",
+      "sha256": "205b8d5d2a4a29e1495bc85372f10a5735ca772c28369da8d6f38659bd9e35de"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/payroll-first-dom.txt",
+      "sha256": "11b9124f334c9441140a126205d9193f8d2f69cac65ec3dd4a60084f1c32ee5b"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/payroll-repeat-dom.txt",
+      "sha256": "c919478f4f3d69b7f042131f8e9d498f318f3aca4214a0906be4fb370dbbf121"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/payroll-repeat.png",
+      "sha256": "8cf7aa15681c2b8e3cfe4d72953f6fe5f7068625114291f9c9b34e9c35c961e9"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/readback.mjs",
+      "sha256": "37f1315f81923f5c7c5fc4930b0706aea7d8145e33d4a4f9ee470add23e7e7e9"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/release-dom.txt",
+      "sha256": "cb693cea9b112fe74a7ba06048b53a75db57f5a8dd7e3b955f389e1d64255a6d"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/release.png",
+      "sha256": "01b159abb562f7f11bd8b096b4d24ceeceeb049ac813911df4cb5e5376536c75"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/report.md",
+      "sha256": "432771c14964516386d7f801bc0a7ee35dd84f296a924b271cf9759bc689d494"
+    },
+    {
+      "path": ".quality-results/fa-0102-ui-smoke-20260927/web.json",
+      "sha256": "df8b6f7d1dbf924f0d104442486930e4f937a2813db0e1b2c504653d712fdade"
+    }
+  ],
+  "rawDocumentationArtifacts": [
+    {
+      "path": ".quality-results/fa-0102-docs-20260928/task-files.json",
+      "sha256": "63c1cf4efcf2e0c0ed74634086f3615a0c556579da34b1a324b7da26114e9ae1"
+    },
+    {
+      "path": ".quality-results/fa-0102-docs-20260928/task.diff",
+      "sha256": "2720905d1e26839c8a6e517fc5c32d0059c4e86b702cfa5842e2fec9cdf19edf"
+    },
+    {
+      "path": ".quality-results/fa-0102-docs-20260928/checks.md",
+      "sha256": "140d0882cbdad3c09eb05b66dcca556f9fee73a6783d9a46ba0143eab8f8fe31"
+    },
+    {
+      "path": ".quality-results/fa-0102-docs-20260928/evidence-check.json",
+      "sha256": "b8c702b94973ee93f18a13e45a43fd7c072d34b249d05fd73aaed0a352b2aee0"
+    },
+    {
+      "path": ".quality-results/fa-0102-docs-20260928/preservation-check.json",
+      "sha256": "b0a61fcba7d39b79f811b8c39cf265fd123489c33e9d47bd08ca2def62c77053"
+    }
+  ],
+  "openItems": [
+    "FA-03",
+    "stage-12",
+    "roadmap"
+  ],
+  "rollbackDrill": "FA-05 unverified",
+  "candidateCi": {
+    "commitSha": null,
+    "run": null,
+    "attempt": null
+  }
+}

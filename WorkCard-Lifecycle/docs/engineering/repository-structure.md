@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 11
+version: 13
 owner: engineering
-updated: 2026-09-27
+updated: 2026-09-29
 ---
 
 # Repository Structure
@@ -39,7 +39,7 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 `infra/render` задаёт один Free image-backed service и локальные contract checks. `infra/terraform` сохраняет неактивные исторические root/runtime modules, provider lock, GitHub WIF и plan-safety checker. Более ранние незакоммиченные foundation/backend templates и дополнительные safety tests сохранены только в локальном рабочем дереве и не включены в Render/Neon commit. Незакоммиченные Terraform HCL/scripts/templates остаются локальной историей и не входят в текущую публикацию Render/Neon. Активный release gate не применяет GCP Terraform; `.terraform/`, state и plans остаются ignored. Причина перехода — [[0009-render-free-neon-free-release|ADR-0009]].
 
-`scripts/release/create-release-manifest.mjs` после успешной публикации и semantic scan validation создаёт только новый `docs/release/manifests/<SHA>.json` по `docs/release/release-manifest.v2.schema.json`; перезапись существующего build record запрещена. `validate-release-manifest.mjs` проверяет schema, cross-field bindings и исходный Trivy JSON. Последующие реальные lifecycle-факты создаёт `append-release-evidence.mjs` как новые последовательные hash-chained файлы по `docs/release/release-evidence.v2.schema.json`, не меняя initial manifest. Фактические manifest/evidence возникают только по результатам publication/hosted operations; локальные fixtures их не заменяют. Эти scoped операции разрешены владельцем по [[deployment]].
+`scripts/release/create-release-manifest.mjs` после успешной публикации и semantic scan validation создаёт только новый `docs/release/manifests/<SHA>.json` по `docs/release/release-manifest.v2.schema.json`; перезапись существующего build record запрещена. `validate-release-manifest.mjs` проверяет schema, cross-field bindings и исходный Trivy JSON. Последующие реальные lifecycle-факты создаёт `append-release-evidence.mjs` как новые последовательные hash-chained файлы по `docs/release/release-evidence.v2.schema.json`, не меняя initial manifest. Фактические manifest/evidence возникают только по результатам publication/hosted operations; локальные fixtures их не заменяют. Разрешения исторических scoped операций зафиксированы в [[deployment]] и не распространяются автоматически на новые работы; текущая граница портфолио — D-033 в [[decision-log]].
 
 `.env.owner` отделяет local owner credentials от runtime `.env`; оба ignored.
 
@@ -63,4 +63,4 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 ## Критерий принятия
 
-Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender и hosted smoke/evidence validators покрыты позитивными и негативными tests; `ci.yml`, `release.yml`, `deploy.yml`, `reset.yml`, `rollback.yml` и `recovery-qualification.yml` проходят `actionlint` в CI. GCP Terraform results исторические; активный `release_iac` проверяет Render/Neon deployment contract. Удалённый CI, deployment и hosted recovery для опубликованного digest подтверждены в [[quality-gates]] и [[deployment]]; локальное состояние другого SHA не подменяет эти записи.
+Структура принята после успешных workspace typecheck/tests/build, сборки multi-stage образа из чистого Docker build context и подтверждения, что repo-root workflows запускают команды из `WorkCard-Lifecycle/`. Release schema/validator/generator/appender и hosted smoke/evidence validators покрыты позитивными и негативными tests. Штатная job `release_iac` задаёт `actionlint` для пяти workflows: `ci.yml`, `release.yml`, `deploy.yml`, `reset.yml`, `rollback.yml`. `recovery-qualification.yml`, recovery helpers и дополнение browser harness сохранены из main при интеграции 29 сентября. Recovery workflow не входит в перечисленные пять файлов штатного actionlint step; наличие файла не считается доказательством проверки этим step. CI `36449212344/1` подтвердил 7/7 для `2d4609ad…`; объединённому составу нужен собственный CI. GCP Terraform results исторические; активный `release_iac` проверяет Render/Neon deployment contract. Удалённый CI, deployment и hosted recovery для опубликованного digest подтверждены в [[quality-gates]] и [[deployment]]; локальное состояние другого SHA не подменяет эти записи.
