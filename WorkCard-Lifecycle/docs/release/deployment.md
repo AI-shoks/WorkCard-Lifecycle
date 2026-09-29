@@ -1,22 +1,48 @@
 ---
 artifact_id: release.deployment
 status: accepted
-version: 22
+version: 23
 owner: release
 updated: 2026-09-29
 ---
 
 # Deployment
 
-**Граница текущей работы — D-033:** завершается портфолио-кейс, публичное демо остаётся прежней версии `1195892…`. Новый release/deployment не требуется для выбранной цели и не разрешён этим решением. Приведённый ниже runbook сохраняется для эксплуатации существующего демо и возможных будущих отдельно разрешённых работ; текущая доступность этим документом не подтверждается.
+**Текущая работа — D-034:** обновить существующее публичное демо проверенным image. Прежнее решение D-033 заменено; итоговый статус и ограничения приведены ниже.
 
-Граница первоначального статического аудита 27 сентября: [[final-audit]] проверил локально сохранённые records/hashes и соответствие runtime source, без online запросов, deployment или reset. Приведённые hosted результаты относятся к указанным runs и средам; текущая доступность/Free и scheduled reset не проверялись заново. Recovery runner с Neon не является повторным production Render smoke. FA-01/02 сначала закрыты локально, затем исходники `2d4609ad0188a0ec2e77ef1065195971aa14c455` прошли CI `36449212344/1` — 7/7 checks, [[quality-gates]]. Новый hosted release не выполнялся; последний документированный hosted source — `1195892f15f2f240dd04f39e8388d6bb8802d9a7`. Его health/logging не подтверждают новый commit или доступность сейчас. Исторические release PASS и ручное подтверждение пользователя без SHA/окружения не переносятся на новый код. Этап 12 и roadmap открыты до отдельного решения по DoD и квалификации выбранной версии.
+Первоначальный статический аудит 27 сентября и последующая квалификация `2d4609ad…` сохранены в [[final-audit]] и исторических разделах ниже. Их результаты имеют собственные версии и не подменяют квалификацию нового размещения.
 
 Контракт [[0009-render-free-neon-free-release|ADR-0009]] реализован для одного Render Free service и двух отдельных Neon Free PostgreSQL 18 projects. Владелец разрешил scoped Git/cloud/DB действия только для этих ресурсов. Платные планы, add-ons, overage, payment methods, GCP apply/destroy и изменение посторонних ресурсов запрещены. Ниже зафиксированы фактические результаты hosted qualification и её границы.
 
 Репозиторий — источник текущей реализации. Workflows находятся в `.github/workflows/` родительского Git root; shell steps работают в `WorkCard-Lifecycle/`. GCP Terraform неактивен. Полный прежний runbook, включая foundation/backend work, сохранён в [[deployment-gcp-history]]; его исторические сведения об аккаунтах не являются новой внешней проверкой.
 
-## Фактическое состояние на 27 сентября 2026 года
+## Обновление демо 2026-09-29
+
+Работа выполняется по D-034 в [[decision-log]] в отдельном чистом checkout от `bdb2647520639b9ca690dfd6d00402076463a63a`. Исходная папка с чужими незакоммиченными изменениями не изменялась. [PR #17](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/17) объединён, фактический main и все семь jobs [CI 36544788733](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733) сверены через GitHub.
+
+| Проверка | Фактический результат |
+|---|---|
+| Release | [36597671054](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36597671054), обе jobs success; сборка точного `bdb2647…` выполнена один раз |
+| Новый image | `ghcr.io/ai-shoks/workcard-lifecycle/work-card@sha256:140d39890df43a8fb4db2a4c7eceec47634e1a5654edef618fe97d75b793c093` |
+| Scan и records | HIGH/CRITICAL: 0; [manifest](manifests/bdb2647520639b9ca690dfd6d00402076463a63a.json), scan и checksums сохранены в [GitHub Release](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-bdb2647520639b9ca690dfd6d00402076463a63a); штатный `fetch-release.mjs` прошёл |
+| Текущий Render | Один `work-card-demo`, Free, image-backed, auto-deploy выключен, без disk/registry credentials; persistent/live image всё ещё `231d91a7…`, source `1195892…`, deploy `dep-danb2d0ae00c73e5nv80` |
+| Read-only HTTP | `/`, `/health/live`, `/health/ready`: HTTP 200; это проверка прежнего image, не нового |
+| Neon runtime | Раздельные staging/production targets доступны с TLS 1.3 и проверенным сертификатом, PostgreSQL 18.6, runtime-роль `workcard_app`; effective transaction/statement/lock/idle budgets `15000/10000/3000/15000` мс при startup options приложения |
+| Daily reset | [Scheduled run 36542957134](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36542957134) success; production `last_reset_verified_at=2026-09-29T08:29:38.971Z`, maintenance flags false. Ручной reset публичной БД не запускался |
+| Staging | Последний reset `2026-09-19T15:32:43.528Z`; перед новым browser run требуется разрешённый staging reset. Новый image в staging пока не квалифицирован |
+| Тарифы/квоты | Free самого Render service подтверждён API. Текущие workspace billing/usage и Neon plan/quotas ещё не подтверждены: сохранённый Neon management key не проходит аутентификацию; кабинет через браузер пока недоступен. До завершения preflight promotion не выполняется |
+
+Прежний release archive скачан, SHA-256 `e2edb7672b9b2c4a9a735ece260c601a6d60871aef25f2db4ddf77095f1e0c89` совпал; records 0001–0005 сохранены. Новый и прежний manifests имеют одинаковый migration checksum `sha256:26c4573a527c8748a0cd837b844c433fdb4dc8a5ee599dbab7a3060c3a0357cd`. Анонимно проверены manifests/configs, OCI source/APP_VERSION и доступность всех 24 слоёв каждого image. Старый GHCR image и Release сохраняются на срок эксплуатации, без удаления/перезаписи.
+
+### Восстановление перед переключением
+
+Штатный `deploy.yml` сначала выполняет owner preparation и reset только staging, затем canonical browser. Production получает `operation=release`, сохраняющий возраст последнего reset. Adapter до PATCH сохраняет previous image и durable intent, после запуска — deploy ID, затем live record до smoke. При ошибке не выдавать prepared/triggered record за успешное размещение.
+
+Если новый image фактически стал live и требует возврата, использовать `rollback.yml` с `current_sha=bdb2647520639b9ca690dfd6d00402076463a63a`, `target_sha=1195892f15f2f240dd04f39e8388d6bb8802d9a7` и фактическим четырёхзначным sequence нового deployment record. Перед запуском record/deploy ID должны совпасть с live Render; несовпадение требует read-only сверки, а не принудительного переключения. Down migrations, изменение secrets и reset production не выполняются. Возврат к прежнему image временно возвращает старые зависимости; это аварийный путь, не целевая версия. Сам план и совпадение migration checksums не являются rollback drill.
+
+Этап 12/roadmap пока открыты. После квалификации нового image документы должны связать фактические deployment/smoke/logging результаты с `bdb2647…`; последующие документационные SHA не являются новой версией приложения.
+
+## Историческое состояние на 27 сентября 2026 года
 
 Опубликованный [release record](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7) для source SHA 1195892f15f2f240dd04f39e8388d6bb8802d9a7 сохраняет пять связанных evidence records и отчёты staging, Render deployment, public smoke и proxy observations. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053) завершил все семь jobs успешно: staging canonical 112 → 3 → 250, persistent/live digest sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057 и production smoke. Публичный https://work-card-demo.onrender.com 27 сентября ответил HTTP 200 на /health/live, /health/ready и /.
 
