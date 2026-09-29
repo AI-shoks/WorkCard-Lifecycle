@@ -1,9 +1,10 @@
 ---
 artifact_id: architecture.adr.0006
-status: accepted
-version: 1
+status: superseded
+version: 2
 owner: architecture
-updated: 2026-09-01
+updated: 2026-09-27
+superseded_by: "[[0010-pg-sql-and-local-payroll-service]]"
 ---
 
 # ADR-0006. Idempotent local payroll adapter

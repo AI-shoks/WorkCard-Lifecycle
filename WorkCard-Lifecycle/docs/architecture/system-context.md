@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.system-context
 status: accepted
-version: 7
+version: 8
 owner: architecture
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # System Context
@@ -21,7 +21,7 @@ C4Context
     Person(qc, "Контролёр БТК", "Принимает первую деталь, карточку и завершённую партию")
     Person(admin, "Администратор / аудитор", "Читает аудит и запускает mock export")
     System(system, "Production Work Card Workflow", "Браузерный MVP жизненного цикла рабочей карточки")
-    System_Ext(payroll, "Payroll", "Внешняя система отсутствует; используется внутренний mock adapter")
+    System_Ext(payroll, "Payroll", "Внешняя система отсутствует; результат хранится в собственной БД")
 
     Rel(planner, system, "HTTPS, русский UI")
     Rel(master, system, "HTTPS, русский UI")
@@ -31,7 +31,7 @@ C4Context
     Rel(system, payroll, "Не вызывает в MVP", "явная mock-граница")
 ```
 
-Mock payroll показан как внешняя граница смысла, но не как реальная сеть: реализация MVP записывает единственную `PayrollRecord` в собственную БД через порт [[mock-integrations]].
+Mock payroll показан как внешняя граница смысла, но не как реальная сеть: метод `exportWorkCardToPayroll` общего `workflow-service.ts` записывает единственную `PayrollRecord` в собственную БД. Отдельных port/adapter нет; текущая реализация описана в [[mock-integrations]] и [[0010-pg-sql-and-local-payroll-service|ADR-0010]].
 
 ## Контейнеры
 
@@ -58,7 +58,7 @@ C4Container
 4. **Reference data синтетические и read-only.** UI не редактирует паспорта, operation plans или нормы.
 5. **Mock payroll не является реальной интеграцией.** Нет исходящего HTTP, денег, персональных начислений или фоновой доставки.
 
-## Backend-модули
+## Логические области backend
 
 | Модуль | Ответственность | Не владеет |
 |---|---|---|
@@ -68,9 +68,9 @@ C4Container
 | `work-card-sets` | operation scope, first-article gate, массовое назначение | финальная приёмка партии |
 | `work-cards` | assignment, lifecycle, per-card quality confirmation | идентичность физической детали |
 | `audit` | append-only события и полный query по `correlationId` | восстановление текущего состояния через replay |
-| `payroll` | порт и идемпотентный mock adapter | денежный расчёт или внешняя доставка |
+| `payroll` | идемпотентная локальная команда и immutable record | денежный расчёт или внешняя доставка |
 
-Модули вызываются через application services; route handlers только аутентифицируют запрос, валидируют contract и преобразуют результат/ошибку в HTTP.
+Таблица описывает ответственность, а не отдельные физические модули. Session/security выделены отдельно; предметные SQL-команды и queries находятся в общем `createWorkflowService` (`apps/api/src/workflow-service.ts`). Route handlers аутентифицируют запрос, проверяют permission и Origin/CSRF, валидируют contract и преобразуют результат/ошибку в HTTP. Разделение service на самостоятельные repositories/ports/adapters не реализовано.
 
 ## Основной поток данных
 

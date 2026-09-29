@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.transactions-concurrency
 status: accepted
-version: 4
+version: 6
 owner: architecture
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # Transactions and Concurrency
@@ -27,14 +27,14 @@ updated: 2026-09-17
 
 1. Проверить trusted session, route permission, mutation Origin/CSRF и затем JSON schema вне транзакции.
 2. Начать `READ COMMITTED` transaction, получить shared maintenance barrier, отдельным SQL statement проверить persistent state/freshness и повторно проверить active session/generation; только затем вставить `command_receipt(state = IN_PROGRESS)` с уникальным `commandId`.
-3. Если insert проиграл unique race, дождаться winner transaction и прочитать receipt:
-   - тот же type/actor и `SUCCEEDED` → вернуть сохранённый result как replay;
-   - другой type/actor → `COMMAND_ID_REUSED`;
-   - отсутствие row после rollback winner → повторить insert один раз в той же новой transaction.
+3. `INSERT ... ON CONFLICT DO NOTHING` сериализует одинаковый `commandId`. Если insert вернул `0` rows, прочитать committed receipt:
+   - тот же type, actor/role, request fingerprint и `SUCCEEDED` → вернуть сохранённый body с `200` как replay;
+   - несовпадение или отсутствие подходящего receipt → `COMMAND_ID_REUSED`.
+   Если конкурирующая вставка откатилась, PostgreSQL допускает исходный insert; отдельного application retry insert нет.
 4. Заблокировать aggregate rows в каноническом порядке.
 5. Проверить существование разрешённых caller ресурсов, state, purpose, gate, resource-dependent business input и все versions.
-6. Применить changes; каждый изменённый root увеличивает version ровно на один.
-7. Вставить по одному audit event на resulting aggregate version.
+6. Применить changes; SQL увеличивает каждую изменённую version ровно на один, а результат `RETURNING` сверяется с locked previous version. Новые roots создаются с v1.
+7. Проверить типизированный payload, сопоставить event version с persisted aggregate и вставить по одному событию на resulting version; проверить фактический `rowCount` вставки. Правила и границы — [[audit-log-design]].
 8. Завершить receipt: result, HTTP status, `event_count`, `correlation_id`, `SUCCEEDED`.
 9. Commit; только после commit вернуть success.
 
@@ -121,11 +121,13 @@ Card/set versions не передаются этой командой и не и
 
 ### `ExportWorkCardToPayroll`
 
-Lock card, проверить expected version, `CLOSED` и assignee. Затем insert `payroll_records` по unique `work_card_id`:
+`exportWorkCardToPayroll` общего `workflow-service.ts` блокирует card, проверяет expected version, `CLOSED` и assignee, затем читает `payroll_records` по unique `work_card_id`:
 
 - новая row → record + event + receipt;
-- уже существует → вернуть существующую запись без изменения card, новой версии или event;
-- concurrent inserts сериализует unique index; loser перечитывает winner row.
+- уже существует → вернуть существующую запись без изменения card, новой версии или event; новый command получает собственный success receipt с `event_count = 0`;
+- concurrent commands сериализует lock карточки; следующая команда читает committed record. Unique index дополнительно защищает от дубликатов.
+
+Port/adapter слой отсутствует, как зафиксировано в [[0010-pg-sql-and-local-payroll-service|ADR-0010]].
 
 ## Version semantics
 
@@ -165,6 +167,8 @@ Runtime только читает `maintenance`, `maintenance_requested`, `gener
 
 ## Обязательные integration tests
 
+Это перечень требуемых проверок; исполнение и применимость к версии подтверждаются отдельно в [[quality-gates]], а не фактом наличия тестового файла.
+
 1. Два assignment с одной version: ровно один success, второй conflict, без partial rows.
 2. Повтор одинакового `commandId` возвращает один result и один event set.
 3. Release failure на середине factory не оставляет batch status/sets/cards/events.
@@ -176,3 +180,5 @@ Runtime только читает `maintenance`, `maintenance_requested`, `gener
 
 9. Maintenance race: допущенные reads/commands завершаются до exclusive close, ожидающие shared reads видят новое состояние отдельным statement; session cleanup тоже блокируется.
 10. Auth-reset-command не создаёт receipt/event; error/cancellation оставляет gate закрытым, verify не меняет timestamp и не открывает доступ.
+11. FA-01: ошибочный payload/version/increment или неполная audit insert откатывают все восемь business/audit/receipt таблиц; отдельные unit и PostgreSQL assertions — [[test-strategy]].
+12. FA-02: key negative branches assignment/lifecycle/final prerequisites/version conflicts не меняют полный business snapshot, включая receipts; результаты исполнения — [[quality-gates]].

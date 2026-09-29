@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.database-bootstrap
 status: accepted
-version: 5
+version: 6
 owner: engineering
-updated: 2026-09-19
+updated: 2026-09-27
 ---
 
 # Database Bootstrap
@@ -146,11 +146,14 @@ Requested и затем maintenance close коммитятся до reset/migrat
 ## Локальные команды и доказательства
 
 ```powershell
+$env:DOTENV_CONFIG_PATH = (Resolve-Path '.env.owner').Path
 pnpm db:bootstrap
 pnpm db:verify
 ```
 
-Команды выполняются в отдельной owner shell с `.env.owner`, API — в отдельной runtime shell с `.env`. Совместимые низкоуровневые `db:migrate`/`db:seed` сохранены: migrate закрывает gate и оставляет закрытым, seed + verify завершает initial bootstrap; повтор не освежает timestamp. `db:reset-demo` выполняет полный owner reset contract. После 26h repeat bootstrap/release отказываются reopen: нужен reset.
+Команды выполняются из корня проекта в отдельной owner shell с `.env.owner`, API — в отдельной runtime shell с `.env`. `owner-cli.ts` использует `dotenv/config`; без абсолютного `DOTENV_CONFIG_PATH` package script ищет `.env` в `apps/api` и не загружает корневую `.env.owner`. Уже установленные переменные shell имеют приоритет над файлом. Compose передаёт owner/runtime environment явно и не загружает `.env.owner` автоматически. Подготовка файлов и раздельный host-запуск — [[local-development]].
+
+Совместимые низкоуровневые `db:migrate`/`db:seed` сохранены: migrate закрывает gate и оставляет закрытым, seed + verify завершает initial bootstrap; повтор не освежает timestamp. `db:reset-demo` выполняет полный owner reset contract. После 26h repeat bootstrap/release отказываются reopen: нужен reset.
 
 `db:verify` теперь использует только owner URL: проверяет history/checksums, канонические fixtures и runtime privileges через catalogs (`has_table_privilege`), атрибуты, memberships и ownership роли. Он не использует runtime password или `SET ROLE`, не открывает gate и не обновляет timestamp. Проверяются:
 
@@ -170,4 +173,4 @@ pnpm db:verify
 
 Исторический baseline этапа 7: миграции `0001`–`0003` применены к чистой PostgreSQL, повторный migrate подтвердил checksum, seed повторяем, runtime verification и DB integration suite прошли. PostgreSQL 18.6 дополнительно проверяется CI service/container job.
 
-Новый gate дополнительно проверяет bootstrap/repeat с non-superuser owner, privilege rejection, runtime read-only maintenance state, migration checksums, read/session/command races, auth-reset race, cancellation и fail-closed age. Результаты текущего прохода перечислены отдельно в [[quality-gates]]; существующая история успешных тестов не объявляется проверкой новых изменений или Neon.
+Тестовый набор maintenance gate содержит bootstrap/repeat с non-superuser owner, privilege rejection, runtime read-only maintenance state, migration checksums, read/session/command races, auth-reset race, cancellation и fail-closed age. Наличие этих тестов не доказывает их успешный запуск: сохранённые результаты и их версии перечислены отдельно в [[quality-gates]]. Аудит 27 сентября 2026 года проверил инструкции по коду и конфигурации без выполнения owner-команд; существующая история успешных тестов не объявляется новым прогоном текущего дерева или Neon.

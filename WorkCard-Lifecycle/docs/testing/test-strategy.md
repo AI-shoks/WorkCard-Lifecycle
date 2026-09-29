@@ -1,9 +1,9 @@
 ---
 artifact_id: testing.strategy
 status: active
-version: 4
+version: 7
 owner: quality
-updated: 2026-09-17
+updated: 2026-09-28
 ---
 
 # Test Strategy
@@ -27,7 +27,15 @@ updated: 2026-09-17
 | `T-API-E2E-SMALL` | integration | Компактная fixture проходит создание, выпуск, first article, serial lifecycle/quality, final acceptance, payroll и audit/read-back только HTTP-командами. |
 | `T-E2E-FINAL-BATCH-001` | browser | Happy path показывает отдельное действие и actor/time/ID после all-closed state. |
 
-Текущий `workflow.integration.test.ts` содержит 5 тестов. Масштабный сценарий проверяет `3 sets / 250 cards / 254 release events`, `60 + 52`, concurrent assignment, replay и полноту audit; перед финальной приёмкой оставшееся массовое CLOSED-состояние в нём готовится owner-SQL и поэтому не объявляется API-only доказательством всех 250 lifecycle-переходов. Отдельный компактный сценарий из двух карточек выполняет каждый заявленный переход через HTTP API, включая final acceptance, payroll и read-back. Остальные проверки покрывают permission/order, CSRF/Origin без side effect, competing final commands, concurrent payroll export и runtime immutable grants.
+Текущий `workflow.integration.test.ts` содержит 6 тестов. Масштабный сценарий проверяет `3 sets / 250 cards / 254 release events`, `60 + 52`, concurrent assignment, replay и полноту audit; перед финальной приёмкой оставшееся массовое CLOSED-состояние в нём готовится owner-SQL и поэтому не объявляется API-only доказательством всех 250 lifecycle-переходов. Отдельный компактный сценарий из двух карточек выполняет каждый заявленный переход через HTTP API, включая final acceptance, payroll и read-back. Остальные проверки покрывают permission/order, CSRF/Origin без side effect, competing final commands, concurrent payroll export и runtime immutable grants. Шестой тест проверяет demo capacity и owner reset mutable данных. Все 37 AC сопоставлены с фактическими тестами и сохранёнными результатами в [[final-audit]]; FA-01/02 закрыты целевыми дополнениями ниже; общая зелёная suite не является доказательством каждой отрицательной ветви каталога. Наличие теста и его успешный запуск фиксируются раздельно.
+
+## Точечное покрытие FA-01/02
+
+`apps/api/src/audit-event.test.ts` проверяет 12 event-specific payload shapes без изменения public response envelope. `quality/audit-invariants.test.ts` использует реальный executor/SQL и инъекции неверного payload/version на границе validator, а также PostgreSQL triggers неправильного increment/stored version и подавленной вставки. В каждом случае сравнивается полный business snapshot. Успешный выпуск проверяет 250 cards, 254 events, действительные workCardSetIds, версии и same-command replay.
+
+`quality/negative-workflow.test.ts` дополняет existing assertions существенными ASG-002/LIF-005/FBA-002/version negatives. Каждая ошибка проверяет HTTP/code и восемь таблиц целиком. FBA fixtures сначала достигают готовности через HTTP, затем отдельное owner-only изменение внутри disposable DB изолирует ровно одно предусловие; SQL assertions подтверждают остальные. Это тестовая подготовка, не обход runtime guard. В `transactions.test.ts` дополнительно подтверждён новый payroll command после export: прежняя record, нулевой event count и только новый receipt.
+
+Фактические PASS 2026-09-27: validator 85/85, targeted PostgreSQL 14/14; дополнительные gates и ограничения — [[quality-gates]]. На том локальном шаге браузер/E2E не запускались, предыдущий manual/CI PASS не переносился. Последующий CI `36449212344/1` подтвердил исходники `2d4609ad…`: 7/7 checks, включая compact/canonical browser; результаты и ограничения — [[quality-gates#CI кандидата FA-03 — 2026-09-28]]. Hosted release этим не подтверждается. Применённые migrations не менялись; новый infrastructure/runtime mechanism вне command service не добавлялся.
 
 ## Автоматизация этапа 9
 

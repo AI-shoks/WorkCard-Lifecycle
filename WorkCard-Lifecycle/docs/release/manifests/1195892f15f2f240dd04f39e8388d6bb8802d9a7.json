@@ -1,0 +1,60 @@
+{
+  "$schema": "../release-manifest.v2.schema.json",
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-17T10:37:09Z",
+  "sourceSha": "1195892f15f2f240dd04f39e8388d6bb8802d9a7",
+  "sourceCiRunUrl": "https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35210700261",
+  "imageTag": "ghcr.io/ai-shoks/workcard-lifecycle/work-card:1195892f15f2f240dd04f39e8388d6bb8802d9a7",
+  "imageDigest": "sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057",
+  "immutableImage": "ghcr.io/ai-shoks/workcard-lifecycle/work-card@sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057",
+  "imageConfigDigest": "sha256:b4a49e231f771826e45525f8ae14b42e8ee3cfe9e568d205b40b185ba89be25e",
+  "ociRevisionLabel": "1195892f15f2f240dd04f39e8388d6bb8802d9a7",
+  "platform": "linux/amd64",
+  "buildScanRunUrl": "https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35211261430/attempts/1",
+  "sourceBuildRunUrl": "https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35211261430/attempts/1",
+  "scan": {
+    "status": "passed",
+    "image": "ghcr.io/ai-shoks/workcard-lifecycle/work-card@sha256:231d91a73a72275cefa0bbfe25d316b73315eb1f783d5618ebf55019a39ff057",
+    "imageConfigDigest": "sha256:b4a49e231f771826e45525f8ae14b42e8ee3cfe9e568d205b40b185ba89be25e",
+    "scannerImage": "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969",
+    "reportPath": ".quality-results/release/image-vulnerabilities.json",
+    "reportSha256": "sha256:d38d7a93307b927334f6ada9f7eb1e764ddfaccbc0edd8a0ac708298c86e3087",
+    "reportSummary": {
+      "schemaVersion": 2,
+      "artifactType": "container_image",
+      "targetCount": 2,
+      "vulnerabilityCount": 0,
+      "severityThreshold": [
+        "HIGH",
+        "CRITICAL"
+      ]
+    }
+  },
+  "migrationsChecksumSummary": {
+    "algorithm": "sha256",
+    "digest": "sha256:26c4573a527c8748a0cd837b844c433fdb4dc8a5ee599dbab7a3060c3a0357cd",
+    "files": [
+      {
+        "path": "apps/api/migrations/0001_foundation.sql",
+        "sha256": "477a1a5d6eb9191b90095713f7daadd2df8b7972576a4675b20e13baab9ecfd7"
+      },
+      {
+        "path": "apps/api/migrations/0002_backend-vertical-slice.sql",
+        "sha256": "897bf313454d5191d0dbe6214e56100d1b0a0ea76dffe31bd05da81c863b551b"
+      },
+      {
+        "path": "apps/api/migrations/0003_align-operation-plan-norm-precision.sql",
+        "sha256": "ab79117fdc3918465039b4ce00eca234aabc017c4b91f89b08addd51c2a9b2a9"
+      },
+      {
+        "path": "apps/api/migrations/0004_demo-maintenance-state.sql",
+        "sha256": "0419e3ee2a1cebf03937410238dfdd8dab2d46e164910ac3ca8a8fc61fd8dab1"
+      }
+    ]
+  },
+  "lifecycleEvidence": {
+    "mode": "append-only-files",
+    "directory": "docs/release/evidence/1195892f15f2f240dd04f39e8388d6bb8802d9a7",
+    "recordSchema": "docs/release/release-evidence.v2.schema.json"
+  }
+}

@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.api-contracts
 status: accepted
-version: 6
+version: 8
 owner: architecture
-updated: 2026-09-17
+updated: 2026-09-27
 ---
 
 # API Contracts
@@ -192,13 +192,13 @@ Replay того же `commandId` и того же trusted actor возвраща
 
 ### Mock payroll
 
-Body содержит `commandId` и `expectedCardVersion`. Первый export — `201`; повтор для того же `workCardId`, даже с новым commandId, — `200` существующей записи с `Idempotent-Replay: true`. Новое событие при повторе не создаётся.
+Body содержит `commandId` и `expectedCardVersion`. Первый export — `201`; повтор для того же `workCardId`, даже с новым commandId, после version/state checks — `200` существующей записи с `Idempotent-Replay: true`. Новый command сохраняет отдельный success receipt/correlation с `event_count = 0`; новое событие не создаётся. Same-command replay возвращает сохранённый body/correlation без нового receipt. Реализация — локальная SQL-команда общего application service, описанная в [[mock-integrations]] и [[0010-pg-sql-and-local-payroll-service|ADR-0010]].
 
 ## Idempotency contract
 
 1. `commandId` — UUID клиента и основной idempotency key; заголовок `Idempotency-Key` не вводится как второй источник истины.
 2. Успешная команда сохраняет `command_receipt` в той же транзакции.
-3. Replay допустим только для того же command type и actor. Повторное использование ID для другого запроса — `409 COMMAND_ID_REUSED`.
+3. Replay допустим только для того же command type, actor/role и request fingerprint (target/body, включая expected versions). Повторное использование ID для другого запроса — `409 COMMAND_ID_REUSED`.
 4. Failed validation/authorization/domain command не сохраняет success receipt и может быть исправлен с новым commandId.
 5. UI не повторяет mutation автоматически; idempotency защищает явный replay и неопределённость транспортного ответа.
 
@@ -265,8 +265,10 @@ Errors используют `application/problem+json` (RFC 9457):
 
 ## Contract gates
 
-- TypeBox schema компилируется и генерирует OpenAPI без ошибок;
-- response serialization включена для всех маршрутов;
-- текущие negative tests покрывают unknown fields, invalid UUID/schema, role tampering и ранний security order; body-limit/decimal/date matrix относится к этапу 9;
-- automated OpenAPI snapshot diff относится к этапу 9; до него contract review выполняется по TypeBox schemas и generated document;
-- API tests доказывают отсутствие `sequenceNumber`, batch-level `normHours` и неявной final acceptance.
+Это требования к проверкам, а не свидетельство текущего запуска. Сохранённые результаты, SHA и окружения перечислены в [[quality-gates]] и [[requirements-traceability]].
+
+- TypeBox schemas должны компилироваться, а OpenAPI генерироваться без ошибок. В `workflow.integration.test.ts` есть запрос OpenAPI и проверка command path; полный automated snapshot diff не реализован.
+- Domain routes задают response schemas; generated OpenAPI endpoint публикует сам контракт. Утверждение о наличии схемы не доказывает исполнение каждой ветви ответа.
+- Negative tests содержат unknown fields, invalid UUID/schema, role tampering и ранний security order; `quality/security.test.ts` также содержит oversized input. Полная decimal/date/contract matrix и её успешное выполнение не подтверждены отдельным сохранённым результатом.
+- API tests содержат проверки отсутствия `sequenceNumber`, batch-level `normHours` и неявной final acceptance; их успешное выполнение устанавливается по evidence, а не наличию assertions.
+- Audit response сохраняет общий envelope с `data: Record<string, unknown>`; внутренняя event-specific валидация выполняется перед записью, см. [[audit-log-design]]. В `ProductionBatchReleased.data` добавлен предусмотренный каталогом `workCardSetIds`; routes/command bodies не меняются. Старые события не мигрируются, проверка gaps прежней per-card history не добавляется.

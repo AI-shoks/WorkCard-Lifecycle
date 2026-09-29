@@ -1,0 +1,61 @@
+{
+  "capturedOrSelectedOn": "2026-09-27",
+  "altered": false,
+  "notes": "Original screenshots; no retouching or simulated UI. Local report paths are ignored historical artifacts, not public download links. Stats belong to the source runs, not a fresh verification.",
+  "images": [
+    {
+      "file": "01-production-passport.png",
+      "sha256": "ebf2776f579d9d4b16c920477ca73c120d1cba119aa3cc46c44d070982c9884f",
+      "source": "https://work-card-demo.onrender.com/batches/new",
+      "description": "Public Render demo; planner passport read-only; captured 2026-09-27; no domain command"
+    },
+    {
+      "file": "02-work-card.png",
+      "sha256": "fcf75abdeedfc890f564d2df5163c409f060f665f689d99e535ab6bd15c217c1",
+      "source": ".quality-results/render-neon-local/canonical-initial-failure/test-results/lifecycle-canonical-112-→--0c3f3-ayroll-read-back-through-UI-desktop/test-failed-1.png",
+      "description": "Historical work card; diagnostic screenshot from failed attempt, not PASS evidence",
+      "localReport": ".quality-results/render-neon-local/canonical-initial-failure/browser-canonical.json",
+      "reportSha256": "b149e0287cb2a6902e42e970cff437e71f99bf5a78139fe1d72969fe47489196",
+      "reportStats": {
+        "startTime": "2026-09-17T08:30:15.508Z",
+        "duration": 471597.603,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "file": "03-final-acceptance-desktop.png",
+      "sha256": "6f0b84343de2dd161fc35adac8ed0c496dea9238505d4bcaf6be9bc6872800d4",
+      "source": "test-results/canonical/lifecycle-canonical-112-→--0c3f3-ayroll-read-back-through-UI-desktop/final-acceptance.png",
+      "description": "Local canonical 112/3/250; final acceptance",
+      "localReport": ".quality-results/render-neon-local/browser-canonical.json",
+      "reportSha256": "dc24503de6fc0a8c42a38989414434d30afe6c5bba90815d1220d34fa8e5c07c",
+      "reportStats": {
+        "startTime": "2026-09-17T08:39:35.921Z",
+        "duration": 631121.252,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "file": "04-final-acceptance-mobile.png",
+      "sha256": "6021d9a8bb63e1ef5eacef65d0d8e6108c8f1f8ab01cfdb2c75aae4c3157f12e",
+      "source": "test-results/compact/lifecycle-compact-112-→-3--cc8a6-ayroll-read-back-through-UI-mobile/final-acceptance.png",
+      "description": "Local compact 112/3/6; final acceptance",
+      "localReport": ".quality-results/render-neon-local/browser-compact.json",
+      "reportSha256": "eecdf11be4251502fe08ebe9dabbdb307258990b109e5fdd4603928142b2528d",
+      "reportStats": {
+        "startTime": "2026-09-16T22:22:34.756Z",
+        "duration": 73461.545,
+        "expected": 4,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    }
+  ]
+}
