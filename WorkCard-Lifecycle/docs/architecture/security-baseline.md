@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.security-baseline
 status: accepted
-version: 10
+version: 11
 owner: architecture
-updated: 2026-09-17
+updated: 2026-10-01
 ---
 
 # Security Baseline
@@ -77,7 +77,7 @@ Rate limiting, JSON parsing и body-size rejection технически пред
 - hosted app ограничивает live state значениями `DEMO_MAX_BATCHES=20` и `DEMO_MAX_SESSIONS=500`; capacity rejection даёт `409` до предметного side effect. Это ограничение накопления общей demo, а не tenant quota;
 - body limit `1 MiB`, graceful shutdown, connection timeout `10 s`, request timeout `15 s`, handler timeout `20 s`, keep-alive `5 s`;
 - runtime PostgreSQL pool: максимум 10 соединений, connection timeout `3 s`, idle pool timeout `10 s`, statement timeout `10 s`, lock timeout `3 s`, idle-in-transaction и transaction timeout `15 s`. Это ресурсные ограничения, не бизнес-SLA; DB timeout даёт безопасный `503`, UI использует существующее контрольное чтение;
-- API/DB timestamps server-side. `PROXY_TRUST_MODE=none` игнорирует forwarded headers локально/на Actions; `render` требует platform metadata и явный `PROXY_TRUSTED_CIDRS` peers. Initial Render `observe` не доверяет forwarded headers, запрещает CIDRs и принудительно закрывает `/api*`/readiness до DB; доступны liveness/SPA и peer logs. Нет безусловного `trustProxy=true`. Проверка CIDR-цепочки и spoof/rate-limit tests не заменяют hosted observation реальной Render chain/client IP; неизвестная цепочка блокирует public qualification.
+- API/DB timestamps server-side. `PROXY_TRUST_MODE=none` игнорирует forwarded headers локально/на Actions; `render` требует platform metadata и явный `PROXY_TRUSTED_CIDRS` для непосредственного socket peer. В Render-режиме логирование и rate limit берут client IP из `CF-Connecting-IP` только после проверки этого peer; отсутствие, неверный формат или недоверенный peer закрывают `/api*` с `503`. Это устраняет зависимость client IP от меняющихся внутренних `10.x` hops в `X-Forwarded-For`. Render [указывает](https://render.com/articles/host-pocketbase-on-render), что Cloudflare перезаписывает присланный клиентом `CF-Connecting-IP`; [Cloudflare описывает](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip) его как адрес подключившегося клиента. Initial Render `observe` не доверяет forwarded headers, запрещает CIDRs и принудительно закрывает `/api*`/readiness до DB; доступны liveness/SPA и peer logs. Нет безусловного `trustProxy=true`. Hosted smoke подставляет оба заголовка и требует `429` и независимого совпадения адреса в логах; до успешного результата новая версия не квалифицирована.
 - Idle pool errors логируются безопасно и не завершают процесс; budgets сохраняются. Пробуждение Neon/Render может не уложиться в budget и дать `503`, это не причина бесконечных retries или keepalive.
 
 Production `APP_ORIGIN` требует HTTPS независимо от Render marker; HTTP в hosted staging допускается только для loopback Docker.
@@ -134,7 +134,7 @@ Production Pino logger пишет однострочный JSON с ISO `time`, �
 | oversize body/list | PostgreSQL security test: body `413`, list из 251 ID `400`, бизнес-состояние неизменно |
 | public health | exact response contract: только status и `200/503`, version/database/migration details отсутствуют |
 | logs | unit test: безопасные JSON level/request fields присутствуют; cookie/token/query/body/DB URL/SQL/raw driver error отсутствуют |
-| proxy/IP | local XFF игнорируется; Render peer/CIDR-chain simulation игнорирует spoofed prefix и разделяет rate-limit key реальных client IP |
+| proxy/IP | local XFF игнорируется; Render проверяет immediate peer, берёт переписанный Cloudflare client IP, закрывает API без него; unit и hosted probes подставляют XFF/CF header и требуют один rate-limit key и `429` |
 | Neon URL | config tests отклоняют pooler/downgrade/неоднозначные параметры и неверные expected host/database; TLS использует проверку сертификата/hostname |
 | Maintenance | reads/session/commands закрываются под gate; owner fail/cancel не открывает; auth-reset race не создаёт receipt |
 | runtime DB role | update/delete immutable tables запрещены |

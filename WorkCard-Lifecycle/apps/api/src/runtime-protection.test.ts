@@ -9,6 +9,7 @@ import {
   handleIdlePoolErrors,
   proxyTrustPolicy,
   rateLimitKey,
+  renderClientIpResolver,
   safeLogger,
 } from './runtime-protection.js';
 
@@ -307,6 +308,67 @@ describe('proxy trust and rate-limit identity', () => {
         ip: '203.0.113.8',
         rateLimitKey: '203.0.113.8:session',
       });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('берёт Render client IP из проверенного Cloudflare header при смене внутренних hops', async () => {
+    const resolveClientIp = renderClientIpResolver(['169.254.1.1/32']);
+    const app = await buildApp({
+      appVersion: 'test',
+      clientIpResolver: resolveClientIp,
+      readiness: { check: async () => ({ database: 'up', migrationVersion: 4 }) },
+      trustProxy: proxyTrustPolicy('render', ['169.254.1.1/32']),
+    });
+    app.post('/api/v1/demo-session', async (request) => ({
+      effectiveIp: resolveClientIp(request),
+      forwardedIp: request.ip,
+      rateLimitKey: rateLimitKey(request, resolveClientIp(request) ?? request.ip),
+    }));
+    const nextHops = ['10.31.50.238', '10.24.232.2', '10.29.4.10'];
+    const requestFrom = (clientIp: string, index: number) =>
+      app.inject({
+        headers: {
+          'cf-connecting-ip': clientIp,
+          'x-forwarded-for': `192.0.2.${index}, ${clientIp}, ${nextHops[index % nextHops.length]}`,
+        },
+        method: 'POST',
+        remoteAddress: '169.254.1.1',
+        url: '/api/v1/demo-session',
+      });
+    try {
+      for (let index = 0; index < 30; index += 1) {
+        const response = await requestFrom('203.0.113.7', index);
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({
+          effectiveIp: '203.0.113.7',
+          forwardedIp: nextHops[index % nextHops.length],
+          rateLimitKey: '203.0.113.7:session',
+        });
+      }
+      expect((await requestFrom('203.0.113.7', 30)).statusCode).toBe(429);
+      expect((await requestFrom('203.0.113.8', 31)).statusCode).toBe(200);
+      expect(
+        (
+          await app.inject({
+            headers: { 'cf-connecting-ip': '203.0.113.9' },
+            method: 'POST',
+            remoteAddress: '198.51.100.20',
+            url: '/api/v1/demo-session',
+          })
+        ).statusCode,
+      ).toBe(503);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            remoteAddress: '169.254.1.1',
+            url: '/api/v1/demo-session',
+          })
+        ).statusCode,
+      ).toBe(503);
+      expect((await app.inject('/health/live')).statusCode).toBe(200);
     } finally {
       await app.close();
     }

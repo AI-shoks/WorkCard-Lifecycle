@@ -864,6 +864,9 @@ export async function probeHostedSurface({
             ...(currentSession ? { Cookie: currentSession.cookie } : {}),
             Origin: origin,
             'X-Forwarded-For': `192.0.2.${100 + index}`,
+            ...(platform === 'render'
+              ? { 'CF-Connecting-IP': `198.51.100.${100 + index}` }
+              : {}),
           }),
           method: 'POST',
         }),

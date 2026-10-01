@@ -1,9 +1,9 @@
 ---
 artifact_id: architecture.adr.0009
 status: accepted
-version: 2
+version: 3
 owner: architecture
-updated: 2026-09-17
+updated: 2026-10-01
 supersedes:
   - "[[0007-cloud-run-and-cloud-sql-release]]"
   - "[[0008-bounded-public-demo-operations]]"
@@ -21,8 +21,11 @@ supersedes:
 - Production и staging используют разные Neon Free projects с PostgreSQL 18. PG18 доступен в Neon без preview-ограничений с 2026-05-01; при создании явно задаётся major 18, фактический patch фиксируется через SQL в hosted qualification. Staging API работает локально или во временном Docker на Actions runner. Обычный CI использует только disposable локальную PostgreSQL и не имеет Neon credentials. [Neon PG18 GA](https://neon.com/docs/changelog/2026-05-01)
 - Единственная release-сборка публикуется в публичный GHCR; один immutable digest проходит scan, staging и production без rebuild. Render хранит постоянный exact image reference; deployment status и resolved digest сверяются после rollout.
 - До первой proxy qualification этот же единственный Render service работает в явном `observe`: нет доверия forwarded headers, API/readiness закрыты до DB, доступны liveness/SPA/peer logs. После наблюдения reviewed peers включается `render`; first bootstrap и обязательный smoke завершают открытие demo. Owner tasks исполняются отдельным одноразовым контейнером того же image. Runtime не получает owner URL/password; browser runner не получает ни DB, ни deployment secrets. TLS, role boundaries и переменные определены в [[environments]] и [[database-bootstrap]].
+
 - Owner/runtime подключаются к direct Neon endpoint с `sslmode=verify-full` и проверкой ожидаемых host/database. Transaction pooler несовместим с используемыми session locks и startup options, поэтому запрещён. Обоснование ограничений — [Neon connection pooling](https://neon.com/docs/connect/connection-pooling).
 - Runtime-роль создаётся SQL и не получает `neon_superuser`, elevated memberships или ownership. Роли, созданные Neon Console/API/CLI, имеют иной privileged default; переносить этот путь на runtime нельзя. [Neon roles](https://neon.com/docs/manage/roles)
+
+**Уточнение 2026-10-01.** Hosted smoke обновления `bdb2647…` обнаружил смену внутренних Render hops: rate limit видел три адреса `10.x` вместо одного клиента; полный browser lifecycle прошёл, но public qualification остановилась. Список проверенных CIDR остаётся границей доверия для непосредственного socket peer. Client IP для журналирования и лимитов в Render-режиме теперь берётся из `CF-Connecting-IP`, который [Render документирует как перезаписываемый Cloudflare](https://render.com/articles/host-pocketbase-on-render); при отсутствии корректного заголовка API закрывается. Это уточнение требует нового image, CI и повторной hosted проверки подставных заголовков и независимого client IP, а не расширения CIDR наугад. Неуспешный run и результат повторной проверки отражаются в [[deployment]].
 
 ## Общий демо-контур и обслуживание
 

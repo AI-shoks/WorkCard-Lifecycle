@@ -27,7 +27,7 @@ import { DomainError } from './domain-error.js';
 import { currentMigrationVersion as expectedMigrationVersion } from './database-gate.js';
 import { defaultDemoCapacity } from './demo-maintenance.js';
 import type { ReadinessService } from './readiness.js';
-import { registerRateLimits } from './runtime-protection.js';
+import { registerRateLimits, type ClientIpResolver } from './runtime-protection.js';
 import type { SessionManagerOptions } from './session-manager.js';
 
 export type BuildAppOptions = {
@@ -38,6 +38,7 @@ export type BuildAppOptions = {
     maximumSessions: number;
   };
   logger?: FastifyServerOptions['logger'];
+  clientIpResolver?: ClientIpResolver;
   pool?: Pool;
   readiness: ReadinessService;
   security?: SessionManagerOptions;
@@ -67,7 +68,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     trustProxy: options.trustProxy ?? false,
   });
 
-  await registerRateLimits(app);
+  await registerRateLimits(app, options.clientIpResolver);
 
   await app.register(helmet, {
     contentSecurityPolicy: {
@@ -98,8 +99,20 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
     );
     reply.header('X-Request-Id', request.id);
+    const path = request.url.split('?')[0] ?? '';
+    if (
+      options.clientIpResolver &&
+      (path === '/api' || path.startsWith('/api/')) &&
+      !options.clientIpResolver(request)
+    ) {
+      throw new DomainError({
+        code: 'DEMO_MAINTENANCE',
+        status: 503,
+        title: 'Демонстрационный контур временно недоступен',
+        detail: 'Повторите попытку позднее.',
+      });
+    }
     if (options.observationOnly) {
-      const path = request.url.split('?')[0] ?? '';
       if (path === '/health/ready') return reply.code(503).send({ status: 'unavailable' });
       if (path === '/api' || path.startsWith('/api/')) {
         throw new DomainError({
@@ -116,7 +129,9 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     const fields = {
       durationMs: reply.elapsedTime,
       method: request.method,
-      remoteIp: request.ip,
+      remoteIp: options.clientIpResolver
+        ? (options.clientIpResolver(request) ?? request.socket.remoteAddress)
+        : request.ip,
       remoteAddress: request.socket.remoteAddress,
       protocol: request.protocol,
       requestId: request.id,

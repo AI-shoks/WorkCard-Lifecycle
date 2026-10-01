@@ -1,4 +1,5 @@
 import rateLimit from '@fastify/rate-limit';
+import { BlockList, isIP } from 'node:net';
 import type { FastifyInstance, FastifyRequest, FastifyServerOptions } from 'fastify';
 import pino, { type DestinationStream, type Logger, type LoggerOptions } from 'pino';
 import type { Pool, PoolConfig } from 'pg';
@@ -155,6 +156,31 @@ export function handleIdlePoolErrors(pool: Pool, logger: Pick<Logger, 'warn'>): 
 }
 
 type RateLimitRequest = Pick<FastifyRequest, 'ip' | 'method' | 'url'>;
+export type ClientIpResolver = (request: FastifyRequest) => string | null;
+
+export function renderClientIpResolver(trustedCidrs: string[]): ClientIpResolver {
+  if (trustedCidrs.length === 0) throw new Error('Render proxy peer allowlist is required.');
+  const peers = new BlockList();
+  for (const cidr of trustedCidrs) {
+    const [address, bits] = cidr.split('/');
+    const family = isIP(address ?? '');
+    if (!address || !family) throw new Error('Invalid Render proxy peer allowlist.');
+    peers.addSubnet(
+      address,
+      bits === undefined ? (family === 4 ? 32 : 128) : Number(bits),
+      family === 4 ? 'ipv4' : 'ipv6',
+    );
+  }
+  return (request) => {
+    const rawPeer = request.socket.remoteAddress ?? '';
+    const peer = rawPeer.startsWith('::ffff:') ? rawPeer.slice(7) : rawPeer;
+    const family = isIP(peer);
+    if (!family || !peers.check(peer, family === 4 ? 'ipv4' : 'ipv6')) return null;
+    const header = request.headers['cf-connecting-ip'];
+    if (typeof header !== 'string' || header !== header.trim() || !isIP(header)) return null;
+    return header;
+  };
+}
 
 function rateLimitGroup(method: string, path: string) {
   return path === '/api/v1/demo-session' && method === 'POST'
@@ -166,18 +192,22 @@ function rateLimitGroup(method: string, path: string) {
         : 'mutation';
 }
 
-export function rateLimitKey(request: RateLimitRequest): string {
+export function rateLimitKey(request: RateLimitRequest, clientIp = request.ip): string {
   const path = request.url.split('?')[0] ?? '';
-  return `${request.ip}:${rateLimitGroup(request.method, path)}`;
+  return `${clientIp}:${rateLimitGroup(request.method, path)}`;
 }
 
-export async function registerRateLimits(app: FastifyInstance) {
+export async function registerRateLimits(app: FastifyInstance, resolveClientIp?: ClientIpResolver) {
   const maximum = { session: 30, health: 600, read: 3000, mutation: 600 };
   await app.register(rateLimit, {
     global: true,
     timeWindow: 60_000,
     cache: 10_000,
-    keyGenerator: rateLimitKey,
+    keyGenerator: (request) =>
+      rateLimitKey(
+        request,
+        resolveClientIp ? (resolveClientIp(request) ?? 'unverified-proxy') : request.ip,
+      ),
     max: (request) => {
       const path = request.url.split('?')[0] ?? '';
       return maximum[rateLimitGroup(request.method, path)];
