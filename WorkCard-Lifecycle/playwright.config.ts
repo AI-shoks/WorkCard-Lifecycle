@@ -16,8 +16,10 @@ export default defineConfig({
   retries: 0,
   forbidOnly: true,
   // 250 cards require 750 separate UI lifecycle decisions plus read-back and navigation.
-  // Allow for real Render/Neon latency, but keep a finite release timeout.
-  timeout: hosted ? 25 * 60_000 : canonical ? 15 * 60_000 : 120_000,
+  // Free Neon staging completed a prior canonical run in 24m and hit the 25m
+  // cap on a slower run; retain every UI assertion under a finite 40m budget.
+  timeout:
+    hosted && canonical ? 40 * 60_000 : hosted ? 25 * 60_000 : canonical ? 15 * 60_000 : 120_000,
   expect: { timeout: 10_000 },
   outputDir: `test-results/${scale}`,
   reporter: [
