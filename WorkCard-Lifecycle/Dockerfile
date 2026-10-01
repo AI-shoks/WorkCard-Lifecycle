@@ -15,7 +15,22 @@ RUN pnpm build
 RUN pnpm --filter @work-card/api --prod deploy /opt/work-card
 RUN cp -R apps/web/dist /opt/work-card/public
 
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:774b7d020b24214835769e24c3544835526cd0288f0b094eae48e8b2c2429a79 AS runtime
+# Distroless's current Debian 13 image still carries libssl3t64 deb13u2.
+# Install the exact Debian security package into the final image without a shell or apt.
+ADD --checksum=sha256:ff16bc048bcd7d1b256094450b79c77947d8e76fe2a24bd99b91021d591fa074 \
+  https://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl3t64_3.5.7-1~deb13u3_amd64.deb \
+  /tmp/libssl3t64.deb
+RUN test "$(dpkg-deb -f /tmp/libssl3t64.deb Package)" = libssl3t64 \
+    && test "$(dpkg-deb -f /tmp/libssl3t64.deb Version)" = '3.5.7-1~deb13u3' \
+    && test "$(dpkg-deb -f /tmp/libssl3t64.deb Architecture)" = amd64 \
+    && mkdir -p /opt/openssl-patch \
+    && dpkg-deb -x /tmp/libssl3t64.deb /opt/openssl-patch \
+    && dpkg-deb --ctrl-tarfile /tmp/libssl3t64.deb | tar -xOf - ./control > /opt/openssl-patch/libssl3t64.status \
+    && test -s /opt/openssl-patch/libssl3t64.status \
+    && test -s /opt/openssl-patch/usr/lib/x86_64-linux-gnu/libcrypto.so.3 \
+    && test -s /opt/openssl-patch/usr/lib/x86_64-linux-gnu/libssl.so.3
+
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:bb6b03d81066993293a10feda7250e8e1cc034035fe9b61cfceededa7c8bf04d AS runtime
 
 ARG APP_VERSION=0.1.0-dev
 LABEL org.opencontainers.image.revision="${APP_VERSION}"
@@ -28,6 +43,9 @@ ENV APP_ENV=production \
     PORT=3000 \
     WEB_DIST_PATH=/opt/work-card/public
 WORKDIR /opt/work-card
+COPY --from=build /opt/openssl-patch/usr/lib/x86_64-linux-gnu/libcrypto.so.3 /usr/lib/x86_64-linux-gnu/libcrypto.so.3
+COPY --from=build /opt/openssl-patch/usr/lib/x86_64-linux-gnu/libssl.so.3 /usr/lib/x86_64-linux-gnu/libssl.so.3
+COPY --from=build /opt/openssl-patch/libssl3t64.status /var/lib/dpkg/status.d/libssl3t64
 COPY --from=build --chown=65532:65532 /opt/work-card ./
 
 USER 65532:65532

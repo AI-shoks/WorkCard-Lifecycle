@@ -345,11 +345,20 @@ test('probes private IAM, sanitized HTTPS surface and negative controls without 
 test('public Render smoke requires secure host-only session cookies', async () => {
   const renderOrigin = 'https://work-card-demo.onrender.com';
   const options = { origin: renderOrigin, platform: 'render', runBrowser: false };
+  const spoofedCloudflareHeaders = [];
+  const fetchImplementation = hostedFetch({ platform: 'render' });
   const result = await probeHostedSurface({
     ...options,
-    fetchImplementation: hostedFetch({ platform: 'render' }),
+    fetchImplementation: async (input, init = {}) => {
+      if (new globalThis.URL(input).pathname === '/api/v1/demo-session' && init.method === 'POST') {
+        const header = new globalThis.Headers(init.headers).get('cf-connecting-ip');
+        if (header) spoofedCloudflareHeaders.push(header);
+      }
+      return fetchImplementation(input, init);
+    },
   });
   assert(result.checks.includes('session-cookie-security'));
+  assert.deepEqual(spoofedCloudflareHeaders, ['198.51.100.100', '198.51.100.101', '198.51.100.102']);
   for (const cookieAttributes of [
     '; Path=/; HttpOnly; SameSite=Lax',
     '; Path=/; SameSite=Lax; Secure',

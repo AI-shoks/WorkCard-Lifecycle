@@ -12,6 +12,7 @@ import {
   databaseBudgets,
   handleIdlePoolErrors,
   proxyTrustPolicy,
+  renderClientIpResolver,
   safeLogger,
 } from './runtime-protection.js';
 
@@ -36,6 +37,9 @@ async function main(): Promise<void> {
       revision: config.revision,
       service: config.serviceName,
     }),
+    ...(config.proxyTrustMode === 'render'
+      ? { clientIpResolver: renderClientIpResolver(config.proxyTrustedCidrs) }
+      : {}),
     pool,
     readiness: createDatabaseReadiness(pool),
     security: {
