@@ -470,6 +470,39 @@ test('temporary localhost staging validates session cookies without requiring HT
   assert(result.checks.includes('session-cookie-security'));
 });
 
+test('hosted browser waits for a fresh session window before the rate-limit burst', async () => {
+  const original = hostedFetch({
+    platform: 'local',
+    cookieAttributes: '; Path=/; HttpOnly; SameSite=Lax',
+  });
+  let browserCompleted = false;
+  let windowElapsed = false;
+  let burstRequests = 0;
+  const result = await probeHostedSurface({
+    origin: 'http://127.0.0.1:3000',
+    platform: 'local',
+    browserRunner: async () => {
+      browserCompleted = true;
+    },
+    waitForSessionWindow: async (duration) => {
+      assert(browserCompleted);
+      assert.equal(duration, 61_000);
+      windowElapsed = true;
+    },
+    fetchImplementation: (input, init = {}) => {
+      const forwarded = new globalThis.Headers(init.headers).get('x-forwarded-for');
+      if (forwarded?.startsWith('192.0.2.10')) {
+        assert(windowElapsed);
+        burstRequests += 1;
+      }
+      return original(input, init);
+    },
+  });
+  assert(browserCompleted && windowElapsed);
+  assert.equal(burstRequests, 3);
+  assert.equal(result.sessionRateLimit.limitedStatus, 429);
+});
+
 test('failed hosted probes never include response bodies or leaked health fields in errors', async () => {
   const marker = 'RESPONSE_SECRET_MUST_NOT_BE_LOGGED';
   for (const [path, status] of [
