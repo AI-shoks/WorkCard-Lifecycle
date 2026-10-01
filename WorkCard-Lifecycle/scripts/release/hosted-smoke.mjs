@@ -837,6 +837,20 @@ export async function probeHostedSurface({
     ]);
   }
 
+  if (platform === 'render') {
+    const spoofedClientIp = await fetchWithTimeout(fetchImplementation, `${origin}/health/live`, {
+      headers: { 'CF-Connecting-IP': '198.51.100.77' },
+    });
+    if (spoofedClientIp.status === 403) {
+      assert.equal(spoofedClientIp.headers.get('server'), 'cloudflare');
+      assert.equal(spoofedClientIp.headers.get('x-request-id'), null);
+    } else {
+      assert.equal(spoofedClientIp.status, 200);
+      requestIdFrom(spoofedClientIp, requestIds);
+    }
+    checks.add('cloudflare-client-ip-spoof-probe');
+  }
+
   // Exercise the browser before deliberately exhausting the session rate-limit
   // bucket. The runner and Chromium normally share one egress IP, so reversing
   // this order would make the canonical browser fail at its first role login.
@@ -864,9 +878,6 @@ export async function probeHostedSurface({
             ...(currentSession ? { Cookie: currentSession.cookie } : {}),
             Origin: origin,
             'X-Forwarded-For': `192.0.2.${100 + index}`,
-            ...(platform === 'render'
-              ? { 'CF-Connecting-IP': `198.51.100.${100 + index}` }
-              : {}),
           }),
           method: 'POST',
         }),
