@@ -1,9 +1,9 @@
 ---
 artifact_id: project.documentation-index
 status: active
-version: 29
+version: 30
 owner: project
-updated: 2026-09-29
+updated: 2026-10-01
 ---
 
 # Documentation Index
@@ -45,7 +45,7 @@ docs/
 
 ## Текущая контрольная точка
 
-**На 29 сентября этапы 1–11 закрыты; исходники с FA-01/02 `2d4609ad…` прошли CI 7/7. Подготовлено их согласование с main; у нового состава ещё нет отдельного commit/CI. Выбран финиш портфолио с прежним публичным демо (D-033); этап 12 и roadmap открыты до итоговой проверки и решения — [[final-audit]].** Ручное подтверждение пользователя без SHA/окружения и исторические release PASS не переносятся на изменённый код; публичный образ не менялся. Упаковка: [README и схема](../README.md), [[demo-script|короткий показ]], [[screenshots|реальные экраны]], [[engineering-retrospective|решения и ограничения]]. Релиз сохраняет исторические 7/7 по hosted evidence. [[0009-render-free-neon-free-release|ADR-0009]] задаёт Render Free + Neon Free, public GHCR, temporary staging, owner maintenance и 26h fail-closed. [Deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053), [recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) и [recovery compact с очисткой](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) подтверждают staging/production smoke и recovery того же digest; versioned assets — в [[deployment]]. GCP решения сохранены как [[deployment-gcp-history|история]]. Rollback drill непроверен без предыдущего совместимого образа.
+**На 1 октября этапы 0–12 и roadmap закрыты для независимого портфолио-кейса D-034.** [Публичное демо](https://work-card-demo.onrender.com) использует точный image приложения `a5d6302…`; CI, release, staging, публичные сценарии и логи связаны в [[deployment#Обновление демо 2026-09-29|deployment evidence]] и [[final-audit|итоговом DoD]]. Упаковка: [README и схема](../README.md), [[demo-script|короткий показ]], [[screenshots|реальные экраны]], [[engineering-retrospective|решения и ограничения]]. [[0009-render-free-neon-free-release|ADR-0009]] задаёт Render Free + Neon Free, public GHCR, temporary staging, owner maintenance и 26h fail-closed. Исторические [deploy](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053), [recovery canonical](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36316059944) и [recovery compact](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36320856998) сохраняют доказательства прежнего digest. GCP решения — [[deployment-gcp-history|история]]. Rollback drill остаётся непроверенным.
 
 Этап 9 зафиксирован implementation SHA [`3ee65709966f5775928de87783fd2946d085e2bc`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc). На 2026-09-05 через GitHub API подтверждены [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850): все 6 обязательных jobs успешны в каждом запуске для этого SHA. Автоматизация качества описана в [[test-strategy]], локальные результаты и полная матрица CI — в [[quality-gates]].
 

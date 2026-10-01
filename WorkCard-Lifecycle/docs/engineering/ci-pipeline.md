@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.ci-pipeline
 status: accepted
-version: 18
+version: 19
 owner: engineering
-updated: 2026-09-29
+updated: 2026-10-01
 ---
 
 # CI Pipeline
@@ -86,7 +86,7 @@ Scheduled Actions могут опаздывать, пропускаться ил
 
 GitHub environments разделяют `staging-owner`, `staging-runtime`, `production-owner` и `production` (Render adapter). Secrets задаются только в нужных steps/containers. Полная матрица имён — [[environments]]. Current/previous GHCR image и GitHub Release assets не удаляются автоматической retention policy весь срок эксплуатации/rollback; workflow artifacts не заменяют этот архив.
 
-Исторические разрешения commit/push, PR/merge и owner/release workflows относились к выполненным задачам и указанным в их результатах версиям. Они не являются разрешением для новых операций. По D-033 в [[decision-log]] завершается портфолио с прежним демо; новый release/deployment в эту цель не входит. Подготовленному объединению с main нужны собственные commit/CI и разрешение на Git-публикацию. Фактические результаты с привязкой к SHA перечислены в [[quality-gates]], исторические hosted records — в [[deployment]].
+Исторические разрешения commit/push, PR/merge и owner/release workflows относились к выполненным задачам и указанным версиям; они не являются разрешением для новых операций. D-034 в [[decision-log]] заменил прежний D-033: существующее демо обновлено штатным workflow после полного CI точного app SHA, а последующие изменения только smoke harness и документов не вызывают перевыпуск image. Фактические результаты с привязкой к SHA перечислены в [[quality-gates]], hosted records и ограничения — в [[deployment]].
 
 ## Критерий принятия
 

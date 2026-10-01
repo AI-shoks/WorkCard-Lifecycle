@@ -6,20 +6,20 @@ tags:
   - case-study
   - workcard
 status: active
-version: 32
+version: 33
 owner: navigation
-updated: 2026-09-29
+updated: 2026-10-01
 ---
 
 # Production Work Card Workflow
 
-**Текущая цель — обновлённое публичное демо и завершённый портфолио-кейс (D-034).** Пользователь 29 сентября заменил прежний отказ от обновления. Проверенный main `bdb2647520639b9ca690dfd6d00402076463a63a` прошёл [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733); точный image опубликован и просканирован. Переключение сайта ещё не выполнено: требуется завершить проверку тарифов/квот и штатный staging/deployment. Этап 12 и roadmap остаются открытыми; rollback drill не проверен. Текущие результаты — [[deployment#Обновление демо 2026-09-29]].
+**D-034: публичное демо обновлено и портфолио-кейс завершён 1 октября 2026 года.** Приложение `a5d6302b7793055ad37883d394de04fd20afaea0` прошло [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36867881849), [release scan](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-a5d6302b7793055ad37883d394de04fd20afaea0) и [staging/public deployment](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36901516374). Этап 12 и roadmap закрыты по [[final-audit|итоговому аудиту]]; rollback drill не проверен. Факты размещения — [[deployment#Обновление демо 2026-09-29]].
 
 > Паспорт → партия → несколько комплектов → первая деталь → серия → per-card БТК → финальная приёмка партии → mock payroll.
 
 ## Сейчас
 
-Этапы 1–11 закрыты; этап 12 и roadmap открыты до квалификации нового размещения. Main `bdb2647…` прошёл CI 7/7, его image опубликован со scan HIGH/CRITICAL=0. Публичный сервис пока использует `1195892…`; актуальные тарифы/квоты, staging и deployment остаются незавершёнными. [[deployment#Обновление демо 2026-09-29|Состояние обновления]]. Портфолио: [README](README.md), [[demo-script]], [[screenshots]], [[engineering-retrospective]].
+Этапы 0–12 закрыты для независимого демо-кейса; публичный сервис использует точный image `a5d6302…`. Бесплатные квоты, общий ежедневный reset, четыре moderate advisory и непроверенный rollback drill остаются ограничениями. [[deployment#Обновление демо 2026-09-29|Проверки и восстановление]]. Портфолио: [README](README.md), [[demo-script]], [[screenshots]], [[engineering-retrospective]].
 
 ### Подтверждения предыдущих этапов
 

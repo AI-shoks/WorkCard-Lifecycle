@@ -1,18 +1,30 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 34
+version: 35
 owner: engineering
-updated: 2026-09-29
+updated: 2026-10-01
 ---
 
 # Quality Gates
+
+## Новая версия приложения — 2026-10-01
+
+[PR #19](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/19) устранил неверную группировку rate limit по сменяющимся внутренним Render hops: непосредственный socket peer остаётся в проверенном allowlist, адрес клиента берётся из перезаписываемого Cloudflare `CF-Connecting-IP`, отсутствие корректного адреса закрывает API. Hosted smoke дополнен проверками подставных заголовков и независимого client IP. Обновлены Fastify, undici, brace-expansion и runtime Debian libssl без suppressions и снижения порога сканирования. Main приложения `a5d6302b7793055ad37883d394de04fd20afaea0` прошёл [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36867881849); [release 36868874769](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36868874769) сохранил digest `sha256:61d4cec30b5adcd01f57c78eb8d38d2fc2cca2a728709e58b64abfdb1f29c7fa`, manifest, checksum и Trivy HIGH/CRITICAL=0. Локальный `pnpm check` и обязательный audit HIGH прошли; четыре moderate advisory остаются в [[security-baseline#Supply chain и container]].
+
+Первая [попытка staging 36869878751](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36869878751) дошла до полного набора 250 завершённых карточек, но тест остановился по общему лимиту 25 минут во время последовательных подтверждений качества. Production/Render jobs не запускались. [PR #20](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/20) увеличил конечный лимит только hosted canonical browser до 40 минут внутри прежнего 45-минутного job, сохранив 250 переходов, assertions, нулевые retries и отдельный performance gate. Обновлённый тестовый main `21150968eab62598b1415c1e5bdaba75b851d983` прошёл [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36877092954). Его изменение не требует новой сборки приложения: штатный deploy повторно проверяет и использует опубликованный image `a5d6302…`.
+
+[Deploy 36877880075](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36877880075) прошёл staging и public browser 250/250, но остановился на smoke harness: Cloudflare отверг подставной `CF-Connecting-IP` своим 403 без application request ID; log-observation job был пропущен. [PR #21](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/21) разделил edge spoof probe и app 429 при вращающемся XFF, а сбор Render logs расширил на 10 секунд для наблюдённого рассинхрона часов; exact request-ID/IP/peer/severity checks сохранены. Main тестового контура `228a8f598d074afd0f62800c779a5951623493bc` прошёл [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36890325766). Точечный публичный probe уже размещённого image подтвердил Cloudflare 403, application 429 после 28 успешных запросов и корреляцию 47/47 request IDs с Render logs и независимо измеренным IP. Этот probe не заменяет полный workflow; app image не пересобирался.
+
+[Run 36892431712](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36892431712) снова прошёл полный staging browser за 33,8 минуты, но 31 последовательный запрос session не дал 429: при медленной Neon 60-секундное окно локального rate-limit store могло истечь внутри серии. Production и Render jobs не запускались. [PR #22](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/22) дожидается свежего окна после браузера; повторяет те же 31 запрос, обязательный 429, spoofed XFF и не меняет performance gate. Причина основана на фактическом timing и коде store, а не на смягчении результата. Локально полный `pnpm check` после ожидания прошёл; затем добавлен focused test порядка действий (12/12), format/lint PASS. Тестовый main `e924a6ce05b7ee0a117d28a8f0b9cdf4b8cf0fff` прошёл [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36900504267).
+
+[Итоговый deployment 36901516374](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36901516374) завершил все 7 jobs успешно на прежнем неизменном app image `a5d6302…`. Staging и public smoke подтвердили полный canonical browser `250/250`, финальную приёмку, audit `254/254`, payroll, security и `429` после 30 успешных session requests. Отдельный Render observation report связал 49/49 request IDs с корректным client IP, доверенным peer, severity и redaction. Опубликованные reports и SHA-256 chain release records `0001`–`0009` повторно сверены; подробности — [[deployment#Обновление демо 2026-09-29]].
 
 ## Интеграция с main — 2026-09-29
 
 [PR #17](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/17) объединён с main `bdb2647520639b9ca690dfd6d00402076463a63a`; собственный [push CI 36544788733](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733) прошёл 7/7. Сохранены recovery workflow, helpers и browser harness из main, исправления журнала FA-01/02 и минимальное обновление `fast-uri`. Прежний CI `2d4609ad…` остаётся отдельным историческим результатом.
 
-**Текущая цель — обновлённое публичное демо и завершённый портфолио-кейс (D-034).** Пользователь 29 сентября заменил прежний отказ от обновления. Проверенный main `bdb2647520639b9ca690dfd6d00402076463a63a` прошёл [CI 7/7](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733); точный image опубликован и просканирован. Переключение сайта ещё не выполнено: требуется завершить проверку тарифов/квот и штатный staging/deployment. Этап 12 и roadmap остаются открытыми; rollback drill не проверен. Текущие результаты — [[deployment#Обновление демо 2026-09-29]].
+**Текущий результат D-034 — проверенное обновлённое демо и завершённый портфолио-кейс.** Main приложения `a5d6302…` прошёл CI 7/7 и release scan HIGH/CRITICAL=0; уже опубликованный digest прошёл staging, публичный smoke и log observations в run `36901516374`. PR #21 и #22 меняли только проверочный контур, не образ приложения. Полный результат и непроверенный rollback drill — [[deployment#Обновление демо 2026-09-29]].
 
 Локально в отдельном checkout выполнены frozen install и `pnpm check` на Node 24.20.0 / pnpm 11.19.0: format, lint, typecheck, 154 API unit, 158 web unit, 94 release-helper tests и production build — PASS. Шесть DB integration tests штатно пропущены без DB URL; contracts workspace не содержит самостоятельных tests. DB/browser/container/performance/security jobs этим локальным запуском не заменяются. В первоначальном объединении миграции, contracts, lockfile и workflows не менялись; шесть TS-файлов FA-01/02 совпадают с `2d4609ad…`, recovery helpers и browser harness — с main. Отдельный actionlint 1.7.12 проверил все шесть workflows, включая recovery; внешние shellcheck/pyflakes не запускались. Это локальная проверка объединения, не CI нового commit и не hosted qualification.
 
@@ -26,7 +38,7 @@ updated: 2026-09-29
 
 Минимальное исправление меняет только транзитивные версии `fast-uri` в lockfile: `3.1.6 → 3.1.8`, `4.1.3 → 4.2.1`, в пределах диапазонов родительских пакетов. Другие зависимости, manifests, workflows и пороги проверок сохранены; suppressions и overrides не добавлены. После обновления `pnpm check` прошёл; локальный обязательный `pnpm audit --audit-level=high` вернул exit 0: HIGH/CRITICAL — 0, moderate — 1. Оставшийся [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v) относится к `undici 8.10.1` через тестовый `jsdom` (dev dependency); он не скрыт и не исправлен этим узким обновлением. Новый состав вошёл в main `bdb2647…`, его полный CI 7/7 подтверждён выше; свежий локальный audit 29 сентября снова вернул 0 HIGH/CRITICAL и 1 moderate.
 
-В lockfile прежнего hosted source `1195892…` остаются `fast-uri 3.1.6/4.1.3`; обновление исходников не исправляет уже размещённое демо. Достижимость этих уязвимостей в live runtime не проверялась. Его исторические security/health/logging результаты не считаются текущей проверкой безопасности; D-034 заменил прежний отказ от обновления: новый image уже опубликован, переключение ещё впереди; [[deployment#Обновление демо 2026-09-29]].
+В lockfile исторического hosted source `1195892…` остаются `fast-uri 3.1.6/4.1.3`; обновление исходников само по себе не исправляло размещённое на тот момент демо. Достижимость этих уязвимостей в том live runtime не проверялась. Его security/health/logging результаты не считаются проверкой новой версии; дальнейший выпуск и размещение — [[deployment#Обновление демо 2026-09-29]].
 
 Один локальный gate объединяет форматирование кода, статический анализ, строгую типизацию, тесты и production build:
 
@@ -76,7 +88,7 @@ pnpm check
 
 В локальном review повторно сверены **146/146 файлов SHA-256, 6 ZIP, 103 извлечённых файла и 5/5 artifact digests**. Hash неизменённого `ci-evidence/run-36449212344-attempt-1/sha256-index.json`: `56954058f40c6ebde763a6cd002e4d361287ce519a3414a360feb40ab92fe629`. Raw evidence и review не включены в Git. Quality/release_iac summaries производные; первичный источник — полные logs. `candidate-tree.json` — снимок до commit, текущее выполнение отражено в ci-result/execution records.
 
-FA-03 закрыт по квалификации этих исходников: пользователь отдельно утвердил D-032 29 сентября. Этап 12/roadmap открыты; последний документированный hosted source — `1195892f15f2f240dd04f39e8388d6bb8802d9a7`, доступность сейчас не проверялась. FA-05 — непроверенный rollback drill. Матрица 22 DoD и принятое D-032 — [[final-audit]].
+На дату D-032 FA-03 был закрыт только по исходникам `2d4609ad…`, а этап 12/roadmap оставались открытыми; тогда последним документированным hosted source был `1195892…`. Этот исторический вывод не описывает последующий D-034. FA-05 — непроверенный rollback drill. Матрица 22 DoD и итог — [[final-audit]].
 
 ## Документационная сверка после CI
 
@@ -120,7 +132,7 @@ Offline сверка в этой задаче: 22/22 hashes предыдущег
 
 Ранее недостававшие семь CI checks получены для `2d4609ad…` и сверены выше. [[final-audit#FA-03 — выбранная версия и минимальные дальнейшие проверки|FA-03]] больше не требует получения CI этого commit; отдельное утверждение квалификации исходников выполнено 29 сентября по D-032. Интеграция с main требует собственного штатного CI. Если впоследствии заявляется новый hosted runtime, его release/health/logging evidence требуют отдельного предложения и разрешения. Повтор tests, UI-smoke или hosted recovery для документационной сверки не назначается.
 
-Прежний [индекс hashes](../testing/evidence/fa-0102-summary.json) сохраняет цепочку подготовки семи документов и digests исходных отчётов; это не снимок нового diff. Критерии DoD и gates сохранены; этап 12/roadmap открыты, FA-05 непроверен.
+Прежний [индекс hashes](../testing/evidence/fa-0102-summary.json) сохраняет цепочку подготовки семи документов и digests исходных отчётов; это не снимок нового diff. Критерии DoD и gates сохранены. На дату этого исторического отчёта этап 12/roadmap были открыты; FA-05 остаётся непроверенным.
 
 ## Исходный финальный аудит документации — 2026-09-27
 
