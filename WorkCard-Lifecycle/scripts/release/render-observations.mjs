@@ -142,11 +142,14 @@ export async function collectLogs({
   assert(/^srv-[a-z0-9]{20}$/.test(serviceId));
   assert(/^(?:tea|usr)-[a-z0-9]{20}$/.test(ownerId));
   assert(token && !/\s/.test(token));
+  // Render log timestamps can precede the runner's request clock by a few
+  // seconds. Request IDs still restrict validation to this smoke run.
+  const clockMarginMs = 10_000;
   const parameters = new globalThis.URLSearchParams({
     ownerId,
     resource: serviceId,
-    startTime: report.startedAt,
-    endTime: report.completedAt,
+    startTime: new Date(Date.parse(report.startedAt) - clockMarginMs).toISOString(),
+    endTime: new Date(Date.parse(report.completedAt) + clockMarginMs).toISOString(),
     direction: 'forward',
     type: 'app',
     limit: '100',

@@ -416,9 +416,14 @@ test('actual application observations qualify reviewed proxy peer and independen
 test('Render log pagination advances safely and refuses a repeating cursor', async () => {
   const { report, logs } = observationFixture();
   let count = 0;
-  const fetchImplementation = async (_url, init) => {
+  const fetchImplementation = async (url, init) => {
     assert.equal(init.redirect, 'error');
     count++;
+    if (count === 1) {
+      const parameters = new globalThis.URL(url).searchParams;
+      assert.equal(Date.parse(parameters.get('startTime')), Date.parse(report.startedAt) - 10_000);
+      assert.equal(Date.parse(parameters.get('endTime')), Date.parse(report.completedAt) + 10_000);
+    }
     return globalThis.Response.json({
       logs: [logs[count - 1]],
       hasMore: count === 1,
@@ -437,13 +442,15 @@ test('Render log pagination advances safely and refuses a repeating cursor', asy
       serviceId,
       ownerId,
       token: 'test-token',
-      fetchImplementation: async () =>
-        globalThis.Response.json({
+      fetchImplementation: async (url) => {
+        const parameters = new globalThis.URL(url).searchParams;
+        return globalThis.Response.json({
           logs: [],
           hasMore: true,
-          nextStartTime: report.startedAt,
-          nextEndTime: report.completedAt,
-        }),
+          nextStartTime: parameters.get('startTime'),
+          nextEndTime: parameters.get('endTime'),
+        });
+      },
     }),
     /did not advance/,
   );

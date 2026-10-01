@@ -97,6 +97,13 @@ function hostedFetch({
     const method = init.method ?? 'GET';
     if (!authenticated) return new globalThis.Response('Forbidden', { status: 403 });
 
+    if (platform === 'render' && headers.has('cf-connecting-ip')) {
+      return new globalThis.Response('Forbidden', {
+        headers: { server: 'cloudflare' },
+        status: 403,
+      });
+    }
+
     if (url.pathname === '/health/live' || url.pathname === '/health/ready') {
       return jsonResponse({ status: 'ok' });
     }
@@ -346,19 +353,24 @@ test('public Render smoke requires secure host-only session cookies', async () =
   const renderOrigin = 'https://work-card-demo.onrender.com';
   const options = { origin: renderOrigin, platform: 'render', runBrowser: false };
   const spoofedCloudflareHeaders = [];
+  const rateProbeCloudflareHeaders = [];
   const fetchImplementation = hostedFetch({ platform: 'render' });
   const result = await probeHostedSurface({
     ...options,
     fetchImplementation: async (input, init = {}) => {
+      const header = new globalThis.Headers(init.headers).get('cf-connecting-ip');
+      if (header) spoofedCloudflareHeaders.push(header);
       if (new globalThis.URL(input).pathname === '/api/v1/demo-session' && init.method === 'POST') {
-        const header = new globalThis.Headers(init.headers).get('cf-connecting-ip');
-        if (header) spoofedCloudflareHeaders.push(header);
+        rateProbeCloudflareHeaders.push(header);
       }
       return fetchImplementation(input, init);
     },
   });
   assert(result.checks.includes('session-cookie-security'));
-  assert.deepEqual(spoofedCloudflareHeaders, ['198.51.100.100', '198.51.100.101', '198.51.100.102']);
+  assert(result.checks.includes('cloudflare-client-ip-spoof-probe'));
+  assert.deepEqual(spoofedCloudflareHeaders, ['198.51.100.77']);
+  assert(rateProbeCloudflareHeaders.length > 0);
+  assert(rateProbeCloudflareHeaders.every((header) => header === null));
   for (const cookieAttributes of [
     '; Path=/; HttpOnly; SameSite=Lax',
     '; Path=/; SameSite=Lax; Secure',
@@ -413,6 +425,22 @@ test('public smoke reuses the issued API session cookie for reads, replacement a
     ),
   );
   assert.equal(authenticatedRequests.filter(({ method }) => method === 'DELETE').length, 3);
+});
+
+test('Render spoof probe also accepts an edge-overwritten header when the app response is traceable', async () => {
+  const original = hostedFetch({ platform: 'render' });
+  const result = await probeHostedSurface({
+    origin: 'https://work-card-demo.onrender.com',
+    platform: 'render',
+    runBrowser: false,
+    fetchImplementation: (input, init = {}) =>
+      new globalThis.URL(input).pathname === '/health/live' &&
+      new globalThis.Headers(init.headers).has('cf-connecting-ip')
+        ? Promise.resolve(jsonResponse({ status: 'ok' }))
+        : original(input, init),
+  });
+  assert(result.checks.includes('cloudflare-client-ip-spoof-probe'));
+  assert(result.requestIds.length >= 16);
 });
 
 test('public smoke rejects missing, empty and unexpected session cookie names', async () => {
