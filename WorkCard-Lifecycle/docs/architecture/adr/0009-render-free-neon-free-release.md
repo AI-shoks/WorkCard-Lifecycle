@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.adr.0009
 status: accepted
-version: 3
+version: 4
 owner: architecture
 updated: 2026-10-01
 supersedes:
@@ -25,7 +25,7 @@ supersedes:
 - Owner/runtime подключаются к direct Neon endpoint с `sslmode=verify-full` и проверкой ожидаемых host/database. Transaction pooler несовместим с используемыми session locks и startup options, поэтому запрещён. Обоснование ограничений — [Neon connection pooling](https://neon.com/docs/connect/connection-pooling).
 - Runtime-роль создаётся SQL и не получает `neon_superuser`, elevated memberships или ownership. Роли, созданные Neon Console/API/CLI, имеют иной privileged default; переносить этот путь на runtime нельзя. [Neon roles](https://neon.com/docs/manage/roles)
 
-**Уточнение 2026-10-01.** Hosted smoke обновления `bdb2647…` обнаружил смену внутренних Render hops: rate limit видел три адреса `10.x` вместо одного клиента; полный browser lifecycle прошёл, но public qualification остановилась. Список проверенных CIDR остаётся границей доверия для непосредственного socket peer. Client IP для журналирования и лимитов в Render-режиме теперь берётся из `CF-Connecting-IP`, который [Render документирует как перезаписываемый Cloudflare](https://render.com/articles/host-pocketbase-on-render); при отсутствии корректного заголовка API закрывается. Это уточнение требует нового image, CI и повторной hosted проверки подставных заголовков и независимого client IP, а не расширения CIDR наугад. Неуспешный run и результат повторной проверки отражаются в [[deployment]].
+**Уточнение 2026-10-01.** Hosted smoke обновления `bdb2647…` обнаружил смену внутренних Render hops: rate limit видел три адреса `10.x` вместо одного клиента; полный browser lifecycle прошёл, но public qualification остановилась. Список проверенных CIDR остаётся границей доверия для непосредственного socket peer. Client IP для журналирования и лимитов в Render-режиме теперь берётся из `CF-Connecting-IP`, который [Render документирует как перезаписываемый Cloudflare](https://render.com/articles/host-pocketbase-on-render); при отсутствии корректного заголовка API закрывается. Уточнение вошло в image `a5d6302…` после CI 7/7; новая hosted проверка подставных заголовков и независимого client IP выполняется без расширения CIDR. Неуспешный run и результат повторной проверки отражаются в [[deployment]].
 
 ## Общий демо-контур и обслуживание
 

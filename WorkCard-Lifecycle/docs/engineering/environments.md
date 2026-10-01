@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.environments
 status: accepted
-version: 14
+version: 15
 owner: engineering
-updated: 2026-09-27
+updated: 2026-10-01
 ---
 
 # Environments and Secrets
@@ -93,10 +93,10 @@ Production `APP_ORIGIN` совпадает с каноническим HTTPS Ren
 
 Для первого запуска `PROXY_TRUST_MODE=observe` разрешён только на Render: CIDR allowlist отсутствует, forwarded headers не получают доверия, все `/api*` и `/health/ready` принудительно отвечают `503` до DB, даже если owner gate случайно открыт. Liveness/SPA и sanitized peer logs остаются доступны. После наблюдения реального socket peer оператор рассматривает exact IP/обоснованный CIDR, переключает `render` и выполняет обязательную chain/client-IP/spoof qualification; угадывать Render диапазон не нужно. Initial owner migration держит persistent DB gate закрытым до bootstrap + verify. Последовательность — [[deployment#Первый запуск без предположения о proxy|Deployment]].
 
-Безусловный `trustProxy=true` запрещён. Код доверяет только проверенному immediate peer из `PROXY_TRUSTED_CIDRS` и цепочке адресов из этого allowlist; localhost test не доказывает реальную Render header chain. Перед публичным запуском нужно наблюдать socket peer, добавляемые Render заголовки, client IP и spoofed XFF, включая cold start/redeploy. Неизвестная цепочка блокирует qualification, а не расширяет allowlist автоматически.
+Безусловный `trustProxy=true` запрещён. Код проверяет непосредственный socket peer по `PROXY_TRUSTED_CIDRS`; в Render-режиме client IP для rate limit и журнала берётся из `CF-Connecting-IP`, который Cloudflare переписывает, а отсутствие корректного адреса закрывает API. Localhost test не доказывает реальную цепочку Render. Hosted qualification проверяет peer, независимо измеренный IP клиента, spoofed XFF, блокировку поддельного CF-заголовка на edge и приложение в логах; неизвестная цепочка блокирует выпуск, а не расширяет allowlist автоматически.
 
 Pino пишет однострочный JSON с безопасными service/version/request/command fields и техническими `remoteAddress` (socket peer), `remoteIp` (resolved client), `protocol` для квалификации proxy chain. Публикуемые observation summaries относятся к synthetic runner requests; raw visitor logs не входят в release assets. Query/body/headers/cookies, SQL, DB URL, CSRF/session tokens и raw driver messages/stack исключены. Render application logs доступны на Hobby с retention 7 дней; platform HTTP request logs требуют Pro+, поэтому $0 qualification опирается на собственный request ID/peer/IP/protocol и независимый egress IP runner, а не на недоступные request logs. Источник — [Render logging](https://render.com/docs/logging). Фактическое ingestion всё равно проверяется отдельно. Idle pool errors обрабатываются безопасно без падения процесса и без credential leakage.
 
 ## Граница проверки
 
-В рамках разрешённого первого deployment созданы один Render Free service и два Neon Free projects. Текущие provider facts и границы ресурсов записаны в [[deployment]]; public image и постоянный release record опубликованы для SHA `1195892f15f2f240dd04f39e8388d6bb8802d9a7` без повторной сборки. Deploy и recovery runs подтвердили реальные DB operations, hosted smoke, 26h fail-closed и owner reset; Render API и Neon UI 27 сентября подтвердили Free-профиль. Это наблюдение не является гарантией будущей стоимости вне free-квот. Разрешение не распространяется на посторонние БД/resources или платные опции; обычный CI сохраняет только disposable PostgreSQL. Доказанные проверки и ограничения — [[quality-gates]] и [[deployment]].
+В рамках первого deployment созданы один Render Free service и два Neon Free projects; новых ресурсов для D-034 не добавлялось. Текущий public image `a5d6302…` и постоянный release record сохранены без повторной сборки после изменений только smoke harness и документов. Тарифы и остатки квот проверены 1 октября в существующих кабинетах; это наблюдение не гарантирует будущую стоимость вне Free-квот. Исторические deploy/recovery runs подтвердили реальные DB operations, 26h fail-closed и owner reset; новая hosted qualification описана отдельно в [[deployment]]. Разрешение не распространяется на посторонние БД/resources или платные опции; обычный CI сохраняет только disposable PostgreSQL. Доказанные проверки и ограничения — [[quality-gates]] и [[deployment]].

@@ -1,7 +1,7 @@
 ---
 artifact_id: architecture.security-baseline
 status: accepted
-version: 11
+version: 12
 owner: architecture
 updated: 2026-10-01
 ---
@@ -109,7 +109,10 @@ Production Pino logger пишет однострочный JSON с ISO `time`, �
 - production image строится multi-stage, запускается non-root, имеет read-only filesystem где возможно и не содержит dev dependencies/source maps с secrets;
 - base image и PostgreSQL pin до поддерживаемого patch/digest;
 - runtime использует закреплённый `distroless/nodejs24-debian13:nonroot`: npm, shell и build tools не нужны для исполнения API/SPA и остаются в build stage. Замена вызвана подтверждёнными HIGH/CRITICAL в прежнем Debian 12 runtime и его global npm; dev dependencies в runtime не копируются;
+- Пока официальный Debian 13 distroless digest содержит уязвимый `libssl3t64` `deb13u2`, Dockerfile извлекает из официального Debian security package точную версию `3.5.7-1~deb13u3`, проверенную по SHA-256, и переносит обе реальные библиотеки и запись пакета в nonroot runtime. Release image `a5d6302…` прошёл Trivy HIGH/CRITICAL=0. Замена базового digest в будущем требует повторного скана и пересмотра этой точечной вставки;
 - `/health/live` всегда публикует только `{"status":"ok"}`; `/health/ready` публикует только `{"status":"ok"}` либо `{"status":"unavailable"}` и сохраняет различие `200/503`. `APP_VERSION`, database state, текущая и ожидаемая migration versions доступны в безопасных logs/release metadata, но не в публичном payload.
+
+На 2026-10-01 `pnpm audit --audit-level=high` проходит. Остались четыре moderate advisory: два в runtime `ip-address` (транзитивно через rate-limit), один в Fastify и один в `brace-expansion` (build/test tools и `@fastify/static`). Это ограничение текущего выпуска, а не повод понижать severity gate.
 
 ## Database protection
 

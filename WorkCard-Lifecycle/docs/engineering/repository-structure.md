@@ -1,9 +1,9 @@
 ---
 artifact_id: engineering.repository-structure
 status: accepted
-version: 13
+version: 14
 owner: engineering
-updated: 2026-09-29
+updated: 2026-10-01
 ---
 
 # Repository Structure
@@ -39,7 +39,7 @@ Git checkout содержит каталог приложения `WorkCard-Life
 
 `infra/render` задаёт один Free image-backed service и локальные contract checks. `infra/terraform` сохраняет неактивные исторические root/runtime modules, provider lock, GitHub WIF и plan-safety checker. Более ранние незакоммиченные foundation/backend templates и дополнительные safety tests сохранены только в локальном рабочем дереве и не включены в Render/Neon commit. Незакоммиченные Terraform HCL/scripts/templates остаются локальной историей и не входят в текущую публикацию Render/Neon. Активный release gate не применяет GCP Terraform; `.terraform/`, state и plans остаются ignored. Причина перехода — [[0009-render-free-neon-free-release|ADR-0009]].
 
-`scripts/release/create-release-manifest.mjs` после успешной публикации и semantic scan validation создаёт только новый `docs/release/manifests/<SHA>.json` по `docs/release/release-manifest.v2.schema.json`; перезапись существующего build record запрещена. `validate-release-manifest.mjs` проверяет schema, cross-field bindings и исходный Trivy JSON. Последующие реальные lifecycle-факты создаёт `append-release-evidence.mjs` как новые последовательные hash-chained файлы по `docs/release/release-evidence.v2.schema.json`, не меняя initial manifest. Фактические manifest/evidence возникают только по результатам publication/hosted operations; локальные fixtures их не заменяют. Разрешения исторических scoped операций зафиксированы в [[deployment]] и не распространяются автоматически на новые работы; текущая граница портфолио — D-033 в [[decision-log]].
+`scripts/release/create-release-manifest.mjs` после успешной публикации и semantic scan validation создаёт только новый `docs/release/manifests/<SHA>.json` по `docs/release/release-manifest.v2.schema.json`; перезапись существующего build record запрещена. `validate-release-manifest.mjs` проверяет schema, cross-field bindings и исходный Trivy JSON. Последующие реальные lifecycle-факты создаёт `append-release-evidence.mjs` как новые последовательные hash-chained файлы по `docs/release/release-evidence.v2.schema.json`, не меняя initial manifest. Фактические manifest/evidence возникают только по результатам publication/hosted operations; локальные fixtures их не заменяют. Разрешения и результат обновления существующего демо по D-034 зафиксированы в [[deployment]] и [[decision-log]]; они не распространяются автоматически на другие ресурсы или работы.
 
 `.env.owner` отделяет local owner credentials от runtime `.env`; оба ignored.
 
