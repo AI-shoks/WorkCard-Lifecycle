@@ -1,28 +1,28 @@
 ---
 artifact_id: project.case-study-positioning
 status: accepted
-version: 17
+version: 18
 owner: project
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # Case Study Positioning
 
-**Независимый портфолио-кейс завершён по D-034 1 октября 2026 года.** Существующее [публичное демо](https://work-card-demo.onrender.com) обновлено до точного image приложения `a5d6302b7793055ad37883d394de04fd20afaea0` после CI, release scan и hosted qualification. Этап 12 закрыт по [[final-audit|итоговому аудиту]]; реальные ограничения, включая непроверенный rollback drill, — в [[deployment#Обновление демо 2026-09-29]].
+**Независимый портфолио-кейс завершён по D-034 1 октября 2026 года.** Существующее [публичное демо](https://work-card-demo.onrender.com) обновлено до точного image приложения `a5d6302b7793055ad37883d394de04fd20afaea0` после CI, release scan и hosted qualification. Этап 12 закрыт по [итоговому аудиту](final-audit.md); реальные ограничения, включая непроверенный rollback drill, — в [отчёте размещения](../release/deployment.md#обновление-демо-2026-09-29).
 
 Проект — **независимый portfolio case study**, а не результат реального внедрения на конкретном предприятии. Его предметная основа опирается на личный производственный опыт автора, ретроспективное интервью с бывшим мастером и изучение обезличенной физической рабочей карточки. Это не формальное обследование предприятия и не даёт права раскрывать или приписывать проекту конкретный заводской регламент.
 
 ## Что утверждаем
 
-- подтверждённые выводы `CONFIRMED_AS_IS` отделены от синтетических `TO_BE_DECISION` в [[decision-provenance]];
+- подтверждённые выводы `CONFIRMED_AS_IS` отделены от синтетических `TO_BE_DECISION` в [происхождении решений](decision-provenance.md);
 - физические карточки, роли ПДБ/технолога/БТБ, первая и финальная приёмки, самоконтроль и мастерское ведение заданий описываются только в обезличенном виде;
 - данные, партия, нормы, пользователи и payroll являются синтетическими;
 - implementation commit [`17d2b04d13b58c7dff677543ed4399751a8593a1`](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/17d2b04d13b58c7dff677543ed4399751a8593a1) демонстрирует product analysis, AS-IS/TO-BE analysis, domain modeling, requirements engineering, UX design, traceability, принятую техническую архитектуру, воспроизводимый инженерный фундамент и проверенный backend vertical slice;
 - отдельная цифровая `FinalBatchAcceptance` является синтетическим TO-BE-решением уровня партии, а не утверждением о существующей заводской ИС;
-- связанный frontend flow закрыт на этапе 8 SHA [b00ff294a7b7ce1e09379c088969d9a02bd033bf](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf), quality-этап — на этапе 9 SHA [3ee65709966f5775928de87783fd2946d085e2bc](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc); этап 10 закрыт на 7/7: публичное Render/Neon демо, production smoke, recovery canonical/compact и elapsed fail-closed подтверждены [[deployment]];
-- упаковка этапа 11 завершена: [README](../../README.md), [[demo-script|короткий показ]], [[screenshots|реальные снимки с происхождением]] и [[engineering-retrospective|инженерная ретроспектива]]; это не закрывает отдельный финальный аудит этапа 12;
-- роль автора описывается через предметное исследование, модель, требования, UX, реализацию, проверки и релиз; ни наличие кода, ни участие инструментов не используются как доказательство единоличной разработки;
-- ограничения и допущения документируются явно; D-029 в [[decision-log]] фиксирует правила упаковки.
+- связанный frontend flow закрыт на этапе 8 SHA [b00ff294a7b7ce1e09379c088969d9a02bd033bf](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/b00ff294a7b7ce1e09379c088969d9a02bd033bf), quality-этап — на этапе 9 SHA [3ee65709966f5775928de87783fd2946d085e2bc](https://github.com/AI-shoks/WorkCard-Lifecycle/commit/3ee65709966f5775928de87783fd2946d085e2bc); этап 10 закрыт на 7/7: публичное Render/Neon демо, production smoke, recovery canonical/compact и elapsed fail-closed подтверждены [отчётом размещения](../release/deployment.md);
+- упаковка этапа 11 завершена: [README](../../README.md), [короткий показ](../portfolio/demo-script.md#короткий-показ), [реальные снимки с происхождением](../portfolio/screenshots.md) и [инженерная ретроспектива](../portfolio/engineering-retrospective.md); это не закрывает отдельный финальный аудит этапа 12;
+- автор портфолио-кейса — Артём; публичный контакт: [Telegram @AIShokstg](https://t.me/AIShokstg); ни наличие кода, ни участие инструментов не используются как доказательство единоличной разработки;
+- ограничения и допущения документируются явно; D-029 в [журнале решений](decision-log.md) фиксирует правила упаковки.
 
 ## Чего не утверждаем
 
