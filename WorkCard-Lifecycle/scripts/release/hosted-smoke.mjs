@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 import { clearInterval, setInterval } from 'node:timers';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
@@ -598,6 +599,7 @@ export async function probeHostedSurface({
   tokenProvider,
   platform = 'cloud-run',
   browserRunner,
+  waitForSessionWindow = delay,
 }) {
   const parsedOrigin = new globalThis.URL(origin);
   const local = platform === 'local';
@@ -864,6 +866,12 @@ export async function probeHostedSurface({
     checks.add('audit-254-of-254');
     checks.add('payroll-read-back');
   }
+
+  // The browser may have opened the same per-IP 60-second session bucket just
+  // before finishing. Start the 31-request burst in a fresh window so a
+  // mid-burst expiry cannot make a working rate limit look bypassable.
+  if (runBrowser && (platform === 'local' || platform === 'render'))
+    await waitForSessionWindow(61_000);
 
   let currentSession = null;
   let successfulSessionAttempts = 0;
