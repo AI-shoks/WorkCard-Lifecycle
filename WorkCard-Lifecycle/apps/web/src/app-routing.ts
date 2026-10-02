@@ -53,6 +53,10 @@ function screenRoute(
   return { kind: 'screen', screenId, pathname, params };
 }
 
+export function isProjectPage(pathname: string): boolean {
+  return pathname.replace(/\/+$/, '') === '/about';
+}
+
 export function matchAppRoute(inputPathname: string): AppRoute {
   const pathname = inputPathname.length > 1 ? inputPathname.replace(/\/+$/, '') : inputPathname;
 

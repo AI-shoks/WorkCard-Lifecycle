@@ -3,12 +3,15 @@ import type { DemoSessionResponse, DemoUser, Role } from '@work-card/contracts';
 
 import { createAdminAuditClient } from './admin-audit.js';
 import { createApiClient } from './api-client.js';
+import { AboutProject } from './AboutProject.js';
 import { AppLink } from './AppLink.js';
+import { Brand } from './Brand.js';
 import { createBatchCommandClient } from './batch-commands.js';
 import { Icon } from './Icon.js';
 import { AccessDenied, RouteLoadingState, ScreenContent } from './ScreenContent.js';
 import {
   breadcrumbsFor,
+  isProjectPage,
   routeAccessFor,
   matchAppRoute,
   titleForRoute,
@@ -78,22 +81,6 @@ function useBrowserNavigation() {
   return { navigate, pathname };
 }
 
-function Brand({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className={`brand${compact ? ' brand--compact' : ''}`}>
-      <span className="brand__mark" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </span>
-      <span className="brand__copy">
-        <strong>Рабочие карточки</strong>
-        <span>Производственный цикл</span>
-      </span>
-    </div>
-  );
-}
-
 function Sidebar({
   navigate,
   pathname,
@@ -141,6 +128,10 @@ function Sidebar({
           </AppLink>
         ) : null}
 
+        <AppLink className="primary-nav__link" navigate={navigate} to="/about">
+          <Icon name="document" />
+          <span>О проекте</span>
+        </AppLink>
         <p className="primary-nav__label primary-nav__label--secondary">По контексту</p>
         <div className="primary-nav__context" aria-label="Контекстные разделы">
           <span>
@@ -242,12 +233,14 @@ function RoleSwitcher({
 
 function SessionGate({
   errorMessage,
+  navigate,
   onRetry,
   onSelect,
   phase,
   users,
 }: {
   errorMessage: string | null;
+  navigate: (to: string) => void;
   onRetry: () => void;
   onSelect: (demoUserId: string) => void;
   phase: Exclude<SessionPhase, 'ready'>;
@@ -269,6 +262,13 @@ function SessionGate({
     <div className="session-entry">
       <main className="session-entry__card" id="main-content">
         <Brand compact />
+        <AppLink
+          className="button button--secondary session-entry__project"
+          navigate={navigate}
+          to="/about"
+        >
+          О проекте и авторе <Icon className="button__icon" name="arrow-right" />
+        </AppLink>
         <p className="session-entry__eyebrow">Серверная демонстрационная сессия</p>
         <h1 id="page-title" tabIndex={-1}>
           {title}
@@ -329,6 +329,32 @@ function SessionGate({
 
 export function App() {
   const { navigate, pathname } = useBrowserNavigation();
+  const publicPage = isProjectPage(pathname);
+
+  useEffect(() => {
+    if (!publicPage) return;
+    document.title = 'О проекте · Рабочие карточки';
+    window.scrollTo({ left: 0, top: 0 });
+    const frame = window.requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>('#page-title')?.focus(),
+    );
+    return () => window.cancelAnimationFrame(frame);
+  }, [publicPage]);
+
+  return publicPage ? (
+    <AboutProject navigate={navigate} />
+  ) : (
+    <ProductionApplication navigate={navigate} pathname={pathname} />
+  );
+}
+
+function ProductionApplication({
+  navigate,
+  pathname,
+}: {
+  navigate: (to: string) => void;
+  pathname: string;
+}) {
   const sessionActionControllerRef = useRef<AbortController | null>(null);
   const [sessionScope] = useState(() => new SessionScope());
   const [bootstrapVersion, setBootstrapVersion] = useState(0);
@@ -557,6 +583,7 @@ export function App() {
         </a>
         <SessionGate
           errorMessage={sessionError}
+          navigate={navigate}
           onRetry={retrySessionBootstrap}
           onSelect={changeRole}
           phase={gatePhase}
@@ -584,6 +611,9 @@ export function App() {
             </div>
             <div className="topbar__context">
               <Breadcrumbs breadcrumbs={breadcrumbs} navigate={navigate} />
+              <AppLink className="project-entry-link" navigate={navigate} to="/about">
+                О проекте
+              </AppLink>
               <span
                 className={`environment-status environment-status--${readinessState}`}
                 role="status"

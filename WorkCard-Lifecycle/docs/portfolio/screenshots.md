@@ -1,9 +1,9 @@
 ---
 artifact_id: portfolio.screenshots
 status: accepted
-version: 2
+version: 3
 owner: portfolio
-updated: 2026-09-27
+updated: 2026-10-02
 ---
 
 # Экраны работающего приложения
@@ -47,6 +47,6 @@ updated: 2026-09-27
 | Рабочая карточка | `canonical-initial-failure/browser-canonical.json`, неуспешная попытка | Только видимое состояние интерфейса на момент снимка |
 | Публичный паспорт | Съёмка 27 сентября, обычная серверная demo-session | Доступность экрана и подготовленных данных на момент съёмки |
 
-Старым снимкам не приписывается релизный SHA. Публичные проверки образа имеют собственные доказательства: [deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053), [canonical recovery receipt](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/download/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7/supplemental-recovery-qualification-36316059944.json) и [compact recovery receipt](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/download/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7/supplemental-recovery-compact-36320856998.json). При упаковке 27 сентября шесть recovery reports и два receipts сверены с опубликованными SHA256; сами сценарии повторно не запускались. Оба receipts оставляют rollback drill непроверенным. Полные условия — в [[deployment]].
+Старым снимкам не приписывается релизный SHA. Публичные проверки образа имеют собственные доказательства: [deploy run](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/35452096053), [canonical recovery receipt](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/download/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7/supplemental-recovery-qualification-36316059944.json) и [compact recovery receipt](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/download/work-card-1195892f15f2f240dd04f39e8388d6bb8802d9a7/supplemental-recovery-compact-36320856998.json). При упаковке 27 сентября шесть recovery reports и два receipts сверены с опубликованными SHA256; сами сценарии повторно не запускались. Оба receipts оставляют rollback drill непроверенным. Полные условия — в [отчёте размещения](../release/deployment.md).
 
 При финальном аудите 27 сентября сохранённые изображения и подписи сопоставлены с `sources.json`, счётчиками исходных локальных отчётов и текущим сценарием сохранения кадра. Новая съёмка и браузерный проход не выполнялись; точный source SHA локальных снимков в provenance не закреплён. Поэтому они подтверждают описанный исторический интерфейс и результаты своих прогонов, но не приёмку текущего рабочего дерева.
