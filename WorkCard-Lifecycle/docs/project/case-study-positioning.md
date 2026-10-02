@@ -1,14 +1,14 @@
 ---
 artifact_id: project.case-study-positioning
 status: accepted
-version: 19
+version: 20
 owner: project
 updated: 2026-10-02
 ---
 
 # Case Study Positioning
 
-**Независимый портфолио-кейс завершён по D-034 1 октября 2026 года.** Существующее [публичное демо](https://work-card-demo.onrender.com) обновлено до точного image приложения `a5d6302b7793055ad37883d394de04fd20afaea0` после CI, release scan и hosted qualification. Этап 12 закрыт по [итоговому аудиту](final-audit.md); реальные ограничения, включая непроверенный rollback drill, — в [отчёте размещения](../release/deployment.md#обновление-демо-2026-09-29).
+**Публичное представление кейса обновлено 2 октября 2026 года.** Согласованные авторский блок и маршрут знакомства доступны на [странице «О проекте»](https://work-card-demo.onrender.com/about) и в [коротком README](../../../README.md). Размещённый source приложения — `0f6768676f50bc53a7a65dd7df24e6cb9508d5ff`; CI, release и полная hosted qualification подтверждены. Факты размещения и публичной desktop/mobile проверки сохранены в [отчёте размещения](../release/deployment.md#представление-портфолио-2026-10-02).
 
 Проект — **независимый portfolio case study**, а не результат реального внедрения на конкретном предприятии. Его предметная основа опирается на личный производственный опыт автора, ретроспективное интервью с бывшим мастером и изучение обезличенной физической рабочей карточки. Это не формальное обследование предприятия и не даёт права раскрывать или приписывать проекту конкретный заводской регламент.
 
@@ -52,3 +52,7 @@ updated: 2026-10-02
 - снимки локальной SPA, свежий экран публичного сервиса и hosted reports имеют разные даты и окружения; диагностический кадр неуспешной попытки не используется как PASS evidence.
 
 Исторический implementation commit этапа 7 и DB integration tests дают два раздельных доказательства: масштабный выпуск `3 → 250` с `254` release events и компактный API-only процесс от создания партии до final acceptance, payroll и audit/read-back. Они также проверяют trusted roles, ранний auth/CSRF order, concurrency, replay и immutable boundaries. Этап 8 добавил реальный browser flow, а этап 9 — compact/canonical browser gates, PostgreSQL regressions, security/image gates и performance profile. Для SHA этапа 9 успешны все 6 обязательных jobs в [push CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970654850) и [PR CI](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/33970656850). Эти результаты не доказывают production deployment: он относится к этапу 10.
+
+## Предшествующее завершение кейса
+
+**Независимый портфолио-кейс завершён по D-034 1 октября 2026 года.** На эту дату существовавшее [публичное демо](https://work-card-demo.onrender.com) обновлено до точного image приложения `a5d6302b7793055ad37883d394de04fd20afaea0` после CI, release scan и hosted qualification. Этап 12 закрыт по [итоговому аудиту](final-audit.md); реальные ограничения, включая непроверенный rollback drill, — в [отчёте размещения](../release/deployment.md#обновление-демо-2026-09-29).
