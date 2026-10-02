@@ -1,14 +1,14 @@
 ---
 artifact_id: release.deployment
 status: accepted
-version: 25
+version: 26
 owner: release
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # Deployment
 
-**D-034 завершено 1 октября 2026 года:** существующий публичный сервис работает на image приложения `a5d6302…`. Полный [deployment 36901516374](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36901516374) прошёл 7/7 jobs; staging, публичный smoke, журналы и фактический digest подтверждены. Прежнее решение D-033 заменено; итоговый статус и ограничения приведены ниже.
+**Публичное демо обновлено 2 октября 2026 года:** существующий сервис работает на source приложения `0f6768676f50bc53a7a65dd7df24e6cb9508d5ff`, image `sha256:c8862cc212b257d4ab17682ea951fefcd27999d67d4e6a24509e61dee70a33ff`. Полный [deployment 36974423462](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36974423462) прошёл 7/7 jobs; staging, публичный smoke, наблюдения Render и durable evidence подтверждены. Публичная страница кейса отдельно проверена на desktop/mobile; [факты и границы](#представление-портфолио-2026-10-02) отделены от исторического размещения.
 
 Первоначальный статический аудит 27 сентября и последующая квалификация `2d4609ad…` сохранены в [[final-audit]] и исторических разделах ниже. Их результаты имеют собственные версии и не подменяют квалификацию нового размещения.
 
@@ -16,7 +16,31 @@ updated: 2026-10-01
 
 Репозиторий — источник текущей реализации. Workflows находятся в `.github/workflows/` родительского Git root; shell steps работают в `WorkCard-Lifecycle/`. GCP Terraform неактивен. Полный прежний runbook, включая foundation/backend work, сохранён в [[deployment-gcp-history]]; его исторические сведения об аккаунтах не являются новой внешней проверкой.
 
+## Представление портфолио 2026-10-02
+
+[PR #24](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/24) добавил короткий README в Git root, публичную страницу «О проекте», согласованные имя, направление, личный вклад, описание помощи ИИ и Telegram. Страница доступна без выбора производственной роли и без обязательного подключения к БД; из демо есть заметный переход. [PR #25](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/25) уточнил, что приёмка первой детали открывает обработку её комплекта. Производственные команды, права и маршруты сохранены.
+
+Точный source приложения `0f6768676f50bc53a7a65dd7df24e6cb9508d5ff` прошёл [main CI 36973663549](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36973663549): 7/7 jobs success. Штатный [release 36974161603](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36974161603) завершил обе jobs; image построен один раз и опубликован как `ghcr.io/ai-shoks/workcard-lifecycle/work-card@sha256:c8862cc212b257d4ab17682ea951fefcd27999d67d4e6a24509e61dee70a33ff`. Trivy HIGH/CRITICAL=0. [Manifest](manifests/0f6768676f50bc53a7a65dd7df24e6cb9508d5ff.json), scan и release archive сохранены в [GitHub Release](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-0f6768676f50bc53a7a65dd7df24e6cb9508d5ff); штатный `fetch-release.mjs` проверил checksum archive, scan и CI/release bindings. Migration checksum `sha256:26c4573a527c8748a0cd837b844c433fdb4dc8a5ee599dbab7a3060c3a0357cd` совпадает с ранее выпущенными образами.
+
+[Deployment 36974423462](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36974423462), attempt 1, завершил все 7 jobs успешно на том же source и digest.
+
+| Проверка | Подтверждённый результат |
+|---|---|
+| [Отчёт staging](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/download/work-card-0f6768676f50bc53a7a65dd7df24e6cb9508d5ff/staging-smoke-36974423462-1.json) | Canonical `112 → 3 → 250`, три допуска первой детали, `250/250` закрытых карточек, отдельная финальная приёмка, audit `254/254`, payroll read-back; session rate limit `429` после 30 успешных запросов — PASS |
+| [Публичный отчёт](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/download/work-card-0f6768676f50bc53a7a65dd7df24e6cb9508d5ff/render-smoke-36974423462-1.json) | Тот же полный canonical процесс, audit/payroll, session cookie, Origin/CSRF, permissions/spoof probes и `429` после 30 успешных запросов — PASS |
+| [Render deployment record](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/download/work-card-0f6768676f50bc53a7a65dd7df24e6cb9508d5ff/render-deployment-36974423462-1.json) | Live deploy `dep-davliifavr4c73ch2lo0`; persistent и resolved image равны digest `c8862cc2…`. Предыдущий image `61d4cec3…` сохранён |
+| [Наблюдения Render](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/download/work-card-0f6768676f50bc53a7a65dd7df24e6cb9508d5ff/render-observations-36974423462-1.json) | Full mode, 49/49 request IDs связаны с независимо измеренным client IP, разрешённым peer, severity и redaction — PASS |
+| [Production owner job](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36974423462/job/110743602942) | Лог подтверждает `OPERATION: release`; публичный reset не запускался, схема и owner code не менялись. Нового прямого чтения `last_reset_verified_at` не было |
+
+Независимая read-only сверка новых release assets подтвердила SHA-256 и размер всех 9 JSON-файлов, source/image bindings, schema, порядок, timestamps и previous-hash chain records `0001`–`0005`. Record `0004` содержит live deployment; `0005` — успешный публичный smoke и hashes reports. [Release assets](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-0f6768676f50bc53a7a65dd7df24e6cb9508d5ff) сохраняются; прошлые образы и reports не удалялись. Эта сверка не запускала повторный lifecycle, reset или deployment. Локальный ignored отчёт — `.quality-results/portfolio-release-audit-0f6768676f50bc53a7a65dd7df24e6cb9508d5ff/audit-summary.json`.
+
+Адресная проверка публичной страницы 2 октября: `/about`, `/health/live`, `/health/ready` и `/api/openapi.json` вернули HTTP 200, OpenAPI подтвердил exact source. В браузере 8/8 проверок без skipped/flaky прошли за 17,2 секунды на desktop 1440×1000 и mobile 390×844: `/about` и `/about/` без сессии/API, переход из демо при недоступном API, восстановление реальной серверной роли мастера после посещения кейса. Ссылки и видимый авторский блок проверены; визуально просмотрены desktop и mobile снимки, переполнений и обрезанных блоков не найдено. Проверка страницы не выполняла производственные команды и reset; mobile capture зафиксировал 0 API-запросов. Локальные ignored reports — `.quality-results/portfolio-public-about/`.
+
+Публичные данные остаются синтетическими и общими для посетителей; сон сервиса, бесплатные квоты и ограничения процесса сохраняются. Новые результаты не являются внедрением на заводе, измеренным бизнес-эффектом, зарплатной интеграцией или rollback drill. Следующие правки только документации не требуют новой сборки: runtime source закреплён в manifest, даже если Git SHA документов отличается.
+
 ## Обновление демо 2026-09-29
+
+**D-034 завершено 1 октября 2026 года:** на эту дату существующий публичный сервис работал на image приложения `a5d6302…`. Полный [deployment 36901516374](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36901516374) прошёл 7/7 jobs; staging, публичный smoke, журналы и фактический digest подтверждены. Прежнее решение D-033 заменено; итоговый статус и ограничения приведены ниже.
 
 Работа выполняется по D-034 в [[decision-log]] в отдельном чистом checkout от `bdb2647520639b9ca690dfd6d00402076463a63a`. Исходная папка с чужими незакоммиченными изменениями не изменялась. [PR #17](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/17) объединён, фактический main и все семь jobs [CI 36544788733](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36544788733) сверены через GitHub.
 

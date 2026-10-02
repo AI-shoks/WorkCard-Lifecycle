@@ -1,12 +1,26 @@
 ---
 artifact_id: engineering.quality-gates
 status: accepted
-version: 35
+version: 36
 owner: engineering
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # Quality Gates
+
+## Представление портфолио 2026-10-02
+
+[PR #24](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/24) и [PR #25](https://github.com/AI-shoks/WorkCard-Lifecycle/pull/25) объединили короткий вход для рекрутера, публичную страницу кейса с согласованным авторским блоком и уточнение допуска после первой детали. Source приложения `0f6768676f50bc53a7a65dd7df24e6cb9508d5ff` получил [main CI 36973663549](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36973663549), 7/7 jobs success. Это полный CI того же source, который передан штатному release.
+
+[Release 36974161603](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36974161603) завершил 2/2 jobs: одна сборка и публичный image `sha256:c8862cc212b257d4ab17682ea951fefcd27999d67d4e6a24509e61dee70a33ff`, Trivy HIGH/CRITICAL=0. [Manifest](../release/manifests/0f6768676f50bc53a7a65dd7df24e6cb9508d5ff.json), scan и release archive из [GitHub Release](https://github.com/AI-shoks/WorkCard-Lifecycle/releases/tag/work-card-0f6768676f50bc53a7a65dd7df24e6cb9508d5ff) прошли штатный `fetch-release.mjs`: archive checksum, manifest/scan и CI/release bindings совпадают. История SQL-миграций не менялась; migration checksum `sha256:26c4573a527c8748a0cd837b844c433fdb4dc8a5ee599dbab7a3060c3a0357cd` сохранён.
+
+[Deploy 36974423462](https://github.com/AI-shoks/WorkCard-Lifecycle/actions/runs/36974423462), attempt 1, прошёл 7/7 jobs на том же source/digest. Отчёты staging и публичного демо подтверждают canonical `112 → 3 → 250`, три допуска первой детали, `250/250` закрытий, отдельную финальную приёмку, audit `254/254`, payroll read-back и `429` после 30 успешных session requests. Full Render observations: 49/49 request IDs, independent client IP, peer allowlist, severity и redaction — PASS. Live deploy `dep-davliifavr4c73ch2lo0` связал persistent/resolved image с digest `c8862cc2…`; previous image `61d4cec3…` сохранён.
+
+Независимая read-only сверка новых durable assets подтвердила hashes и размеры 9 JSON-файлов, schemas/source/image bindings и previous-hash/timestamp chain records `0001`–`0005`. Ни lifecycle, ни health, ни reset/deploy при этой сверке не повторялись. Подробности и обычные ссылки на reports — в [отчёте размещения](../release/deployment.md#представление-портфолио-2026-10-02). Production owner log подтвердил `operation=release`; нового прямого DB чтения reset timestamp не было. Результаты приложения `a5d6302…` ниже сохраняют собственную дату и окружение.
+
+Публичная страница «О проекте» отдельно прошла 8/8 браузерных проверок на desktop 1440×1000 и mobile 390×844; skipped/flaky — 0, длительность — 17,2 секунды. Проверены `/about` и `/about/` без сессии/API, навигация из демо при недоступном API, ссылки и возврат к фактической серверной роли мастера. `/about`, liveness, readiness и OpenAPI вернули 200; OpenAPI подтвердил source `0f67686…`. Desktop и mobile снимки визуально просмотрены без найденного переполнения или обрезания блоков; mobile capture зафиксировал 0 API-запросов. Проверка не выполняла производственные команды и reset. Локальные ignored reports — `.quality-results/portfolio-public-about/`.
+
+Вспомогательный [статический прототип](../ux/prototype.html) проверен отдельно, без API и команд БД: `window.runUxCopyAudit()` прошёл 14 экранов и 70 ролевых вариантов; все 14 шагов просмотрены на desktop и mobile. Визуальная сверка выявила два предшествующих дефекта прототипа: длинная мобильная метка паспорта выходит за ячейку, а раскрытое описание преждевременной финальной приёмки сохраняет текст готового состояния при корректных 2/3, 249/250 и заблокированном основном действии. Эти замечания не относятся к runtime-приложению или новой странице кейса; прототип не менялся. Локальный ignored report — `.quality-results/portfolio-prototype/report.json`.
 
 ## Новая версия приложения — 2026-10-01
 
