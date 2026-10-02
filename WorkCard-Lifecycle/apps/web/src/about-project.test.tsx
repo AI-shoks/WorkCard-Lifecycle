@@ -71,6 +71,29 @@ describe('публичная страница проекта', () => {
     expect(container.textContent).toContain('Проверка отката не выполнена');
   });
 
+  it('разделяет согласованные личный вклад и помощь ИИ и показывает публичный контакт', async () => {
+    await openPage();
+    const author = container.querySelector('#project-author');
+    const text = author?.textContent?.replace(/\s+/g, ' ').trim();
+
+    expect(text).toContain('Артём');
+    expect([...author!.querySelectorAll('h3')].map((heading) => heading.textContent)).toEqual([
+      'Мой вклад',
+      'Как использовал ИИ',
+    ]);
+    expect(text).toContain('Направление — системный и бизнес-анализ.');
+    expect(text).toContain(
+      'Исследование процесса, постановка задачи, требования, модель и проверка результата.',
+    );
+    expect(text).toContain(
+      'ИИ помогал готовить документацию, код и проверки; решения и итоговый результат я оценивал сам.',
+    );
+    expect(author?.querySelector('a[href="https://t.me/AIShokstg"]')?.textContent).toContain(
+      '@AIShokstg',
+    );
+    expect(author?.querySelectorAll('a[href]')).toHaveLength(3);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('начинает штатную подготовку сессии только при переходе к рабочему демо', async () => {
     await openPage();
     await clickLink('/batches');

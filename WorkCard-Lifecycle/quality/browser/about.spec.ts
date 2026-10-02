@@ -33,6 +33,18 @@ for (const pathname of ['/about', '/about/']) {
       /\/WorkCard-Lifecycle\/README\.md$/,
     );
     await expect(page.getByRole('heading', { name: 'Артём', exact: true })).toBeVisible();
+    const author = page.locator('#project-author');
+    await expect(author).toContainText('Направление — системный и бизнес-анализ.');
+    await expect(author.getByRole('heading', { name: 'Мой вклад', exact: true })).toBeVisible();
+    await expect(author).toContainText(
+      'Исследование процесса, постановка задачи, требования, модель и проверка результата.',
+    );
+    await expect(
+      author.getByRole('heading', { name: 'Как использовал ИИ', exact: true }),
+    ).toBeVisible();
+    await expect(author).toContainText(
+      'ИИ помогал готовить документацию, код и проверки; решения и итоговый результат я оценивал сам.',
+    );
     await expect(
       page.getByRole('link', { name: 'Связаться в Telegram · @AIShokstg', exact: true }),
     ).toHaveAttribute('href', 'https://t.me/AIShokstg');
